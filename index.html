@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SlipSpark TV</title>
+  <link rel="stylesheet" href="receiver.css">
+  <script src="https://www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>
+</head>
+<body>
+  <main id="app" data-screen="ready" data-phase="ready" aria-live="polite">
+    <div class="ambient ambient-one"></div>
+    <div class="ambient ambient-two"></div>
+    <div class="arena-lines" aria-hidden="true">
+      <i></i><i></i><i></i>
+    </div>
+
+    <section id="ready-screen" class="screen ready-screen">
+      <div class="brand-mark" aria-label="SlipSpark">
+        <span class="brand-bolt">ϟ</span>
+        <span>SLIPSPARK</span>
+      </div>
+      <div class="ready-status"><span class="status-dot"></span> TV READY</div>
+      <h1>Choose a fight<br>on your iPhone</h1>
+      <p>Keep the iPhone facing you. Its camera remains your controller.</p>
+    </section>
+
+    <section id="positioning-screen" class="screen positioning-screen" hidden>
+      <header class="positioning-header">
+        <span class="eyebrow">CAMERA STAYS ON IPHONE</span>
+        <h1 id="positioning-title">FIT YOUR UPPER BODY IN THE FRAME</h1>
+      </header>
+      <div id="positioning-frame" class="positioning-frame">
+        <svg id="pose-skeleton" viewBox="0 0 400 640" aria-hidden="true">
+          <g class="skeleton-lines">
+            <line data-bone="nose-neck" x1="200" y1="118" x2="200" y2="172"></line>
+            <line data-bone="neck-leftShoulder" x1="200" y1="172" x2="132" y2="208"></line>
+            <line data-bone="neck-rightShoulder" x1="200" y1="172" x2="268" y2="208"></line>
+            <line data-bone="leftShoulder-leftElbow" x1="132" y1="208" x2="92" y2="320"></line>
+            <line data-bone="leftElbow-leftWrist" x1="92" y1="320" x2="142" y2="250"></line>
+            <line data-bone="rightShoulder-rightElbow" x1="268" y1="208" x2="308" y2="320"></line>
+            <line data-bone="rightElbow-rightWrist" x1="308" y1="320" x2="258" y2="250"></line>
+            <line data-bone="neck-root" x1="200" y1="172" x2="200" y2="430"></line>
+            <line data-bone="root-leftHip" x1="200" y1="430" x2="155" y2="470"></line>
+            <line data-bone="root-rightHip" x1="200" y1="430" x2="245" y2="470"></line>
+          </g>
+          <g class="skeleton-joints">
+            <circle data-joint="nose" cx="200" cy="118" r="18"></circle>
+            <circle data-joint="neck" cx="200" cy="172" r="9"></circle>
+            <circle data-joint="leftShoulder" cx="132" cy="208" r="9"></circle>
+            <circle data-joint="rightShoulder" cx="268" cy="208" r="9"></circle>
+            <circle data-joint="leftElbow" cx="92" cy="320" r="9"></circle>
+            <circle data-joint="rightElbow" cx="308" cy="320" r="9"></circle>
+            <circle data-joint="leftWrist" cx="142" cy="250" r="12"></circle>
+            <circle data-joint="rightWrist" cx="258" cy="250" r="12"></circle>
+            <circle data-joint="root" cx="200" cy="430" r="9"></circle>
+            <circle data-joint="leftHip" cx="155" cy="470" r="9"></circle>
+            <circle data-joint="rightHip" cx="245" cy="470" r="9"></circle>
+          </g>
+        </svg>
+      </div>
+      <div id="positioning-status" class="bottom-chip">TRACKING FROM IPHONE</div>
+    </section>
+
+    <section id="fight-screen" class="screen fight-screen" hidden>
+      <header class="hud">
+        <div class="score-card">
+          <strong id="score">0</strong>
+          <span id="combo"></span>
+        </div>
+        <div class="health-card">
+          <div class="health-row"><span>YOU</span><div class="health-track"><i id="player-health"></i></div></div>
+          <div class="health-row opponent-health"><span id="opponent-name">AGGRESSOR</span><div class="health-track"><i id="opponent-health"></i></div></div>
+        </div>
+        <div class="timer-card">
+          <strong id="timer">1:00</strong>
+          <span id="round"></span>
+        </div>
+      </header>
+
+      <div class="fighters" aria-hidden="true">
+        <div id="player-figure" class="fighter player-figure pose-neutral">
+          <i class="head"></i><i class="torso"></i><i class="arm arm-left"></i><i class="arm arm-right"></i>
+        </div>
+        <div id="opponent-figure" class="fighter opponent-figure style-aggressor">
+          <i class="head"></i><i class="torso"></i><i class="arm arm-left"></i><i class="arm arm-right"></i>
+        </div>
+        <div id="incoming-glove" class="incoming-glove"><span></span></div>
+        <div id="punch-target" class="punch-target"><span>●</span></div>
+      </div>
+
+      <div id="action-callout" class="action-callout" hidden>
+        <strong id="action-title"></strong>
+        <span id="action-detail"></span>
+      </div>
+
+      <footer class="tracking-footer">TRACKED BY THE IPHONE CAMERA</footer>
+    </section>
+  </main>
+
+  <script src="receiver-core.js"></script>
+  <script src="receiver.js"></script>
+</body>
+</html>
