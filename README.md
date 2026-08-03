@@ -2,7 +2,7 @@
 
 This static receiver renders positioning and fight state on Chromecast and Google TV. The iPhone remains the only camera and motion controller; messages contain normalized pose coordinates and deterministic game state, never frames.
 
-Production URL: `https://mayankpahadia1993.github.io/slipspark/`
+Production URL: `https://mayankpahadia1993.github.io/slipspark-cast/`
 
 Local preview:
 
