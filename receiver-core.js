@@ -5,7 +5,7 @@
 })(typeof globalThis !== "undefined" ? globalThis : this, function () {
   "use strict";
 
-  const validScreens = new Set(["ready", "positioning", "fight"]);
+  const validScreens = new Set(["ready", "positioning", "fight", "arcadePositioning", "arcade"]);
   const validPhases = new Set([
     "ready", "countdown", "telegraph", "defend", "counter", "opening",
     "feedback", "trackingPaused", "roundBreak", "finished"
@@ -19,6 +19,12 @@
     "straight", "leftHook", "rightHook", "body", "doubleStraight", "highLow",
     "lowHigh", "delayed", "feint"
   ]);
+  const validArcadePhases = new Set([
+    "ready", "countdown", "telegraph", "active", "counter", "feedback",
+    "trackingPaused", "finished"
+  ]);
+  const validGames = new Set(["swordDuel", "goalkeeper", "tennis"]);
+  const validHands = new Set(["left", "right"]);
   const jointNames = [
     "nose", "neck", "leftShoulder", "rightShoulder", "leftElbow", "rightElbow",
     "leftWrist", "rightWrist", "root", "leftHip", "rightHip"
@@ -64,19 +70,38 @@
     const value = input && typeof input === "object" ? input : {};
     const screen = validScreens.has(value.screen) ? value.screen : "ready";
     const normalized = {
-      schemaVersion: number(value.schemaVersion, 1),
+      schemaVersion: number(value.schemaVersion, 2),
       sequence: Math.max(0, Math.floor(number(value.sequence, 0))),
       screen,
       positioning: null,
-      fight: null
+      fight: null,
+      arcade: null
     };
 
-    if (screen === "positioning") {
+    if (screen === "positioning" || screen === "arcadePositioning") {
       const positioning = value.positioning && typeof value.positioning === "object" ? value.positioning : {};
       normalized.positioning = {
         isReady: positioning.isReady === true,
         instruction: boundedString(positioning.instruction, "Fit your upper body in the frame", 160),
-        joints: normalizeJoints(positioning.joints)
+        joints: normalizeJoints(positioning.joints),
+        gameID: screen === "arcadePositioning"
+          ? allowedString(positioning.gameID, validGames, "swordDuel")
+          : null
+      };
+    }
+
+    if (screen === "arcade") {
+      const arcade = value.arcade && typeof value.arcade === "object" ? value.arcade : {};
+      normalized.arcade = {
+        gameID: allowedString(arcade.gameID, validGames, "swordDuel"),
+        phase: allowedString(arcade.phase, validArcadePhases, "ready"),
+        phaseValue: arcade.phaseValue == null ? null : boundedString(arcade.phaseValue, "", 80),
+        phaseDetail: arcade.phaseDetail == null ? null : boundedString(arcade.phaseDetail, "", 160),
+        score: Math.floor(clamp(arcade.score, 0, 999999999)),
+        streak: Math.floor(clamp(arcade.streak, 0, 999)),
+        timeRemaining: Math.floor(clamp(arcade.timeRemaining, 0, 3600)),
+        handedness: allowedString(arcade.handedness, validHands, "right"),
+        playerAction: allowedString(arcade.playerAction, validActions, "neutral")
       };
     }
 
@@ -118,10 +143,32 @@
   function sampleState(kind) {
     if (kind === "positioning") {
       return normalizeState({
-        schemaVersion: 1,
+        schemaVersion: 2,
         sequence: 2,
         screen: "positioning",
-        positioning: { isReady: false, instruction: "Fit your upper body in the frame", joints: {} }
+        positioning: { isReady: false, instruction: "Fit your upper body in the frame", joints: {}, gameID: null }
+      });
+    }
+
+    if (kind === "arcadePositioning") {
+      return normalizeState({
+        schemaVersion: 2,
+        sequence: 3,
+        screen: "arcadePositioning",
+        positioning: { isReady: false, instruction: "Fit your upper body and hands in the frame", joints: {}, gameID: "tennis" }
+      });
+    }
+
+    if (["swordDuel", "goalkeeper", "tennis"].includes(kind)) {
+      return normalizeState({
+        schemaVersion: 2,
+        sequence: 12,
+        screen: "arcade",
+        arcade: {
+          gameID: kind, phase: "active", phaseValue: kind === "goalkeeper" ? "HIGH LEFT" : "FOREHAND",
+          phaseDetail: "MOVE NOW", score: 2480, streak: 4, timeRemaining: 38,
+          handedness: "right", playerAction: "neutral"
+        }
       });
     }
 
@@ -135,7 +182,7 @@
     };
     const phase = phaseMap[kind] || phaseMap.fight;
     return normalizeState({
-      schemaVersion: 1,
+      schemaVersion: 2,
       sequence: 10,
       screen: "fight",
       fight: {

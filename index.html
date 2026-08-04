@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>SlipSpark TV</title>
+  <title>Bodycade TV</title>
   <link rel="stylesheet" href="receiver.css">
   <script src="https://www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>
 </head>
@@ -16,12 +16,12 @@
     </div>
 
     <section id="ready-screen" class="screen ready-screen">
-      <div class="brand-mark" aria-label="SlipSpark">
-        <span class="brand-bolt">ϟ</span>
-        <span>SLIPSPARK</span>
+      <div class="brand-mark" aria-label="Bodycade">
+        <span class="brand-bolt">B</span>
+        <span>BODYCADE</span>
       </div>
       <div class="ready-status"><span class="status-dot"></span> TV READY</div>
-      <h1>Choose a fight<br>on your iPhone</h1>
+      <h1>Choose a game<br>on your iPhone</h1>
       <p>Keep the iPhone facing you. Its camera remains your controller.</p>
     </section>
 
@@ -95,6 +95,30 @@
       </div>
 
       <footer class="tracking-footer">TRACKED BY THE IPHONE CAMERA</footer>
+    </section>
+
+    <section id="arcade-screen" class="screen arcade-screen" hidden>
+      <header class="arcade-hud">
+        <div class="arcade-stat"><span>SCORE</span><strong id="arcade-score">0</strong></div>
+        <div class="arcade-title"><span id="arcade-game-name">SWORD DUEL</span><strong id="arcade-timer">1:00</strong></div>
+        <div class="arcade-stat"><span>STREAK</span><strong id="arcade-streak">0</strong></div>
+      </header>
+
+      <div id="arcade-playfield" class="arcade-playfield" data-game="swordDuel" aria-hidden="true">
+        <div class="arcade-goal"></div>
+        <div class="arcade-net"></div>
+        <div class="arcade-tool tool-left"></div>
+        <div class="arcade-tool tool-right"></div>
+        <div class="arcade-orb"></div>
+        <div class="arcade-target"></div>
+      </div>
+
+      <div id="arcade-callout" class="action-callout arcade-callout">
+        <strong id="arcade-action-title"></strong>
+        <span id="arcade-action-detail"></span>
+      </div>
+
+      <footer class="tracking-footer">YOUR BODY IS THE CONTROLLER</footer>
     </section>
   </main>
 
