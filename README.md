@@ -1,4 +1,4 @@
-# Bodycade Custom Web Receiver
+# FitArcade Custom Web Receiver
 
 This static receiver renders positioning plus Boxing, Sword Duel, Goalkeeper, and Tennis Rally state on Chromecast and Google TV. The iPhone remains the only camera and motion controller; messages contain normalized pose coordinates and deterministic game state, never frames.
 
