@@ -7,7 +7,6 @@
   const readyScreen = document.getElementById("ready-screen");
   const positioningScreen = document.getElementById("positioning-screen");
   const fightScreen = document.getElementById("fight-screen");
-  const arcadeScreen = document.getElementById("arcade-screen");
 
   function text(id, value) {
     document.getElementById(id).textContent = value == null ? "" : String(value);
@@ -49,24 +48,9 @@
   function renderPositioning(positioning) {
     const isReady = positioning.isReady;
     text("positioning-title", positioning.instruction.toUpperCase());
-    text("positioning-status", isReady ? `✓ STARTING ${positioning.gameID ? "GAME" : "FIGHT"}…` : "TRACKING FROM IPHONE");
+    text("positioning-status", isReady ? "✓ STARTING FIGHT…" : "TRACKING FROM IPHONE");
     document.getElementById("positioning-frame").classList.toggle("is-ready", isReady);
     renderSkeleton(positioning.joints || {});
-  }
-
-  function renderArcade(arcade) {
-    const gameNames = { swordDuel: "SWORD DUEL", goalkeeper: "GOALKEEPER", tennis: "TENNIS RALLY" };
-    arcadeScreen.dataset.game = arcade.gameID;
-    document.getElementById("arcade-playfield").dataset.game = arcade.gameID;
-    text("arcade-game-name", gameNames[arcade.gameID] || "BODYCADE");
-    text("arcade-score", arcade.score.toLocaleString("en-US"));
-    text("arcade-streak", arcade.streak);
-    text("arcade-timer", core.formatTime(arcade.timeRemaining));
-    text("arcade-action-title", (arcade.phaseValue || "").toUpperCase());
-    text("arcade-action-detail", arcade.phaseDetail || "");
-    const callout = document.getElementById("arcade-callout");
-    callout.className = `action-callout arcade-callout phase-${arcade.phase}`;
-    setVisible(callout, arcade.phase !== "finished" || Boolean(arcade.phaseValue));
   }
 
   function renderFight(fight) {
@@ -113,17 +97,14 @@
   function render(rawState) {
     const state = core.normalizeState(rawState);
     window.__slipsparkReceiverState = state;
-    window.__bodycadeReceiverState = state;
     app.dataset.screen = state.screen;
     app.dataset.sequence = String(state.sequence);
-    app.dataset.phase = state.fight ? state.fight.phase : (state.arcade ? state.arcade.phase : state.screen);
+    app.dataset.phase = state.fight ? state.fight.phase : state.screen;
     setVisible(readyScreen, state.screen === "ready");
-    setVisible(positioningScreen, state.screen === "positioning" || state.screen === "arcadePositioning");
+    setVisible(positioningScreen, state.screen === "positioning");
     setVisible(fightScreen, state.screen === "fight");
-    setVisible(arcadeScreen, state.screen === "arcade");
     if (state.positioning) renderPositioning(state.positioning);
     if (state.fight) renderFight(state.fight);
-    if (state.arcade) renderArcade(state.arcade);
   }
 
   const preview = new URLSearchParams(window.location.search).get("preview");
@@ -137,8 +118,8 @@
     options.customNamespaces[NAMESPACE] = window.cast.framework.system.MessageType.JSON;
     options.disableIdleTimeout = true;
     options.skipPlayersLoad = true;
-    options.statusText = "Bodycade is ready";
-    context.setApplicationState("Bodycade is ready");
+    options.statusText = "SlipSpark is ready";
+    context.setApplicationState("SlipSpark is ready");
     context.start(options);
   }
 })();
