@@ -58,7 +58,7 @@
     const gameNames = { swordDuel: "SWORD DUEL", goalkeeper: "GOALKEEPER", tennis: "TENNIS RALLY" };
     arcadeScreen.dataset.game = arcade.gameID;
     document.getElementById("arcade-playfield").dataset.game = arcade.gameID;
-    text("arcade-game-name", gameNames[arcade.gameID] || "FITARCADE");
+    text("arcade-game-name", gameNames[arcade.gameID] || "BODYCADE");
     text("arcade-score", arcade.score.toLocaleString("en-US"));
     text("arcade-streak", arcade.streak);
     text("arcade-timer", core.formatTime(arcade.timeRemaining));
@@ -113,7 +113,7 @@
   function render(rawState) {
     const state = core.normalizeState(rawState);
     window.__slipsparkReceiverState = state;
-    window.__fitArcadeReceiverState = state;
+    window.__bodycadeReceiverState = state;
     app.dataset.screen = state.screen;
     app.dataset.sequence = String(state.sequence);
     app.dataset.phase = state.fight ? state.fight.phase : (state.arcade ? state.arcade.phase : state.screen);
@@ -137,8 +137,8 @@
     options.customNamespaces[NAMESPACE] = window.cast.framework.system.MessageType.JSON;
     options.disableIdleTimeout = true;
     options.skipPlayersLoad = true;
-    options.statusText = "FitArcade is ready";
-    context.setApplicationState("FitArcade is ready");
+    options.statusText = "Bodycade is ready";
+    context.setApplicationState("Bodycade is ready");
     context.start(options);
   }
 })();
