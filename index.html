@@ -96,6 +96,78 @@
 
       <footer class="tracking-footer">TRACKED BY THE IPHONE CAMERA</footer>
     </section>
+
+    <section id="cricket-screen" class="screen game-board cricket-screen" hidden>
+      <header class="board-hud">
+        <div class="board-score"><strong id="cricket-runs">0</strong><span>RUNS</span></div>
+        <div class="board-center"><strong id="cricket-chase"></strong><span id="cricket-ball">BALL 1/12</span></div>
+        <div class="board-score"><strong id="cricket-wickets">0/3</strong><span>WICKETS</span></div>
+      </header>
+      <div class="pitch-art" aria-hidden="true"><i></i><span>●</span></div>
+      <div class="board-callout"><strong id="cricket-title"></strong><span id="cricket-detail"></span></div>
+      <footer class="tracking-footer">TRACKED BY THE IPHONE CAMERA</footer>
+    </section>
+
+    <section id="versus-setup-screen" class="screen setup-board" hidden>
+      <span class="eyebrow">CAMERA STAYS ON IPHONE</span>
+      <h1 id="versus-setup-title">STAND SIDE BY SIDE</h1>
+      <div class="corner-guides">
+        <div id="red-corner-guide" class="corner-guide red"><strong>RED CORNER</strong><span>STEP IN</span></div>
+        <div id="blue-corner-guide" class="corner-guide blue"><strong>BLUE CORNER</strong><span>STEP IN</span></div>
+      </div>
+      <div id="versus-setup-status" class="bottom-chip">ONE FIGHTER IN EACH FRAME</div>
+    </section>
+
+    <section id="versus-screen" class="screen game-board versus-screen" hidden>
+      <header class="duel-hud">
+        <div class="corner-score red"><span>RED</span><strong id="versus-left-score">0</strong><div class="health-track"><i id="versus-left-health"></i></div></div>
+        <div class="duel-timer" id="versus-timer">1:00</div>
+        <div class="corner-score blue"><span>BLUE</span><strong id="versus-right-score">0</strong><div class="health-track"><i id="versus-right-health"></i></div></div>
+      </header>
+      <div class="versus-figures" aria-hidden="true"><i id="versus-left-figure" class="versus-figure red pose-neutral"></i><i id="versus-right-figure" class="versus-figure blue pose-neutral"></i></div>
+      <div class="board-callout"><strong id="versus-title"></strong><span id="versus-detail"></span></div>
+      <div class="corner-feedback"><span id="versus-left-feedback"></span><span id="versus-right-feedback"></span></div>
+      <footer class="tracking-footer">TWO PLAYERS · ONE IPHONE CAMERA</footer>
+    </section>
+
+    <section id="result-screen" class="screen scorecard-screen" hidden>
+      <span id="result-mode" class="eyebrow">FIGHT</span>
+      <h1 id="result-headline">YOU WIN</h1>
+      <strong id="result-score" class="hero-score">0</strong>
+      <span id="result-caption" class="score-caption">FINAL SCORE</span>
+      <div id="result-stats" class="result-stats"></div>
+      <p>Raise both hands to go again · Results saved on your iPhone</p>
+    </section>
+
+    <section id="versus-result-screen" class="screen scorecard-screen" hidden>
+      <span class="eyebrow">1V1 FIGHT</span>
+      <h1 id="versus-result-headline">DRAW</h1>
+      <span id="versus-result-detail" class="score-caption">RUN IT BACK</span>
+      <div class="versus-result-grid">
+        <div id="versus-result-left" class="result-corner red"><span>RED CORNER</span><strong id="versus-result-left-score">0</strong><small id="versus-result-left-stats"></small></div>
+        <div id="versus-result-right" class="result-corner blue"><span>BLUE CORNER</span><strong id="versus-result-right-score">0</strong><small id="versus-result-right-stats"></small></div>
+      </div>
+      <p>Raise both hands for a rematch</p>
+    </section>
+
+    <section id="duel-handoff-screen" class="screen scorecard-screen" hidden>
+      <span class="eyebrow">INNINGS BREAK</span>
+      <h1>PLAYER 2 — YOUR CHASE</h1>
+      <strong id="duel-target" class="hero-score">1</strong>
+      <span id="duel-rules" class="score-caption"></span>
+      <p>Raise both hands at the crease to begin</p>
+    </section>
+
+    <section id="duel-result-screen" class="screen scorecard-screen" hidden>
+      <span class="eyebrow">CHASE DUEL</span>
+      <h1 id="duel-result-headline">TIED</h1>
+      <span id="duel-result-margin" class="score-caption">SCORES LEVEL</span>
+      <div class="versus-result-grid">
+        <div id="duel-result-first" class="result-corner"><span>PLAYER 1</span><strong id="duel-result-first-score">0</strong><small id="duel-result-first-wickets"></small></div>
+        <div id="duel-result-second" class="result-corner"><span>PLAYER 2</span><strong id="duel-result-second-score">0</strong><small id="duel-result-second-wickets"></small></div>
+      </div>
+      <p>Raise both hands for another duel</p>
+    </section>
   </main>
 
   <script src="receiver-core.js"></script>
