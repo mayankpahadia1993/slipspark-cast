@@ -206,8 +206,8 @@
     options.customNamespaces[NAMESPACE] = window.cast.framework.system.MessageType.JSON;
     options.disableIdleTimeout = true;
     options.skipPlayersLoad = true;
-    options.statusText = "SlipSpark is ready";
-    context.setApplicationState("SlipSpark is ready");
+    options.statusText = "Rallycade is ready";
+    context.setApplicationState("Rallycade is ready");
     context.start(options);
   }
 })();
