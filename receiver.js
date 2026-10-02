@@ -201,9 +201,25 @@
   if (!preview && window.cast && window.cast.framework) {
     const context = window.cast.framework.CastReceiverContext.getInstance();
     context.addCustomMessageListener(NAMESPACE, (event) => render(core.parseMessage(event.data)));
+    // The phone's own picture, when it streams one; the scoreboard above
+    // stays underneath as the fallback.
+    const videoModule = window.RallycadeReceiverVideo;
+    let videoSender = null;
+    const player = videoModule && videoModule.createPlayer(
+      document.getElementById("stream"),
+      (message) => { if (videoSender) context.sendCustomMessage(videoModule.NAMESPACE, videoSender, message); },
+      (isLive) => { document.body.dataset.video = isLive ? "on" : "off"; }
+    );
+    if (player) {
+      context.addCustomMessageListener(videoModule.NAMESPACE, (event) => {
+        videoSender = event.senderId;
+        player.handle(event.data);
+      });
+    }
     const options = new window.cast.framework.CastReceiverOptions();
     options.customNamespaces = {};
     options.customNamespaces[NAMESPACE] = window.cast.framework.system.MessageType.JSON;
+    if (videoModule) options.customNamespaces[videoModule.NAMESPACE] = window.cast.framework.system.MessageType.JSON;
     options.disableIdleTimeout = true;
     options.skipPlayersLoad = true;
     options.statusText = "Rallycade is ready";

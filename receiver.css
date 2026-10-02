@@ -180,3 +180,17 @@ body { font-family: Inter, "Google Sans", system-ui, sans-serif; color: var(--pa
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; }
 }
+
+/* The phone's streamed picture covers the scoreboard while it is live. */
+#stream {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  object-fit: contain;
+  background: #000;
+  display: none;
+  z-index: 10;
+}
+body[data-video="on"] #stream { display: block; }
+body[data-video="on"] #app { visibility: hidden; }
