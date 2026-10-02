@@ -11,20 +11,26 @@
   // the stream's timeline, so playback shows each one as it arrives.
   const NAMESPACE = "urn:x-cast:com.slipspark.video";
   /// Reported to the phone so its log says which receiver the TV loaded.
-  const VERSION = "30";
+  const VERSION = "31";
   /// How often the receiver tells the phone what it sees (milliseconds).
   const STATS_EVERY = 3000;
   // How a Chromecast plays a live picture (measured on a Chromecast Ultra):
   // its player starts only once it holds about a second of picture, and a
   // jump makes it gather that second again, so jumping early or often keeps
   // it from ever showing a frame. It is left alone until it plays; then it
-  // runs a little fast until it trails the newest frame by TARGET_BEHIND,
-  // which it sustains smoothly (about 0.25 s on average).
-  const TARGET_BEHIND = 0.15;
+  // runs a little fast until it trails the newest frame by about
+  // TARGET_BEHIND. Closer than that, a frame that arrives a little late
+  // empties its buffer and it stops for a second to gather another, so it
+  // eases off instead (0.15 s gave such a stop every 10-15 s; 0.25 s none
+  // in a 30 s run).
+  const TARGET_BEHIND = 0.25;
   /// Catch up while more than this past the target, until within CATCH_UP_UNTIL.
   const CATCH_UP_ABOVE = 0.15;
   const CATCH_UP_UNTIL = 0.05;
   const CATCH_UP_RATE = 1.15;
+  /// Ease off while this far short of the target, until back on it.
+  const EASE_BELOW = 0.1;
+  const EASE_RATE = 0.95;
   /// Catching up this long without getting closer means the TV holds that
   /// delay itself: stop trying for CATCH_UP_PAUSE (seconds).
   const CATCH_UP_GIVE_UP = 8;
@@ -92,12 +98,14 @@
     cooldown: JUMP_COOLDOWN, target: TARGET_BEHIND, speed: CATCH_UP_RATE
   };
 
-  /// Playback speed: a little faster while well past the target, normal
-  /// once close.
+  /// Playback speed: a little faster while well past the target, a little
+  /// slower while well short of it, normal once back on it.
   function catchUpRate(behind, target, currentRate) {
     const extra = behind - (Number.isFinite(target) ? target : TARGET_BEHIND);
     if (extra > CATCH_UP_ABOVE) return CATCH_UP_RATE;
-    if (extra < CATCH_UP_UNTIL) return 1;
+    if (extra < -EASE_BELOW) return EASE_RATE;
+    if (currentRate > 1 && extra < CATCH_UP_UNTIL) return 1;
+    if (currentRate < 1 && extra >= 0) return 1;
     return currentRate;
   }
 
