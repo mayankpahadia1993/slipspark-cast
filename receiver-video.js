@@ -11,7 +11,7 @@
   // the stream's timeline, so playback shows each one as it arrives.
   const NAMESPACE = "urn:x-cast:com.slipspark.video";
   /// Reported to the phone so its log says which receiver the TV loaded.
-  const VERSION = "28";
+  const VERSION = "29";
   /// How often the receiver tells the phone what it sees (milliseconds).
   const STATS_EVERY = 3000;
   /// After a jump, play from this far behind the newest frame (seconds).
@@ -79,7 +79,7 @@
 
   /// Playback policy. The phone (or a test bench) can override these in
   /// hello's `x` while the right values for each Chromecast are worked out.
-  const DEFAULT_POLICY = { manage: 1, seek: 1, rate: 1, maxBehind: MAX_BEHIND, cushion: 0, cooldown: 0 };
+  const DEFAULT_POLICY = { manage: 1, seek: 1, rate: 1, maxBehind: MAX_BEHIND, cushion: 0, cooldown: 0, target: 0, speed: CATCH_UP_RATE };
 
   /// The least playback has trailed the newest frame within the window.
   function createFloor(windowSeconds) {
@@ -314,7 +314,8 @@
         } else if (policy.rate) {
           const behind = end - video.currentTime;
           floor.add(Date.now() / 1000, behind);
-          const rate = catchUpRate(behind, floor.value, video.playbackRate);
+          let rate = catchUpRate(behind, policy.target > 0 ? policy.target : floor.value, video.playbackRate);
+          if (rate > 1) rate = policy.speed;
           if (rate !== video.playbackRate) video.playbackRate = rate;
         }
       }
