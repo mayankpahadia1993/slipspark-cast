@@ -11,23 +11,30 @@
   // the stream's timeline, so playback shows each one as it arrives.
   const NAMESPACE = "urn:x-cast:com.slipspark.video";
   /// Reported to the phone so its log says which receiver the TV loaded.
-  const VERSION = "29";
+  const VERSION = "30";
   /// How often the receiver tells the phone what it sees (milliseconds).
   const STATS_EVERY = 3000;
-  /// After a jump, play from this far behind the newest frame (seconds).
-  const LIVE_EDGE = 0.1;
-  /// Every decoder trails the newest frame a little; the least it has
-  /// trailed over this window is what this TV needs.
-  const FLOOR_WINDOW = 6;
-  /// Trailing more than that by this much, play slightly faster until close
-  /// again (only the delay piled up by a hiccup can be caught up; speeding
-  /// into the decoder's own delay just stutters)…
+  // How a Chromecast plays a live picture (measured on a Chromecast Ultra):
+  // its player starts only once it holds about a second of picture, and a
+  // jump makes it gather that second again, so jumping early or often keeps
+  // it from ever showing a frame. It is left alone until it plays; then it
+  // runs a little fast until it trails the newest frame by TARGET_BEHIND,
+  // which it sustains smoothly (about 0.25 s on average).
+  const TARGET_BEHIND = 0.15;
+  /// Catch up while more than this past the target, until within CATCH_UP_UNTIL.
   const CATCH_UP_ABOVE = 0.15;
   const CATCH_UP_UNTIL = 0.05;
-  const CATCH_UP_RATE = 1.25;
-  /// …and further behind than this, jump (decoding from a keyframe costs a
-  /// moment on older Chromecasts, so it is the last resort).
-  const MAX_BEHIND = 1.0;
+  const CATCH_UP_RATE = 1.15;
+  /// Catching up this long without getting closer means the TV holds that
+  /// delay itself: stop trying for CATCH_UP_PAUSE (seconds).
+  const CATCH_UP_GIVE_UP = 8;
+  const CATCH_UP_PAUSE = 30;
+  /// Further behind than this (seconds), jump instead, to JUMP_BACKOFF behind
+  /// the newest frame so the player has a second in hand to restart with;
+  /// at most once every JUMP_COOLDOWN seconds.
+  const MAX_BEHIND = 3.0;
+  const JUMP_BACKOFF = 1.0;
+  const JUMP_COOLDOWN = 10;
   /// Without a frame or keep-alive for this long, the phone has stopped.
   const STALL_SECONDS = 2.5;
   /// Acknowledge every this many frames so the phone knows how far the TV got.
@@ -68,36 +75,27 @@
     return new Uint8Array(Buffer.from(text, "base64"));
   }
 
-  /// Where to jump so playback continues near the newest frame, or null to
-  /// stay. `start` and `end` bound the newest buffered range.
-  function liveSeekTarget(currentTime, start, end, maxBehind) {
+  /// Where to jump, or null to stay. `start` and `end` bound the newest
+  /// buffered range. Stuck before it (frames were lost), go to its start;
+  /// far behind, go to `backoff` behind its end.
+  function liveSeekTarget(currentTime, start, end, maxBehind, backoff) {
     if (!(end > start)) return null;
-    const limit = maxBehind > 0 ? maxBehind : MAX_BEHIND;
-    if (currentTime >= start && end - currentTime <= limit) return null;
-    return Math.max(start, end - LIVE_EDGE);
+    if (currentTime < start) return start;
+    if (end - currentTime <= (maxBehind > 0 ? maxBehind : MAX_BEHIND)) return null;
+    return Math.max(start, end - (backoff >= 0 ? backoff : JUMP_BACKOFF));
   }
 
-  /// Playback policy. The phone (or a test bench) can override these in
-  /// hello's `x` while the right values for each Chromecast are worked out.
-  const DEFAULT_POLICY = { manage: 1, seek: 1, rate: 1, maxBehind: MAX_BEHIND, cushion: 0, cooldown: 0, target: 0, speed: CATCH_UP_RATE };
+  /// Playback policy. A phone (or the test bench) can override any of these
+  /// in hello's `x`, to try other values on a particular TV.
+  const DEFAULT_POLICY = {
+    manage: 1, seek: 1, rate: 1, maxBehind: MAX_BEHIND, backoff: JUMP_BACKOFF,
+    cooldown: JUMP_COOLDOWN, target: TARGET_BEHIND, speed: CATCH_UP_RATE
+  };
 
-  /// The least playback has trailed the newest frame within the window.
-  function createFloor(windowSeconds) {
-    let samples = [];
-    return {
-      add(at, behind) {
-        samples.push({ at, behind });
-        while (samples.length && at - samples[0].at > windowSeconds) samples.shift();
-      },
-      get value() { return samples.reduce((least, sample) => Math.min(least, sample.behind), Infinity); },
-      reset() { samples = []; }
-    };
-  }
-
-  /// Playback speed: a little faster while further behind than the decoder
-  /// needs, normal once close.
-  function catchUpRate(behind, floor, currentRate) {
-    const extra = behind - (Number.isFinite(floor) ? floor : 0);
+  /// Playback speed: a little faster while well past the target, normal
+  /// once close.
+  function catchUpRate(behind, target, currentRate) {
+    const extra = behind - (Number.isFinite(target) ? target : TARGET_BEHIND);
     if (extra > CATCH_UP_ABOVE) return CATCH_UP_RATE;
     if (extra < CATCH_UP_UNTIL) return 1;
     return currentRate;
@@ -131,7 +129,8 @@
     let lastAck = 0;
     let askedForOpeningAt = 0;
     let recoveries = [];
-    const floor = createFloor(FLOOR_WINDOW);
+    let catchUp = null;
+    let catchUpPausedUntil = 0;
     let appended = 0;
     let waitingForKey = 0;
     let lastError = "";
@@ -210,7 +209,7 @@
     /// A fresh player for the stream's opening; frames wait for its keyframe.
     function open(stream) {
       teardown();
-      floor.reset();
+      catchUp = null;
       started = false;
       needKey = true;
       const type = 'video/mp4; codecs="' + stream.codec + '"';
@@ -301,20 +300,35 @@
       const last = ranges.length - 1;
       const start = ranges.start(last);
       const end = ranges.end(last);
-      // Some players need a little picture in hand before they start.
-      if (!started && end - start < policy.cushion) return;
+      const now = Date.now();
       if (policy.manage) {
-        const target = policy.seek ? liveSeekTarget(video.currentTime, start, end, policy.maxBehind) : null;
-        if (target !== null && Date.now() - lastSeekAt >= policy.cooldown * 1000) {
-          lastSeekAt = Date.now();
+        const behind = end - video.currentTime;
+        // Until it plays, the player is gathering its first second of
+        // picture and a jump only makes it start over, unless it is stuck
+        // far behind.
+        const mayJump = started || behind > 2 * policy.maxBehind;
+        const target = policy.seek && mayJump
+          ? liveSeekTarget(video.currentTime, start, end, policy.maxBehind, policy.backoff) : null;
+        if (target !== null && now - lastSeekAt >= policy.cooldown * 1000) {
+          lastSeekAt = now;
           seeks += 1;
+          catchUp = null;
           video.playbackRate = 1;
           video.currentTime = target;
-          floor.reset();
-        } else if (policy.rate) {
-          const behind = end - video.currentTime;
-          floor.add(Date.now() / 1000, behind);
-          let rate = catchUpRate(behind, policy.target > 0 ? policy.target : floor.value, video.playbackRate);
+        } else if (policy.rate && started) {
+          let rate = catchUpRate(behind, policy.target, video.playbackRate);
+          if (rate > 1 && now < catchUpPausedUntil) {
+            rate = 1;
+          } else if (rate > 1 && !catchUp) {
+            catchUp = { since: now, behind };
+          } else if (rate > 1 && now - catchUp.since > CATCH_UP_GIVE_UP * 1000 && behind > catchUp.behind - 0.2) {
+            // Not getting closer: this TV holds that much itself.
+            catchUpPausedUntil = now + CATCH_UP_PAUSE * 1000;
+            catchUp = null;
+            rate = 1;
+          } else if (rate === 1) {
+            catchUp = null;
+          }
           if (rate > 1) rate = policy.speed;
           if (rate !== video.playbackRate) video.playbackRate = rate;
         }
@@ -394,7 +408,7 @@
   }
 
   return {
-    NAMESPACE, VERSION, LIVE_EDGE, MAX_BEHIND, CATCH_UP_ABOVE, CATCH_UP_UNTIL, CATCH_UP_RATE, ACK_EVERY,
-    createAssembler, base64ToBytes, liveSeekTarget, createFloor, catchUpRate, shouldAcknowledge, createPlayer
+    NAMESPACE, VERSION, TARGET_BEHIND, MAX_BEHIND, JUMP_BACKOFF, CATCH_UP_ABOVE, CATCH_UP_UNTIL, CATCH_UP_RATE, ACK_EVERY,
+    createAssembler, base64ToBytes, liveSeekTarget, catchUpRate, shouldAcknowledge, createPlayer
   };
 });
