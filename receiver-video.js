@@ -10,6 +10,10 @@
   // through Media Source Extensions. The phone places frames back to back on
   // the stream's timeline, so playback shows each one as it arrives.
   const NAMESPACE = "urn:x-cast:com.slipspark.video";
+  /// Reported to the phone so its log says which receiver the TV loaded.
+  const VERSION = "27";
+  /// How often the receiver tells the phone what it sees (milliseconds).
+  const STATS_EVERY = 3000;
   /// After a jump, play from this far behind the newest frame (seconds).
   const LIVE_EDGE = 0.1;
   /// Every decoder trails the newest frame a little; the least it has
@@ -99,10 +103,14 @@
     return seq < lastAck || seq - lastAck >= ACK_EVERY;
   }
 
+  function round(value) { return Math.round(value * 1000) / 1000; }
+
   /// Drives a <video> element from stream messages. `send` replies to the
   /// phone on the video namespace; `onLive(isLive)` reports whether the
-  /// stream is showing so the receiver can hide its scoreboard.
-  function createPlayer(video, send, onLive) {
+  /// stream is showing so the receiver can hide its scoreboard;
+  /// `onStatus(text)`, when a TestFlight phone asks for it, shows the
+  /// player's counters on the TV.
+  function createPlayer(video, send, onLive, onStatus) {
     const assemble = createAssembler(base64ToBytes);
     let mediaSource = null;
     let sourceBuffer = null;
@@ -119,6 +127,48 @@
     let askedForOpeningAt = 0;
     let recoveries = [];
     const floor = createFloor(FLOOR_WINDOW);
+    let appended = 0;
+    let waitingForKey = 0;
+    let lastError = "";
+    let lastErrorSentAt = 0;
+    let lastStatsAt = 0;
+    let debug = false;
+
+    /// Tells the phone what went wrong (at most twice a second).
+    function report(where, error) {
+      const message = error && error.name ? error.name + ": " + (error.message || "") : String(error);
+      lastError = where + " " + message;
+      if (Date.now() - lastErrorSentAt < 500) return;
+      lastErrorSentAt = Date.now();
+      send({ t: "error", where, message: message.slice(0, 200) });
+    }
+
+    function snapshot() {
+      const ranges = video.buffered;
+      const end = ranges && ranges.length ? ranges.end(ranges.length - 1) : 0;
+      const quality = video.getVideoPlaybackQuality ? video.getVideoPlaybackQuality() : null;
+      return {
+        rx: received, app: appended, wait: waitingForKey, q: queue.length,
+        open: opening ? 1 : 0, ms: mediaSource ? mediaSource.readyState : "none", sb: sourceBuffer ? 1 : 0,
+        rs: video.readyState, ct: round(video.currentTime || 0), behind: round(end - (video.currentTime || 0)),
+        live: live ? 1 : 0, rate: video.playbackRate, dec: quality ? quality.totalVideoFrames : -1,
+        lost: quality ? quality.droppedVideoFrames : -1, rec: recoveries.length, err: lastError
+      };
+    }
+
+    function shareStatus() {
+      if (!received && !opening && !lastError) return;
+      const stats = snapshot();
+      if (debug && onStatus) {
+        onStatus("TV " + VERSION + " · frames " + stats.rx + " in, " + stats.app + " played · " +
+          (stats.live ? "live" : "not live") + " · behind " + stats.behind.toFixed(2) + " s · decoded " + stats.dec +
+          (stats.err ? " · " + stats.err : ""));
+      }
+      if (Date.now() - lastStatsAt >= STATS_EVERY) {
+        lastStatsAt = Date.now();
+        send(Object.assign({ t: "stats" }, stats));
+      }
+    }
 
     function setLive(value) {
       if (live === value) return;
@@ -154,7 +204,7 @@
       const type = 'video/mp4; codecs="' + stream.codec + '"';
       if (!window.MediaSource || !MediaSource.isTypeSupported(type)) {
         gaveUp = true;
-        send({ t: "unsupported", codec: stream.codec });
+        send({ t: "unsupported", codec: stream.codec, reason: "type not supported" });
         return;
       }
       const source = new MediaSource();
@@ -166,12 +216,17 @@
           const buffer = source.addSourceBuffer(type);
           buffer.mode = "segments";
           buffer.addEventListener("updateend", () => { keepLive(); pump(); });
-          buffer.addEventListener("error", () => { if (sourceBuffer === buffer) recover(); });
+          buffer.addEventListener("error", () => {
+            if (sourceBuffer !== buffer) return;
+            report("sourceBuffer", "error event");
+            recover();
+          });
           sourceBuffer = buffer;
           pump();
         } catch (error) {
+          report("addSourceBuffer", error);
           gaveUp = true;
-          send({ t: "unsupported", codec: stream.codec });
+          send({ t: "unsupported", codec: stream.codec, reason: "addSourceBuffer failed" });
         }
       }, { once: true });
       objectUrl = URL.createObjectURL(source);
@@ -188,7 +243,7 @@
         gaveUp = true;
         teardown();
         setLive(false);
-        send({ t: "unsupported", codec: opening.codec });
+        send({ t: "unsupported", codec: opening.codec, reason: "player kept failing: " + lastError });
         return;
       }
       open(opening);
@@ -204,7 +259,9 @@
       const item = queue.shift();
       try {
         sourceBuffer.appendBuffer(item.bytes);
+        if (!item.opening) appended += 1;
       } catch (error) {
+        report("append", error);
         if (error && error.name === "QuotaExceededError") {
           // Full: drop what has played and carry on from the next keyframe.
           trim(true);
@@ -243,7 +300,10 @@
         const rate = catchUpRate(behind, floor.value, video.playbackRate);
         if (rate !== video.playbackRate) video.playbackRate = rate;
       }
-      if (video.paused) { const played = video.play(); if (played && played.catch) played.catch(() => {}); }
+      if (video.paused) {
+        const played = video.play();
+        if (played && played.catch) played.catch((error) => report("play", error));
+      }
       trim(false);
     }
 
@@ -254,8 +314,10 @@
         forgetStream();
         gaveUp = false;
         recoveries = [];
+        debug = message.debug === 1;
         const supported = !!(window.MediaSource && MediaSource.isTypeSupported('video/mp4; codecs="avc1.4D001F"'));
-        send({ t: "ready", video: supported ? 1 : 0 });
+        const agent = typeof navigator === "object" && navigator.userAgent ? navigator.userAgent.slice(0, 160) : "";
+        send({ t: "ready", video: supported ? 1 : 0, version: VERSION, ua: agent });
         return;
       }
       if (message.t === "stop") { forgetStream(); return; }
@@ -280,7 +342,7 @@
         if (Date.now() - askedForOpeningAt > 1000) { askedForOpeningAt = Date.now(); send({ t: "need-init" }); }
         return;
       }
-      if (needKey && first.key !== 1) return;
+      if (needKey && first.key !== 1) { waitingForKey += 1; return; }
       needKey = false;
       queue.push({ opening: false, bytes: complete.bytes });
       if (queue.length > 45) { dropQueuedFrames(); needKey = true; send({ t: "need-key" }); return; }
@@ -289,21 +351,29 @@
     }
 
     // Only the current player's failure: a replaced one may report late.
-    video.addEventListener("error", () => { if (video.error && mediaSource) recover(); });
+    video.addEventListener("error", () => {
+      if (!video.error || !mediaSource) return;
+      report("video", "code " + video.error.code + " " + (video.error.message || ""));
+      recover();
+    });
+    let ticks = 0;
     const upkeep = setInterval(() => {
       if (live && Date.now() - lastHeardAt > STALL_SECONDS * 1000) setLive(false);
       if (live) keepLive();
+      ticks += 1;
+      if (ticks % 4 === 0) shareStatus();
     }, 250);
     if (upkeep && upkeep.unref) upkeep.unref();
 
     return {
       handle,
-      get stats() { return { received, live, queued: queue.length, gaveUp }; }
+      report,
+      get stats() { return { received, live, queued: queue.length, gaveUp, appended }; }
     };
   }
 
   return {
-    NAMESPACE, LIVE_EDGE, MAX_BEHIND, CATCH_UP_ABOVE, CATCH_UP_UNTIL, CATCH_UP_RATE, ACK_EVERY,
+    NAMESPACE, VERSION, LIVE_EDGE, MAX_BEHIND, CATCH_UP_ABOVE, CATCH_UP_UNTIL, CATCH_UP_RATE, ACK_EVERY,
     createAssembler, base64ToBytes, liveSeekTarget, createFloor, catchUpRate, shouldAcknowledge, createPlayer
   };
 });

@@ -200,21 +200,38 @@
 
   if (!preview && window.cast && window.cast.framework) {
     const context = window.cast.framework.CastReceiverContext.getInstance();
-    context.addCustomMessageListener(NAMESPACE, (event) => render(core.parseMessage(event.data)));
+    let reportFailure = () => {};
+    context.addCustomMessageListener(NAMESPACE, (event) => {
+      try { render(core.parseMessage(event.data)); } catch (error) { reportFailure("render", error); }
+    });
     // The phone's own picture, when it streams one; the scoreboard above
     // stays underneath as the fallback.
     const videoModule = window.RallycadeReceiverVideo;
     let videoSender = null;
+    let statusLine = null;
     const player = videoModule && videoModule.createPlayer(
       document.getElementById("stream"),
       (message) => { if (videoSender) context.sendCustomMessage(videoModule.NAMESPACE, videoSender, message); },
-      (isLive) => { document.body.dataset.video = isLive ? "on" : "off"; }
+      (isLive) => { document.body.dataset.video = isLive ? "on" : "off"; },
+      (text) => {
+        // TestFlight phones ask for the player's counters on screen.
+        if (!statusLine) {
+          statusLine = document.createElement("div");
+          statusLine.id = "stream-status";
+          document.body.appendChild(statusLine);
+        }
+        statusLine.textContent = text;
+      }
     );
     if (player) {
+      reportFailure = player.report;
       context.addCustomMessageListener(videoModule.NAMESPACE, (event) => {
         videoSender = event.senderId;
-        player.handle(event.data);
+        try { player.handle(event.data); } catch (error) { player.report("handle", error); }
       });
+      // Any script failure on the TV reaches the phone's log.
+      window.addEventListener("error", (event) => player.report("script", event.message + " @" + event.lineno));
+      window.addEventListener("unhandledrejection", (event) => player.report("promise", event.reason));
     }
     const options = new window.cast.framework.CastReceiverOptions();
     options.customNamespaces = {};

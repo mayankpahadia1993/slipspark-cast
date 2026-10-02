@@ -194,3 +194,17 @@ body { font-family: Inter, "Google Sans", system-ui, sans-serif; color: var(--pa
 }
 body[data-video="on"] #stream { display: block; }
 body[data-video="on"] #app { visibility: hidden; }
+
+/* TestFlight builds: the stream's counters, small, over everything. */
+#stream-status {
+  position: fixed;
+  left: 24px;
+  bottom: 18px;
+  z-index: 20;
+  max-width: 70vw;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.62);
+  color: #f5f1e3;
+  font: 600 14px/1.3 system-ui, sans-serif;
+}
