@@ -11,7 +11,7 @@
   // the stream's timeline, so playback shows each one as it arrives.
   const NAMESPACE = "urn:x-cast:com.slipspark.video";
   /// Reported to the phone so its log says which receiver the TV loaded.
-  const VERSION = "27";
+  const VERSION = "28";
   /// How often the receiver tells the phone what it sees (milliseconds).
   const STATS_EVERY = 3000;
   /// After a jump, play from this far behind the newest frame (seconds).
@@ -70,11 +70,16 @@
 
   /// Where to jump so playback continues near the newest frame, or null to
   /// stay. `start` and `end` bound the newest buffered range.
-  function liveSeekTarget(currentTime, start, end) {
+  function liveSeekTarget(currentTime, start, end, maxBehind) {
     if (!(end > start)) return null;
-    if (currentTime >= start && end - currentTime <= MAX_BEHIND) return null;
+    const limit = maxBehind > 0 ? maxBehind : MAX_BEHIND;
+    if (currentTime >= start && end - currentTime <= limit) return null;
     return Math.max(start, end - LIVE_EDGE);
   }
+
+  /// Playback policy. The phone (or a test bench) can override these in
+  /// hello's `x` while the right values for each Chromecast are worked out.
+  const DEFAULT_POLICY = { manage: 1, seek: 1, rate: 1, maxBehind: MAX_BEHIND, cushion: 0, cooldown: 0 };
 
   /// The least playback has trailed the newest frame within the window.
   function createFloor(windowSeconds) {
@@ -133,6 +138,10 @@
     let lastErrorSentAt = 0;
     let lastStatsAt = 0;
     let debug = false;
+    let policy = Object.assign({}, DEFAULT_POLICY);
+    let started = false;
+    let seeks = 0;
+    let lastSeekAt = 0;
 
     /// Tells the phone what went wrong (at most twice a second).
     function report(where, error) {
@@ -152,7 +161,9 @@
         open: opening ? 1 : 0, ms: mediaSource ? mediaSource.readyState : "none", sb: sourceBuffer ? 1 : 0,
         rs: video.readyState, ct: round(video.currentTime || 0), behind: round(end - (video.currentTime || 0)),
         live: live ? 1 : 0, rate: video.playbackRate, dec: quality ? quality.totalVideoFrames : -1,
-        lost: quality ? quality.droppedVideoFrames : -1, rec: recoveries.length, err: lastError
+        lost: quality ? quality.droppedVideoFrames : -1, rec: recoveries.length, err: lastError,
+        sk: seeks, pz: video.paused ? 1 : 0, sg: video.seeking ? 1 : 0, buf: ranges ? ranges.length : 0,
+        st: ranges && ranges.length ? round(ranges.start(ranges.length - 1)) : 0, go: started ? 1 : 0
       };
     }
 
@@ -200,6 +211,7 @@
     function open(stream) {
       teardown();
       floor.reset();
+      started = false;
       needKey = true;
       const type = 'video/mp4; codecs="' + stream.codec + '"';
       if (!window.MediaSource || !MediaSource.isTypeSupported(type)) {
@@ -289,16 +301,22 @@
       const last = ranges.length - 1;
       const start = ranges.start(last);
       const end = ranges.end(last);
-      const target = liveSeekTarget(video.currentTime, start, end);
-      if (target !== null) {
-        video.playbackRate = 1;
-        video.currentTime = target;
-        floor.reset();
-      } else {
-        const behind = end - video.currentTime;
-        floor.add(Date.now() / 1000, behind);
-        const rate = catchUpRate(behind, floor.value, video.playbackRate);
-        if (rate !== video.playbackRate) video.playbackRate = rate;
+      // Some players need a little picture in hand before they start.
+      if (!started && end - start < policy.cushion) return;
+      if (policy.manage) {
+        const target = policy.seek ? liveSeekTarget(video.currentTime, start, end, policy.maxBehind) : null;
+        if (target !== null && Date.now() - lastSeekAt >= policy.cooldown * 1000) {
+          lastSeekAt = Date.now();
+          seeks += 1;
+          video.playbackRate = 1;
+          video.currentTime = target;
+          floor.reset();
+        } else if (policy.rate) {
+          const behind = end - video.currentTime;
+          floor.add(Date.now() / 1000, behind);
+          const rate = catchUpRate(behind, floor.value, video.playbackRate);
+          if (rate !== video.playbackRate) video.playbackRate = rate;
+        }
       }
       if (video.paused) {
         const played = video.play();
@@ -315,6 +333,7 @@
         gaveUp = false;
         recoveries = [];
         debug = message.debug === 1;
+        policy = Object.assign({}, DEFAULT_POLICY, message.x && typeof message.x === "object" ? message.x : {});
         const supported = !!(window.MediaSource && MediaSource.isTypeSupported('video/mp4; codecs="avc1.4D001F"'));
         const agent = typeof navigator === "object" && navigator.userAgent ? navigator.userAgent.slice(0, 160) : "";
         send({ t: "ready", video: supported ? 1 : 0, version: VERSION, ua: agent });
@@ -350,6 +369,7 @@
       setLive(true);
     }
 
+    video.addEventListener("playing", () => { started = true; });
     // Only the current player's failure: a replaced one may report late.
     video.addEventListener("error", () => {
       if (!video.error || !mediaSource) return;
