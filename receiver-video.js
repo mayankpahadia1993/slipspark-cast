@@ -11,7 +11,7 @@
   // the stream's timeline, so playback shows each one as it arrives.
   const NAMESPACE = "urn:x-cast:com.slipspark.video";
   /// Reported to the phone so its log says which receiver the TV loaded.
-  const VERSION = "31";
+  const VERSION = "32";
   /// How often the receiver tells the phone what it sees (milliseconds).
   const STATS_EVERY = 3000;
   // How a Chromecast plays a live picture (measured on a Chromecast Ultra):
@@ -27,10 +27,12 @@
   /// Catch up while more than this past the target, until within CATCH_UP_UNTIL.
   const CATCH_UP_ABOVE = 0.15;
   const CATCH_UP_UNTIL = 0.05;
-  const CATCH_UP_RATE = 1.15;
+  // 1.15 sped the whole picture up visibly (the ball and bat with it);
+  // 5% is hard to see and still sheds a few tenths of a second in seconds.
+  const CATCH_UP_RATE = 1.05;
   /// Ease off while this far short of the target, until back on it.
   const EASE_BELOW = 0.1;
-  const EASE_RATE = 0.95;
+  const EASE_RATE = 0.97;
   /// Catching up this long without getting closer means the TV holds that
   /// delay itself: stop trying for CATCH_UP_PAUSE (seconds).
   const CATCH_UP_GIVE_UP = 8;
