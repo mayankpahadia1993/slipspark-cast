@@ -163,7 +163,7 @@
 
   function renderDuelHandoff(handoff) {
     text("duel-target", handoff.target.toLocaleString("en-US"));
-    text("duel-rules", `${handoff.balls} BALLS · ${handoff.wickets} WICKETS · SAME DELIVERIES`);
+    text("duel-rules", handoff.rules || `${handoff.balls} BALLS · ${handoff.wickets} WICKETS · SAME DELIVERIES`);
   }
 
   function renderDuelResult(result) {

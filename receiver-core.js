@@ -222,7 +222,8 @@
       normalized.cricketDuelHandoff = {
         target: Math.floor(clamp(handoff.target, 1, 99999)),
         balls: Math.floor(clamp(handoff.balls, 1, 999)),
-        wickets: Math.floor(clamp(handoff.wickets, 1, 20))
+        wickets: Math.floor(clamp(handoff.wickets, 1, 20)),
+        rules: optionalString(handoff.rules, 120)
       };
     }
 
