@@ -37,7 +37,7 @@ body { font-family: Inter, "Google Sans", system-ui, sans-serif; color: var(--pa
 
 .ready-screen { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 7vh 8vw; }
 .brand-mark { display: flex; align-items: center; gap: 1.1vw; font-size: clamp(24px, 2.7vw, 52px); font-weight: 950; letter-spacing: .08em; }
-.brand-bolt { display: grid; place-items: center; width: 1.6em; height: 1.6em; border-radius: .45em; color: var(--void); background: var(--signal); font-size: .9em; transform: skew(-7deg); }
+.brand-icon { width: 1.6em; height: 1.6em; border-radius: 22.37%; object-fit: cover; }
 .ready-status { margin-top: 6vh; padding: 1.2vh 1.5vw; border: 1px solid rgba(214,255,56,.35); border-radius: 999px; background: rgba(0,0,0,.42); color: var(--signal); font-size: clamp(16px, 1.4vw, 28px); font-weight: 900; letter-spacing: .14em; }
 .status-dot { display: inline-block; width: .62em; height: .62em; margin-right: .65em; border-radius: 50%; background: var(--signal); box-shadow: 0 0 1.2em var(--signal); }
 .ready-screen h1 { margin: 3vh 0 1.5vh; font-size: clamp(52px, 6.5vw, 124px); line-height: .93; letter-spacing: -.045em; }
