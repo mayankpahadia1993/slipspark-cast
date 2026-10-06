@@ -162,11 +162,18 @@
   }
 
   function renderDuelHandoff(handoff) {
+    // Play a friend names who bats next and says where the chase goes.
+    text("duel-handoff-title", handoff.title || "PLAYER 2 — YOUR CHASE");
     text("duel-target", handoff.target.toLocaleString("en-US"));
     text("duel-rules", handoff.rules || `${handoff.balls} BALLS · ${handoff.wickets} WICKETS · SAME DELIVERIES`);
+    text("duel-handoff-note", handoff.note || "Raise both hands at the crease to begin");
   }
 
   function renderDuelResult(result) {
+    text("duel-result-eyebrow", result.eyebrow || "CHASE DUEL");
+    text("duel-result-first-name", result.firstName || "PLAYER 1");
+    text("duel-result-second-name", result.secondName || "PLAYER 2");
+    text("duel-result-note", result.note || "Raise both hands for another duel");
     text("duel-result-headline", result.headline);
     text("duel-result-margin", result.margin);
     text("duel-result-first-score", result.firstRuns.toLocaleString("en-US"));

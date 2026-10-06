@@ -223,7 +223,9 @@
         target: Math.floor(clamp(handoff.target, 1, 99999)),
         balls: Math.floor(clamp(handoff.balls, 1, 999)),
         wickets: Math.floor(clamp(handoff.wickets, 1, 20)),
-        rules: optionalString(handoff.rules, 120)
+        rules: optionalString(handoff.rules, 120),
+        title: optionalString(handoff.title, 80),
+        note: optionalString(handoff.note, 120)
       };
     }
 
@@ -237,7 +239,11 @@
         firstRuns: Math.floor(clamp(result.firstRuns, 0, 99999)),
         firstWickets: Math.floor(clamp(result.firstWickets, 0, 20)),
         secondRuns: Math.floor(clamp(result.secondRuns, 0, 99999)),
-        secondWickets: Math.floor(clamp(result.secondWickets, 0, 20))
+        secondWickets: Math.floor(clamp(result.secondWickets, 0, 20)),
+        firstName: optionalString(result.firstName, 40),
+        secondName: optionalString(result.secondName, 40),
+        eyebrow: optionalString(result.eyebrow, 40),
+        note: optionalString(result.note, 120)
       };
     }
 
