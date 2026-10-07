@@ -14,7 +14,8 @@
     result: document.getElementById("result-screen"),
     versusResult: document.getElementById("versus-result-screen"),
     cricketDuelHandoff: document.getElementById("duel-handoff-screen"),
-    cricketDuelResult: document.getElementById("duel-result-screen")
+    cricketDuelResult: document.getElementById("duel-result-screen"),
+    timingCheck: document.getElementById("timing-check-screen")
   };
 
   function element(id) { return document.getElementById(id); }
@@ -184,6 +185,32 @@
     element("duel-result-second").classList.toggle("is-winner", result.winner === "second");
   }
 
+  const VERDICT_WORDS = {
+    early: ["Early", "far"], littleEarly: ["Bit early", "little"], perfect: ["Perfect", "perfect"],
+    littleLate: ["Bit late", "little"], late: ["Late", "far"], noSwing: ["No swing", "none"]
+  };
+
+  function renderTimingCheck(check) {
+    text("timing-headline", check.headline);
+    text("timing-detail", check.detail || "");
+    element("timing-detail").hidden = !check.detail;
+    element("timing-balls").replaceChildren(...check.verdicts.map((verdict, index) => {
+      const [word, kind] = VERDICT_WORDS[verdict] || VERDICT_WORDS.noSwing;
+      const chip = document.createElement("span");
+      chip.className = `timing-chip verdict-${kind}`;
+      const number = document.createElement("b");
+      number.textContent = String(index + 1);
+      chip.append(number, document.createTextNode(word));
+      return chip;
+    }));
+    element("timing-lines").replaceChildren(...check.lines.map((line) => {
+      const item = document.createElement("li");
+      item.textContent = line;
+      return item;
+    }));
+    text("timing-note", check.note);
+  }
+
   function render(rawState) {
     const state = core.normalizeState(rawState);
     window.__slipsparkReceiverState = state;
@@ -200,6 +227,7 @@
     if (state.versusResult) renderVersusResult(state.versusResult);
     if (state.cricketDuelHandoff) renderDuelHandoff(state.cricketDuelHandoff);
     if (state.cricketDuelResult) renderDuelResult(state.cricketDuelResult);
+    if (state.timingCheck) renderTimingCheck(state.timingCheck);
   }
 
   const query = new URLSearchParams(window.location.search);

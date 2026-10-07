@@ -293,3 +293,55 @@ body[data-scene="on"] #stream { visibility: hidden; }
 
 /* TestFlight builds: the scene's counters, small, over everything. */
 #scene-status { position: absolute; left: 24px; bottom: 18px; z-index: 3; padding: 6px 10px; border-radius: 8px; background: rgba(0, 0, 0, .62); color: #f5f1e3; font: 600 14px/1.3 system-ui, sans-serif; }
+
+/* Build 121: the screens the TV doesn't draw as the stadium (setup, results,
+   the innings break, the timing check) take the stadium's look: the same
+   photograph, colours and rounded type as the phone. Boxing keeps its own. */
+:root {
+  --signal: #ffc252;
+  --amber: #ffc252;
+  --paper: #fcf5de;
+  --muted: rgba(252, 245, 222, .74);
+  --stadium-ink: rgba(18, 43, 38, .9);
+}
+#app {
+  background:
+    linear-gradient(180deg, rgba(6, 14, 12, .55) 0%, rgba(6, 14, 12, .72) 55%, rgba(6, 14, 12, .86) 100%),
+    url("scene-images/stadium-backdrop-1672x941.jpg") center / cover no-repeat,
+    #0c1a17;
+}
+#app[data-screen="fight"], #app[data-screen="versus"], #app[data-screen="versusSetup"], #app[data-screen="versusResult"] {
+  background:
+    radial-gradient(circle at 14% 55%, rgba(214,255,56,.10), transparent 30%),
+    linear-gradient(135deg, #111614 0%, #070909 56%, #020303 100%);
+}
+#app:not([data-screen="fight"]):not([data-screen="versus"]):not([data-screen="versusSetup"]):not([data-screen="versusResult"]) .ambient,
+#app:not([data-screen="fight"]):not([data-screen="versus"]):not([data-screen="versusSetup"]):not([data-screen="versusResult"]) .arena-lines { display: none; }
+#app h1, .hero-score, .brand-mark, .board-callout strong, .board-score strong, .result-stat strong, .result-corner strong {
+  font-family: Nunito, "Varela Round", "Google Sans", sans-serif;
+  font-weight: 900;
+}
+.status-dot { box-shadow: none; }
+.ready-status, .bottom-chip, .tracking-footer { border: 0; background: var(--stadium-ink); }
+.ready-screen h1, .scorecard-screen h1, .setup-board h1, .positioning-header h1 { text-shadow: 0 .4vw 2vw rgba(0, 0, 0, .45); }
+.result-stat, .result-corner, .board-score, .board-center { border: 0; background: var(--stadium-ink); }
+.hero-score { color: var(--paper); text-shadow: 0 .6vw 2.4vw rgba(0, 0, 0, .4); }
+.positioning-frame { background: rgba(18, 43, 38, .55); border-color: rgba(252, 245, 222, .7); }
+.skeleton-joints circle { stroke: #122b26; }
+.result-corner.is-winner { border: 3px solid var(--signal); box-shadow: 0 0 3vw rgba(255, 194, 82, .2); }
+
+.timing-check-screen { display: flex; align-items: center; justify-content: center; padding: 6vh 8vw; }
+.stadium-card { width: min(76vw, 1400px); display: flex; flex-direction: column; gap: 1.6vh; }
+.stadium-card h1 { margin: 0; font-size: clamp(48px, 5.6vw, 108px); line-height: 1; letter-spacing: -.02em; }
+.card-detail { margin: 0; color: var(--paper); font-size: clamp(18px, 1.7vw, 32px); font-weight: 600; }
+.timing-balls { display: flex; flex-wrap: wrap; gap: .6vw; margin-top: 1vh; }
+.timing-chip { display: inline-flex; align-items: center; gap: .6vw; padding: .8vh 1.2vw; border-radius: 999px; background: var(--stadium-ink); color: var(--paper); font-size: clamp(14px, 1.3vw, 24px); font-weight: 800; }
+.timing-chip b { display: inline-flex; align-items: center; justify-content: center; width: 1.6em; height: 1.6em; border-radius: 50%; color: #122b26; font-size: .85em; }
+.timing-chip.verdict-perfect b { background: #61d67a; }
+.timing-chip.verdict-little b { background: #ffc252; }
+.timing-chip.verdict-far b { background: #f56b54; }
+.timing-chip.verdict-none b { background: transparent; color: var(--paper); box-shadow: inset 0 0 0 2px rgba(252, 245, 222, .7); }
+.timing-lines { margin: 1vh 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: .8vh; }
+.timing-lines li { color: var(--paper); font-size: clamp(16px, 1.45vw, 28px); font-weight: 600; }
+.timing-lines li:last-child { margin-top: .6vh; color: var(--signal); font-weight: 800; }
+.card-note { margin: 1.4vh 0 0; color: var(--muted); font-size: clamp(14px, 1.2vw, 22px); font-weight: 700; }

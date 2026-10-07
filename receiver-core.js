@@ -7,8 +7,9 @@
 
   const validScreens = new Set([
     "ready", "positioning", "fight", "cricket", "versusSetup", "versus",
-    "result", "versusResult", "cricketDuelHandoff", "cricketDuelResult"
+    "result", "versusResult", "cricketDuelHandoff", "cricketDuelResult", "timingCheck"
   ]);
+  const verdicts = new Set(["early", "littleEarly", "perfect", "littleLate", "late", "noSwing"]);
   const fightPhases = new Set([
     "ready", "countdown", "telegraph", "defend", "counter", "opening",
     "feedback", "trackingPaused", "roundBreak", "finished"
@@ -108,7 +109,8 @@
       result: null,
       versusResult: null,
       cricketDuelHandoff: null,
-      cricketDuelResult: null
+      cricketDuelResult: null,
+      timingCheck: null
     };
 
     if (screen === "positioning") {
@@ -247,6 +249,19 @@
       };
     }
 
+    if (screen === "timingCheck") {
+      const check = value.timingCheck && typeof value.timingCheck === "object" ? value.timingCheck : {};
+      normalized.timingCheck = {
+        headline: boundedString(check.headline, "Timing check", 80),
+        detail: optionalString(check.detail, 200),
+        verdicts: (Array.isArray(check.verdicts) ? check.verdicts : []).slice(0, 12)
+          .map((verdict) => verdicts.has(verdict) ? verdict : "noSwing"),
+        lines: (Array.isArray(check.lines) ? check.lines : []).slice(0, 6)
+          .map((line) => optionalString(line, 200)).filter(Boolean),
+        note: boundedString(check.note, "Raise both hands to play your innings", 120)
+      };
+    }
+
     return normalized;
   }
 
@@ -287,6 +302,7 @@
     if (kind === "versusResult") return normalizeState({ ...base, screen: "versusResult", versusResult: { headline: "RED CORNER WINS", detail: "ON POINTS", winner: "left", leftScore: 4200, rightScore: 3700, leftDefense: 88, rightDefense: 76, leftCounters: 5, rightCounters: 3 } });
     if (kind === "cricketDuelHandoff") return normalizeState({ ...base, screen: "cricketDuelHandoff", cricketDuelHandoff: { target: 32, balls: 12, wickets: 3 } });
     if (kind === "cricketDuelResult") return normalizeState({ ...base, screen: "cricketDuelResult", cricketDuelResult: { headline: "PLAYER 2 WINS", margin: "BY 2 WICKETS · 1 BALL TO SPARE", winner: "second", firstRuns: 31, firstWickets: 3, secondRuns: 32, secondWickets: 1 } });
+    if (kind === "timingCheck") return normalizeState({ ...base, screen: "timingCheck", timingCheck: { headline: "Mostly early", detail: "Your swings met the ball about a quarter of a second before it reached you.", verdicts: ["early", "littleEarly", "perfect", "early", "littleEarly", "noSwing"], lines: ["Balls 1 and 4 were early.", "Balls 2 and 5 were a little early.", "Ball 3 was perfect.", "Ball 6 had no swing.", "Wait for the ball to reach the crease before you swing."], note: "Raise both hands to play your innings" } });
     if (kind === "ready" || !kind) return normalizeState({ ...base, sequence: 1, screen: "ready" });
     return normalizeState({ ...base, screen: "fight", fight: fightSample(kind) });
   }

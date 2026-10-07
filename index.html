@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800;900&family=Nunito:wght@600;700;800;900&display=swap">
-  <link rel="stylesheet" href="receiver.css?v=40">
+  <link rel="stylesheet" href="receiver.css?v=41">
   <script src="https://www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>
 </head>
 <body>
@@ -171,6 +171,16 @@
       </div>
       <p id="duel-result-note">Raise both hands for another duel</p>
     </section>
+    <section id="timing-check-screen" class="screen timing-check-screen" hidden>
+      <div class="stadium-card">
+        <span class="eyebrow">TIMING CHECK</span>
+        <h1 id="timing-headline">Right on time</h1>
+        <p id="timing-detail" class="card-detail"></p>
+        <div id="timing-balls" class="timing-balls"></div>
+        <ul id="timing-lines" class="timing-lines"></ul>
+        <p id="timing-note" class="card-note"></p>
+      </div>
+    </section>
   </main>
 
   <video id="stream" muted autoplay playsinline disablepictureinpicture aria-label="Rallycade on your iPhone"></video>
@@ -231,10 +241,10 @@
     </div>
   </section>
   <!-- ?v= keeps a Chromecast from mixing cached files of two receiver versions. -->
-  <script src="receiver-core.js?v=40"></script>
-  <script src="receiver-video.js?v=40"></script>
-  <script src="receiver-scene-core.js?v=40"></script>
-  <script src="receiver-scene.js?v=40"></script>
-  <script src="receiver.js?v=40"></script>
+  <script src="receiver-core.js?v=41"></script>
+  <script src="receiver-video.js?v=41"></script>
+  <script src="receiver-scene-core.js?v=41"></script>
+  <script src="receiver-scene.js?v=41"></script>
+  <script src="receiver.js?v=41"></script>
 </body>
 </html>
