@@ -109,12 +109,58 @@
     return { s: a.s + (b.s - a.s) * u, o: ops, fl: blendValue(a.fl, b.fl, u), cl: blendValue(a.cl, b.cl, u), h: null };
   }
 
+  // Blends `a` toward `b` into `out`, a frame of the same shapes from
+  // `cloneFrame`. Drawing thirty blended frames a second as new arrays kept
+  // the Chromecast's garbage collector busy, and each collection cost a
+  // frame (build 121: ~26 a 15 s innings stretch, up to 13 ms each).
+  function blendInto(out, a, b, u) {
+    for (let index = 0; index < a.length; index += 1) {
+      const x = a[index];
+      const y = b[index];
+      if (typeof x === "number" && typeof y === "number") out[index] = x + (y - x) * u;
+      else if (isArray(x) && isArray(y) && isArray(out[index])) blendInto(out[index], x, y, u);
+      else out[index] = x;
+    }
+  }
+
+  function cloneValue(value) {
+    return isArray(value) ? value.map(cloneValue) : value;
+  }
+
+  function cloneFrame(frame) {
+    return { s: frame.s, o: frame.o.map(cloneValue), fl: cloneValue(frame.fl), cl: cloneValue(frame.cl), h: null };
+  }
+
+  function blendFramesInto(out, a, b, u) {
+    for (let index = 0; index < a.o.length; index += 1) {
+      const opA = a.o[index];
+      const opB = b.o[index];
+      const op = out.o[index];
+      const discrete = DISCRETE[opA[0]] || [];
+      op[0] = opA[0];
+      for (let field = 1; field < opA.length; field += 1) {
+        const x = opA[field];
+        if (discrete.indexOf(field) >= 0) op[field] = x;
+        else if (typeof x === "number") op[field] = x + (opB[field] - x) * u;
+        else if (isArray(x) && isArray(op[field])) blendInto(op[field], x, opB[field], u);
+        else op[field] = x;
+      }
+    }
+    out.s = a.s + (b.s - a.s) * u;
+    blendInto(out.fl, a.fl, b.fl, u);
+    blendInto(out.cl, a.cl, b.cl, u);
+    return out;
+  }
+
   // The frames on their way to the screen, by moment. A redraw (a newer
   // epoch) replaces everything from its first moment on, and frames of an
   // older epoch still arriving are dropped.
   function createTimeline() {
     let frames = [];
     let epoch = 0;
+    // The blended frame `at` hands out, reused while the shapes stay the same.
+    let scratch = null;
+    let scratchShape = null;
     // The HUD changes waiting for their moment, oldest first.
     let huds = [];
 
@@ -175,7 +221,9 @@
         const b = frames[1];
         if (b && b.s - a.s <= MAX_BLEND_GAP && shapeKey(a) === shapeKey(b)) {
           const u = Math.min(1, Math.max(0, (now - a.s) / (b.s - a.s)));
-          return { frame: u > 0 ? blendFrames(a, b, u) : a, stamp: a.s, blended: u > 0 };
+          if (u <= 0) return { frame: a, stamp: a.s, blended: false };
+          if (scratchShape !== shapeKey(a)) { scratch = cloneFrame(a); scratchShape = shapeKey(a); }
+          return { frame: blendFramesInto(scratch, a, b, u), stamp: a.s, blended: true };
         }
         return { frame: a, stamp: a.s, blended: false };
       },
@@ -251,7 +299,7 @@
   }
 
   return {
-    STAGE, MAX_BLEND_GAP, normalizeFrame, shapeKey, blendFrames, createTimeline, createClock,
+    STAGE, MAX_BLEND_GAP, normalizeFrame, shapeKey, blendFrames, blendFramesInto, cloneFrame, createTimeline, createClock,
     percentile, tracePath, cssColor
   };
 });
