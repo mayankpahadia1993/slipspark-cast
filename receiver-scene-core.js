@@ -187,7 +187,10 @@
         return latest;
       },
 
-      clear() { frames = []; huds = []; }
+      clear() { frames = []; huds = []; },
+
+      // A new phone (or the same one, started again) counts epochs afresh.
+      reset() { frames = []; huds = []; epoch = 0; }
     };
   }
 

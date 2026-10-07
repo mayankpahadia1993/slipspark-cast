@@ -542,7 +542,8 @@
           if (Number(message.canvas) >= 320) { maxCanvasWidth = Math.min(1920, Number(message.canvas)); resize(); }
           if (["low", "medium", "high"].indexOf(message.smooth) >= 0) smoothing = message.smooth;
           clock.reset();
-          timeline.clear();
+          timeline.reset();
+          lastStamp = null;
           if (readyToAnswer) answerHello(); else pendingHello = true;
           break;
         case "ping":
