@@ -22,7 +22,14 @@
     const canvas = options.canvas;
     const hud = options.hud;
     const send = options.send;
-    const ctx = canvas.getContext("2d", { alpha: false });
+    const ctx = canvas.getContext("2d");
+    // The opaque photo a frame starts from (the stadium, or the replay's
+    // outfield) sits behind the canvas as an image the TV's GPU composites:
+    // the Chromecast's canvas is drawn in software and can't fill the screen
+    // with a photo thirty times a second. Anything it hides isn't drawn.
+    const backdrop = options.backdrop;
+    let backdropKey = null;
+    let backdropTransform = "";
     const timeline = core.createTimeline();
     const clock = core.createClock();
     const images = new Map();
@@ -60,6 +67,7 @@
         canvas.height = height;
         layers.length = 0;
         needsRedraw = true;
+        backdropTransform = "";
       }
       scale = canvas.width / STAGE.width;
       const stageScale = Math.min(window.innerWidth / HUD_STAGE.width, window.innerHeight / HUD_STAGE.height);
@@ -97,7 +105,10 @@
     function loadBundled() {
       return fetch("scene-images/manifest.json").then((response) => response.ok ? response.json() : { images: {} })
         .then((manifest) => {
-          Object.entries((manifest && manifest.images) || {}).forEach(([key, file]) => bundled.set(key, file));
+          Object.entries((manifest && manifest.images) || {}).forEach(([key, file]) => {
+            bundled.set(key, file);
+            if (/\.jpe?g$/i.test(file)) opaque.add(key);
+          });
         }).catch(() => {});
     }
 
@@ -171,6 +182,7 @@
       const array = new Uint8Array(bytes.length);
       for (let index = 0; index < bytes.length; index += 1) array[index] = bytes.charCodeAt(index);
       const blob = new Blob([array], { type: upload.type });
+      if (upload.type === "image/jpeg") opaque.add(key);
       const url = URL.createObjectURL(blob);
       loadImage(url).then((image) => {
         addImage(key, image);
@@ -199,6 +211,52 @@
     }
 
     // MARK: Drawing
+
+    // Pictures with no see-through pixels (JPEGs).
+    const opaque = new Set();
+
+    // The last top-level command that paints a whole opaque picture over the
+    // stage, plainly: everything before it is hidden.
+    function coverIndex(frame) {
+      let depth = 0;
+      let found = -1;
+      for (let index = 0; index < frame.o.length; index += 1) {
+        const op = frame.o[index];
+        if (op[0] === "L") { depth += 1; continue; }
+        if (op[0] === "l") { depth -= 1; continue; }
+        if (depth || op[0] !== "i" || op[1] < 1000 || (op[2] && op[2] !== "source-over") || op[5] >= 0 || op[6] >= 0) continue;
+        const image = images.get(op[3]);
+        if (!image || !opaque.has(op[3])) continue;
+        const m = op[4];
+        if (m[1] !== 0 || m[2] !== 0 || m[0] <= 0 || m[3] <= 0) continue;
+        const width = image.naturalWidth || image.width;
+        const height = image.naturalHeight || image.height;
+        const left = m[4] / 10, top = m[5] / 10;
+        const right = left + width * m[0] / 10000, bottom = top + height * m[3] / 10000;
+        if (left <= 0.5 && top <= 0.5 && right >= STAGE.width - 0.5 && bottom >= STAGE.height - 0.5) found = index;
+      }
+      return found;
+    }
+
+    function showBackdrop(op) {
+      if (!backdrop) return false;
+      const image = images.get(op[3]);
+      if (backdropKey !== op[3]) {
+        backdropKey = op[3];
+        backdrop.src = image.src;
+      }
+      // Stage points to the screen's CSS pixels.
+      const css = window.innerWidth / STAGE.width;
+      const m = op[4];
+      const transform = "matrix(" + [m[0] / 10000 * css, 0, 0, m[3] / 10000 * css, m[4] / 10 * css, m[5] / 10 * css]
+        .map((v) => v.toFixed(4)).join(",") + ")";
+      if (transform !== backdropTransform) {
+        backdropTransform = transform;
+        backdrop.style.transform = transform;
+      }
+      backdrop.hidden = false;
+      return true;
+    }
 
     function layerCanvas(depth) {
       let layer = layers[depth];
@@ -257,12 +315,19 @@
       ctx.globalAlpha = 1;
       ctx.globalCompositeOperation = "source-over";
       ctx.filter = "none";
-      ctx.fillStyle = "#0c1a17";
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.imageSmoothingQuality = smoothing;
+      const cover = coverIndex(frame);
+      let from = 0;
+      if (cover >= 0 && showBackdrop(frame.o[cover])) {
+        from = cover + 1;
+      } else if (backdrop) {
+        backdrop.hidden = true;
+      }
       const stack = [{ c: ctx }];
       let c = ctx;
-      for (const op of frame.o) {
+      for (let index = from; index < frame.o.length; index += 1) {
+        const op = frame.o[index];
         switch (op[0]) {
           case "L": {
             const layer = layerCanvas(stack.length);
@@ -582,6 +647,7 @@
     function playRecording(data, at, base) {
       const entries = Object.entries((data && data.images) || {});
       const resolve = (file) => base ? new URL(file, base).href : file;
+      entries.forEach(([key, file]) => { if (/\.jpe?g$/i.test(file)) opaque.add(key); });
       return Promise.all(entries.map(([key, file]) => loadImage(resolve(file)).then((image) => addImage(key, image))))
         .then(() => fontsReady)
         .then(() => {

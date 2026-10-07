@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800;900&family=Nunito:wght@600;700;800;900&display=swap">
-  <link rel="stylesheet" href="receiver.css?v=35">
+  <link rel="stylesheet" href="receiver.css?v=36">
   <script src="https://www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>
 </head>
 <body>
@@ -177,7 +177,10 @@
 
   <!-- The stadium the TV draws from the phone's drawing commands, and its HUD. -->
   <section id="scene" class="scene" hidden aria-label="Rallycade stadium">
+    <img id="scene-backdrop" alt="" hidden>
     <canvas id="scene-canvas"></canvas>
+    <!-- The broadcast shading at the top and bottom, as on the phone. -->
+    <div class="scene-shade" aria-hidden="true"></div>
     <div id="scene-hud" class="scene-hud">
       <div class="hud-top">
         <div class="hud-left">
@@ -225,10 +228,10 @@
     </div>
   </section>
   <!-- ?v= keeps a Chromecast from mixing cached files of two receiver versions. -->
-  <script src="receiver-core.js?v=35"></script>
-  <script src="receiver-video.js?v=35"></script>
-  <script src="receiver-scene-core.js?v=35"></script>
-  <script src="receiver-scene.js?v=35"></script>
-  <script src="receiver.js?v=35"></script>
+  <script src="receiver-core.js?v=36"></script>
+  <script src="receiver-video.js?v=36"></script>
+  <script src="receiver-scene-core.js?v=36"></script>
+  <script src="receiver-scene.js?v=36"></script>
+  <script src="receiver.js?v=36"></script>
 </body>
 </html>
