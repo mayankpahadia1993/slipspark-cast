@@ -43,17 +43,8 @@ body { font-family: Inter, "Google Sans", system-ui, sans-serif; color: var(--pa
 .ready-screen h1 { margin: 3vh 0 1.5vh; font-size: clamp(52px, 6.5vw, 124px); line-height: .93; letter-spacing: -.045em; }
 .ready-screen p { max-width: 60vw; margin: 0; color: var(--muted); font-size: clamp(20px, 1.8vw, 36px); font-weight: 650; }
 
-.positioning-screen { display: grid; grid-template-rows: auto 1fr auto; place-items: center; padding: 5vh 6vw 4vh; }
-.positioning-header { text-align: center; }
 .eyebrow { color: var(--signal); font-size: clamp(14px, 1.2vw, 24px); font-weight: 900; letter-spacing: .16em; }
-.positioning-header h1 { margin: 1.2vh 0 0; font-size: clamp(34px, 4vw, 76px); line-height: 1; }
-.positioning-frame { position: relative; width: min(32vw, 54vh); height: min(50vw, 65vh); margin: 2vh; border: .4vw dashed rgba(246,245,236,.72); border-radius: 3vw; background: rgba(0,0,0,.28); transition: .25s ease; }
-.positioning-frame.is-ready { border-style: solid; border-color: var(--signal); box-shadow: 0 0 5vw rgba(214,255,56,.16); }
-#pose-skeleton { width: 100%; height: 100%; overflow: visible; }
-.skeleton-lines line { stroke: var(--paper); stroke-width: 11; stroke-linecap: round; }
-.skeleton-joints circle { fill: var(--signal); stroke: #071008; stroke-width: 5; }
 .bottom-chip, .tracking-footer { padding: 1.2vh 1.4vw; border-radius: 999px; background: rgba(0,0,0,.56); color: var(--muted); font-size: clamp(14px, 1.1vw, 22px); font-weight: 900; letter-spacing: .12em; }
-.positioning-frame.is-ready + .bottom-chip { color: var(--signal); }
 
 .fight-screen { padding: 3vh 3vw 2.5vh; }
 .hud { position: relative; z-index: 20; display: grid; grid-template-columns: minmax(9vw, 15vw) minmax(38vw, 47vw) minmax(9vw, 15vw); justify-content: space-between; gap: 2vw; align-items: start; }
@@ -231,7 +222,8 @@ body[data-scene="on"] #app,
 body[data-scene="on"] #stream { visibility: hidden; }
 .scene-stage { position: absolute; left: 50%; top: 50%; width: min(100vw, 177.7778vh); height: min(56.25vw, 100vh); transform: translate(-50%, -50%); overflow: hidden; }
 #scene-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
-#scene-backdrop { position: absolute; left: 0; top: 0; transform-origin: 0 0; will-change: transform; max-width: none; }
+#scene-backdrop { display: none; }
+.scene-backdrop { position: absolute; left: 0; top: 0; transform-origin: 0 0; will-change: transform, opacity; max-width: none; }
 .scene-shade { position: absolute; inset: 0; pointer-events: none; background: linear-gradient(to bottom, rgba(0,0,0,.22) 0%, rgba(0,0,0,0) 33.333%, rgba(0,0,0,0) 66.667%, rgba(0,0,0,.24) 100%); }
 .scene-hud { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; transform-origin: 0 0; pointer-events: none; }
 .scene-hud small { display: block; font-size: 17px; font-weight: 800; letter-spacing: 2.55px; }
@@ -285,8 +277,6 @@ body[data-scene="on"] #stream { visibility: hidden; }
 .hud-int-detail { font-size: 24px; font-weight: 500; white-space: pre-line; }
 .hud-interruption[data-kind="lost"] .hud-pause { display: none; }
 .hud-interruption[data-kind="lost"] .hud-int-title { font-size: 29px; font-weight: 700; color: rgba(252, 245, 222, .8); }
-.hud-int-progress { width: 272px; height: 7px; border-radius: 4px; background: rgba(252, 245, 222, .2); overflow: hidden; }
-.hud-int-progress i { display: block; height: 100%; width: 0; background: var(--gold); }
 
 @keyframes hud-fade { from { opacity: 0; } to { opacity: 1; } }
 @keyframes hud-caption-in { from { opacity: 0; transform: translate(-50%, 40px); } to { opacity: 1; transform: translate(-50%, 0); } }
@@ -323,11 +313,9 @@ body[data-scene="on"] #stream { visibility: hidden; }
 }
 .status-dot { box-shadow: none; }
 .ready-status, .bottom-chip, .tracking-footer { border: 0; background: var(--stadium-ink); }
-.ready-screen h1, .scorecard-screen h1, .setup-board h1, .positioning-header h1 { text-shadow: 0 .4vw 2vw rgba(0, 0, 0, .45); }
+.ready-screen h1, .scorecard-screen h1, .setup-board h1, .stadium-card h1 { text-shadow: 0 .4vw 2vw rgba(0, 0, 0, .45); }
 .result-stat, .result-corner, .board-score, .board-center { border: 0; background: var(--stadium-ink); }
 .hero-score { color: var(--paper); text-shadow: 0 .6vw 2.4vw rgba(0, 0, 0, .4); }
-.positioning-frame { background: rgba(18, 43, 38, .55); border-color: rgba(252, 245, 222, .7); }
-.skeleton-joints circle { stroke: #122b26; }
 .result-corner.is-winner { border: 3px solid var(--signal); box-shadow: 0 0 3vw rgba(255, 194, 82, .2); }
 
 .timing-check-screen { display: flex; align-items: center; justify-content: center; padding: 6vh 8vw; }
@@ -345,3 +333,29 @@ body[data-scene="on"] #stream { visibility: hidden; }
 .timing-lines li { color: var(--paper); font-size: clamp(16px, 1.45vw, 28px); font-weight: 600; }
 .timing-lines li:last-child { margin-top: .6vh; color: var(--signal); font-weight: 800; }
 .card-note { margin: 1.4vh 0 0; color: var(--muted); font-size: clamp(14px, 1.2vw, 22px); font-weight: 700; }
+
+/* Build 122: setup on a Chromecast is the phone's setup card and its hold
+   ring; the TV never draws the batter's skeleton. The same ring fills on the
+   paused card. */
+.positioning-screen { display: flex; align-items: center; justify-content: flex-start; padding: 6vh 8vw; }
+.positioning-screen .stadium-card { width: min(62vw, 1200px); }
+#positioning-detail { white-space: pre-line; }
+.hold { display: flex; align-items: center; gap: 1.2vw; margin-top: 2vh; }
+.hold[hidden] { display: none; }
+.hold-ring { flex: none; width: clamp(64px, 6.4vw, 124px); height: clamp(64px, 6.4vw, 124px); transform: rotate(-90deg); }
+.hold-ring circle { fill: none; stroke-width: 8; }
+.hold-track { stroke: rgba(252, 245, 222, .2); }
+.hold-fill { stroke: #ffc252; stroke-linecap: round; stroke-dasharray: 276.5; stroke-dashoffset: 276.5; transition: stroke-dashoffset .15s linear; }
+.hold-figure { transform: rotate(90deg); transform-origin: 50px 50px; }
+.hold-figure circle { fill: #fcf5de; stroke: none; }
+.hold-figure path { fill: none; stroke: #fcf5de; stroke-width: 5.5; stroke-linecap: round; stroke-linejoin: round; }
+.hold.is-holding .hold-figure circle { fill: #ffc252; }
+.hold.is-holding .hold-figure path { stroke: #ffc252; }
+.hold-label { color: var(--paper); font-size: clamp(20px, 1.9vw, 36px); font-weight: 800; }
+.hold.is-holding .hold-label { color: #ffc252; }
+.hud-interruption .hold { margin-top: 6px; gap: 18px; }
+.hud-interruption .hold-ring { width: 72px; height: 72px; }
+.hud-interruption .hold-label { font-size: 26px; }
+.positioning-screen .hold { margin-top: 3vh; gap: 1.8vw; }
+.positioning-screen .hold-ring { width: clamp(96px, 10vw, 200px); height: clamp(96px, 10vw, 200px); }
+.positioning-screen .hold-label { font-size: clamp(26px, 2.8vw, 56px); font-weight: 900; }

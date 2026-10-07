@@ -30,7 +30,12 @@
     // outfield) sits behind the canvas as an image the TV's GPU composites:
     // the Chromecast's canvas is drawn in software and can't fill the screen
     // with a photo thirty times a second. Anything it hides isn't drawn.
+    // `options.backdrop` marks where the layers go, under the canvas. Each
+    // photo gets its own layer, decoded once: swapping one element's source
+    // between the stadium and the replay's outfield re-decoded it each time,
+    // and the TV showed black meanwhile (build 121).
     const backdrop = options.backdrop;
+    const backdropLayers = new Map();
     let backdropKey = null;
     let backdropTransform = "";
     const timeline = core.createTimeline();
@@ -70,7 +75,7 @@
         canvas.height = height;
         layers.length = 0;
         needsRedraw = true;
-        backdropTransform = "";
+        backdropLayers.forEach((entry) => { entry.transform = ""; });
       }
       scale = canvas.width / STAGE.width;
       const stageScale = boxWidth() / HUD_STAGE.width;
@@ -264,24 +269,53 @@
       return found;
     }
 
-    function showBackdrop(op) {
-      if (!backdrop) return false;
-      const image = images.get(op[3]);
-      if (backdropKey !== op[3]) {
-        backdropKey = op[3];
-        backdrop.src = image.src;
+    // The photo's own layer once it is decoded; until then null, and the
+    // canvas draws the photo itself.
+    function backdropLayer(key) {
+      if (!backdrop) return null;
+      let entry = backdropLayers.get(key);
+      if (!entry) {
+        const source = images.get(key);
+        if (!source || !source.src) return null;
+        const element = document.createElement("img");
+        element.className = "scene-backdrop";
+        element.alt = "";
+        element.style.opacity = "0";
+        entry = { element, ready: false, transform: "" };
+        backdropLayers.set(key, entry);
+        backdrop.parentNode.insertBefore(element, backdrop);
+        element.src = source.src;
+        const done = () => { entry.ready = true; needsRedraw = true; };
+        if (element.decode) element.decode().then(done, () => { if (element.complete) done(); });
+        else element.onload = done;
       }
+      return entry.ready ? entry : null;
+    }
+
+    function showBackdrop(op) {
+      const entry = backdropLayer(op[3]);
+      if (!entry) return false;
       // Stage points to the screen's CSS pixels.
       const css = boxWidth() / STAGE.width;
       const m = op[4];
       const transform = "matrix(" + [m[0] / 10000 * css, 0, 0, m[3] / 10000 * css, m[4] / 10 * css, m[5] / 10 * css]
         .map((v) => v.toFixed(4)).join(",") + ")";
-      if (transform !== backdropTransform) {
-        backdropTransform = transform;
-        backdrop.style.transform = transform;
+      if (transform !== entry.transform) {
+        entry.transform = transform;
+        entry.element.style.transform = transform;
       }
-      backdrop.hidden = false;
+      if (backdropKey !== op[3]) {
+        hideBackdrops(op[3]);
+        entry.element.style.opacity = "1";
+        backdropKey = op[3];
+      }
+      backdropTransform = transform;
       return true;
+    }
+
+    function hideBackdrops(except) {
+      backdropLayers.forEach((entry, key) => { if (key !== except) entry.element.style.opacity = "0"; });
+      if (except == null) backdropKey = null;
     }
 
     function layerCanvas(depth) {
@@ -347,9 +381,11 @@
       let from = 0;
       if (cover >= 0 && showBackdrop(frame.o[cover])) {
         from = cover + 1;
-      } else if (backdrop) {
-        backdrop.hidden = true;
+      } else if (cover < 0) {
+        hideBackdrops(null);
       }
+      // A photo whose layer isn't decoded yet is drawn on the canvas, over
+      // whichever layer was showing: never an empty frame.
       const stack = [{ c: ctx }];
       let c = ctx;
       for (let index = from; index < frame.o.length; index += 1) {
@@ -518,7 +554,9 @@
         setText("hud-int-instruction", interruption.instruction);
         setText("hud-int-detail", interruption.detail);
         show("hud-int-progress", interruption.progress != null);
-        if (interruption.progress != null) el("hud-int-bar").style.width = Math.round(interruption.progress * 100) + "%";
+        if (interruption.progress != null && window.RallycadeHold) {
+          window.RallycadeHold(el("hud-int-progress"), interruption.progress, "Raise both hands to play on");
+        }
       }
     }
 
@@ -627,7 +665,7 @@
         const c = shot.getContext("2d");
         c.fillStyle = "#0c1a17";
         c.fillRect(0, 0, shot.width, shot.height);
-        if (backdrop && !backdrop.hidden && backdropKey && images.get(backdropKey)) {
+        if (backdropKey && images.get(backdropKey)) {
           const m = (backdropTransform.match(/[-0-9.]+/g) || []).map(Number);
           const k = shot.width / boxWidth();
           if (m.length === 6) c.setTransform(m[0] * k, 0, 0, m[3] * k, m[4] * k, m[5] * k);
@@ -717,9 +755,8 @@
               end: sorted[sorted.length - 1].s,
               // The recording's own frame `index`, exactly (the parity check).
               drawIndex(index) {
-                const before = backdropKey;
                 drawFrame(frames[index]);
-                return before !== backdropKey && backdrop && backdrop.decode ? backdrop.decode().catch(() => null) : null;
+                return null;
               },
               drawAt(t) {
                 let low = 0, high = sorted.length - 1;
@@ -729,12 +766,11 @@
                 if (b && t > a.s && b.s - a.s <= core.MAX_BLEND_GAP && core.shapeKey(a) === core.shapeKey(b)) {
                   frame = core.blendFrames(a, b, Math.min(1, (t - a.s) / (b.s - a.s)));
                 }
-                const before = backdropKey;
                 drawFrame(frame);
                 for (let k = low; k >= 0; k -= 1) {
                   if (sorted[k].h) { if (sorted[k].h !== shownHUD) { shownHUD = sorted[k].h; renderHUD(shownHUD); } break; }
                 }
-                return before !== backdropKey && backdrop && backdrop.decode ? backdrop.decode().catch(() => null) : null;
+                return null;
               }
             };
             document.body.dataset.sceneDrawn = "1";

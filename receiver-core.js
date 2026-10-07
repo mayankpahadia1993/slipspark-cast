@@ -118,7 +118,12 @@
       normalized.positioning = {
         isReady: positioning.isReady === true,
         instruction: boundedString(positioning.instruction, "Fit your upper body in the frame", 160),
-        joints: normalizeJoints(positioning.joints)
+        eyebrow: positioning.eyebrow == null ? null : boundedString(positioning.eyebrow, "", 80),
+        title: positioning.title == null ? null : boundedString(positioning.title, "", 120),
+        detail: positioning.detail == null ? null : boundedString(positioning.detail, "", 240),
+        hand: positioning.hand == null ? null : boundedString(positioning.hand, "", 60),
+        canHold: positioning.canHold === true,
+        progress: Math.max(0, Math.min(1, Number(positioning.progress) || 0))
       };
     }
 
@@ -294,7 +299,7 @@
 
   function sampleState(kind) {
     const base = { schemaVersion: 2, sequence: 10 };
-    if (kind === "positioning") return normalizeState({ ...base, screen: "positioning", positioning: { isReady: false, instruction: "Fit your upper body in the frame", joints: {} } });
+    if (kind === "positioning") return normalizeState({ ...base, screen: "positioning", positioning: { isReady: true, instruction: "You’re ready.", eyebrow: "FIND YOUR CREASE", title: "You’re ready.", detail: "Return to your stance.\nRaise both hands and hold to start.", hand: "Right-handed batter", canHold: true, progress: 0.45 } });
     if (kind === "cricket") return normalizeState({ ...base, screen: "cricket", cricket: { phase: "delivery", phaseValue: "FULL!", phaseDetail: "DRIVE", runs: 18, wicketsLost: 1, wicketLimit: 3, ballsFaced: 7, totalBalls: 12, ballsRemaining: 5, playerAction: "counterRight" } });
     if (kind === "versusSetup") return normalizeState({ ...base, screen: "versusSetup", versusSetup: { isLeftReady: true, isRightReady: false, instruction: "RED CORNER SET — ONE MORE" } });
     if (kind === "versus") return normalizeState({ ...base, screen: "versus", versus: { phase: "defend", phaseValue: "leftHook", phaseDetail: "DUCK", timeRemaining: 41, currentAttack: "leftHook", calledDefense: "Duck", telegraphDuration: 1.3, left: { score: 1700, health: 82, combo: 1.5, action: "duck" }, right: { score: 1450, health: 70, combo: 1.25, action: "duck" } } });

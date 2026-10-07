@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800;900&family=Nunito:wght@600;700;800;900&display=swap">
-  <link rel="stylesheet" href="receiver.css?v=41">
+  <link rel="stylesheet" href="receiver.css?v=42">
   <script src="https://www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>
 </head>
 <body>
@@ -29,40 +29,21 @@
     </section>
 
     <section id="positioning-screen" class="screen positioning-screen" hidden>
-      <header class="positioning-header">
-        <span class="eyebrow">CAMERA STAYS ON IPHONE</span>
-        <h1 id="positioning-title">FIT YOUR UPPER BODY IN THE FRAME</h1>
-      </header>
-      <div id="positioning-frame" class="positioning-frame">
-        <svg id="pose-skeleton" viewBox="0 0 400 640" aria-hidden="true">
-          <g class="skeleton-lines">
-            <line data-bone="nose-neck" x1="200" y1="118" x2="200" y2="172"></line>
-            <line data-bone="neck-leftShoulder" x1="200" y1="172" x2="132" y2="208"></line>
-            <line data-bone="neck-rightShoulder" x1="200" y1="172" x2="268" y2="208"></line>
-            <line data-bone="leftShoulder-leftElbow" x1="132" y1="208" x2="92" y2="320"></line>
-            <line data-bone="leftElbow-leftWrist" x1="92" y1="320" x2="142" y2="250"></line>
-            <line data-bone="rightShoulder-rightElbow" x1="268" y1="208" x2="308" y2="320"></line>
-            <line data-bone="rightElbow-rightWrist" x1="308" y1="320" x2="258" y2="250"></line>
-            <line data-bone="neck-root" x1="200" y1="172" x2="200" y2="430"></line>
-            <line data-bone="root-leftHip" x1="200" y1="430" x2="155" y2="470"></line>
-            <line data-bone="root-rightHip" x1="200" y1="430" x2="245" y2="470"></line>
-          </g>
-          <g class="skeleton-joints">
-            <circle data-joint="nose" cx="200" cy="118" r="18"></circle>
-            <circle data-joint="neck" cx="200" cy="172" r="9"></circle>
-            <circle data-joint="leftShoulder" cx="132" cy="208" r="9"></circle>
-            <circle data-joint="rightShoulder" cx="268" cy="208" r="9"></circle>
-            <circle data-joint="leftElbow" cx="92" cy="320" r="9"></circle>
-            <circle data-joint="rightElbow" cx="308" cy="320" r="9"></circle>
-            <circle data-joint="leftWrist" cx="142" cy="250" r="12"></circle>
-            <circle data-joint="rightWrist" cx="258" cy="250" r="12"></circle>
-            <circle data-joint="root" cx="200" cy="430" r="9"></circle>
-            <circle data-joint="leftHip" cx="155" cy="470" r="9"></circle>
-            <circle data-joint="rightHip" cx="245" cy="470" r="9"></circle>
-          </g>
+      <div class="stadium-card">
+        <span id="positioning-eyebrow" class="eyebrow">FIND YOUR CREASE</span>
+        <h1 id="positioning-title">Step into view.</h1>
+        <p id="positioning-detail" class="card-detail"></p>
+        <span id="positioning-hand" class="card-note" hidden></span>
+        <!-- The hold ring, as on the phone: fills while both hands stay up. -->
+        <div id="positioning-hold" class="hold" hidden>
+        <svg class="hold-ring" viewBox="0 0 100 100" aria-hidden="true">
+          <circle class="hold-track" cx="50" cy="50" r="44"></circle>
+          <circle class="hold-fill" cx="50" cy="50" r="44"></circle>
+          <g class="hold-figure"><circle cx="50" cy="27" r="7"></circle><path d="M50 37v24M50 41l-13-15M50 41l13-15M50 61l-8 16M50 61l8 16"></path></g>
         </svg>
+          <span id="positioning-hold-label" class="hold-label">Raise both hands and hold</span>
+        </div>
       </div>
-      <div id="positioning-status" class="bottom-chip">TRACKING FROM IPHONE</div>
     </section>
 
     <section id="fight-screen" class="screen fight-screen" hidden>
@@ -235,16 +216,23 @@
         <span id="hud-int-title" class="hud-int-title"></span>
         <strong id="hud-int-instruction" class="hud-int-instruction" hidden></strong>
         <span id="hud-int-detail" class="hud-int-detail"></span>
-        <div id="hud-int-progress" class="hud-int-progress" hidden><i id="hud-int-bar"></i></div>
+        <div id="hud-int-progress" class="hold" hidden>
+        <svg class="hold-ring" viewBox="0 0 100 100" aria-hidden="true">
+            <circle class="hold-track" cx="50" cy="50" r="44"></circle>
+            <circle class="hold-fill" cx="50" cy="50" r="44"></circle>
+            <g class="hold-figure"><circle cx="50" cy="27" r="7"></circle><path d="M50 37v24M50 41l-13-15M50 41l13-15M50 61l-8 16M50 61l8 16"></path></g>
+          </svg>
+          <span id="hud-int-hold-label" class="hold-label">Raise both hands to play on</span>
+        </div>
       </div>
     </div>
     </div>
   </section>
   <!-- ?v= keeps a Chromecast from mixing cached files of two receiver versions. -->
-  <script src="receiver-core.js?v=41"></script>
-  <script src="receiver-video.js?v=41"></script>
-  <script src="receiver-scene-core.js?v=41"></script>
-  <script src="receiver-scene.js?v=41"></script>
-  <script src="receiver.js?v=41"></script>
+  <script src="receiver-core.js?v=42"></script>
+  <script src="receiver-video.js?v=42"></script>
+  <script src="receiver-scene-core.js?v=42"></script>
+  <script src="receiver-scene.js?v=42"></script>
+  <script src="receiver.js?v=42"></script>
 </body>
 </html>
