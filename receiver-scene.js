@@ -93,13 +93,36 @@
       requested.delete(key);
     }
 
+    // Decoded before it is first drawn, so a frame never waits on a photo.
     function loadImage(url) {
       return new Promise((resolve, reject) => {
         const image = new Image();
-        image.onload = () => resolve(image);
         image.onerror = () => reject(new Error("image " + url));
+        image.onload = () => {
+          if (image.decode) image.decode().then(() => resolve(image), () => resolve(image));
+          else resolve(image);
+        };
         image.src = url;
       });
+    }
+
+    // The receiver's own pictures, two at a time, as soon as a phone says
+    // hello: by the first ball every one is ready.
+    function preloadBundled() {
+      const keys = Array.from(bundled.keys());
+      let next = 0;
+      const pump = () => {
+        while (next < keys.length && (images.has(keys[next]) || loading.has(keys[next]))) next += 1;
+        if (next >= keys.length) return;
+        const key = keys[next];
+        next += 1;
+        loading.add(key);
+        loadImage("scene-images/" + bundled.get(key))
+          .then((image) => addImage(key, image), () => loading.delete(key))
+          .then(() => window.setTimeout(pump, 20));
+      };
+      pump();
+      pump();
     }
 
     function loadBundled() {
@@ -581,6 +604,7 @@
     function answerHello() {
       const have = Array.from(new Set([...bundled.keys(), ...cached, ...images.keys()]));
       send({ t: "ready", scene: 1, version: VERSION, ua: navigator.userAgent, have });
+      preloadBundled();
     }
 
     function report(where, error) {
@@ -678,6 +702,33 @@
           const frames = (data.frames || []).map(core.normalizeFrame).filter(Boolean);
           if (!frames.length) return;
           setOn(true);
+          if (at === -2) {
+            // Film mode: a script draws each moment in turn (scripts/cast-scene-film.mjs).
+            on = false;
+            const sorted = frames.slice().sort((x, y) => x.s - y.s);
+            let shownHUD = null;
+            window.__sceneFilm = {
+              start: sorted[0].s,
+              end: sorted[sorted.length - 1].s,
+              drawAt(t) {
+                let low = 0, high = sorted.length - 1;
+                while (low < high) { const mid = (low + high + 1) >> 1; if (sorted[mid].s <= t) low = mid; else high = mid - 1; }
+                const a = sorted[low], b = sorted[low + 1];
+                let frame = a;
+                if (b && t > a.s && b.s - a.s <= core.MAX_BLEND_GAP && core.shapeKey(a) === core.shapeKey(b)) {
+                  frame = core.blendFrames(a, b, Math.min(1, (t - a.s) / (b.s - a.s)));
+                }
+                const before = backdropKey;
+                drawFrame(frame);
+                for (let k = low; k >= 0; k -= 1) {
+                  if (sorted[k].h) { if (sorted[k].h !== shownHUD) { shownHUD = sorted[k].h; renderHUD(shownHUD); } break; }
+                }
+                return before !== backdropKey && backdrop && backdrop.decode ? backdrop.decode().catch(() => null) : null;
+              }
+            };
+            document.body.dataset.sceneDrawn = "1";
+            return;
+          }
           if (at >= 0) {
             on = false;
             const frame = frames[Math.min(at, frames.length - 1)];
