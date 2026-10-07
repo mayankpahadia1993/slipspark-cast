@@ -346,13 +346,9 @@ body[data-scene="on"] #stream { visibility: hidden; }
 .hold-ring circle { fill: none; stroke-width: 8; }
 .hold-track { stroke: rgba(252, 245, 222, .2); }
 .hold-fill { stroke: #ffc252; stroke-linecap: round; stroke-dasharray: 276.5; stroke-dashoffset: 276.5; transition: stroke-dashoffset .15s linear; }
-.hold-figure { transform: rotate(90deg); transform-origin: 50px 50px; }
-.hold-figure circle { fill: #fcf5de; stroke: none; }
-.hold-figure path { fill: none; stroke: #fcf5de; stroke-width: 5.5; stroke-linecap: round; stroke-linejoin: round; }
-.hold.is-holding .hold-figure circle { fill: #ffc252; }
-.hold.is-holding .hold-figure path { stroke: #ffc252; }
 .hold-label { color: var(--paper); font-size: clamp(20px, 1.9vw, 36px); font-weight: 800; }
-.hold.is-holding .hold-label { color: #ffc252; }
+/* The ring shows once both hands are up (it keeps its place, so nothing moves). */
+.hold:not(.is-holding) .hold-ring { visibility: hidden; }
 .hud-interruption .hold { margin-top: 6px; gap: 18px; }
 .hud-interruption .hold-ring { width: 72px; height: 72px; }
 .hud-interruption .hold-label { font-size: 26px; }

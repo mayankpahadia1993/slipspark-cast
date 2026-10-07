@@ -22,13 +22,16 @@
   function text(id, value) { element(id).textContent = value == null ? "" : String(value); }
   function setVisible(target, visible) { target.hidden = !visible; }
 
-  // The hold ring (index.html `.hold`): fills while both hands stay up.
+  // The hold (index.html `.hold`): its words, and once both hands are up a
+  // ring that fills while they stay up. No words when `label` is empty.
   const RING = 276.5;
   function renderHold(container, progress, label) {
     const value = Math.max(0, Math.min(1, Number(progress) || 0));
     container.classList.toggle("is-holding", value > 0);
     container.querySelector(".hold-fill").style.strokeDashoffset = String(RING * (1 - value));
-    container.querySelector(".hold-label").textContent = value > 0 ? "Keep holding" : label;
+    const words = container.querySelector(".hold-label");
+    words.textContent = label || "";
+    words.hidden = !label;
   }
   window.RallycadeHold = renderHold;
 
@@ -42,7 +45,138 @@
     element("positioning-hand").hidden = !positioning.hand;
     const hold = element("positioning-hold");
     hold.hidden = !positioning.canHold;
-    if (positioning.canHold) renderHold(hold, positioning.progress, "Raise both hands and hold");
+    if (positioning.canHold) renderHold(hold, positioning.progress, "Raise both hands to play");
+  }
+
+  function renderFight(fight) {
+    text("score", fight.score.toLocaleString("en-US"));
+    text("combo", fight.combo > 1.01 ? `×${fight.combo.toFixed(2)}` : "");
+    text("timer", core.formatTime(fight.timeRemaining));
+    text("round", fight.currentRound > 1 || fight.timeRemaining > 60 ? `ROUND ${fight.currentRound}` : "");
+    text("opponent-name", fight.opponentName.toUpperCase());
+    element("player-health").style.width = `${fight.playerHealth}%`;
+    element("opponent-health").style.width = `${fight.opponentHealth}%`;
+    element("player-figure").className = `fighter player-figure pose-${fight.playerAction}`;
+    element("opponent-figure").className = `fighter opponent-figure style-${fight.opponentStyle}${fight.opponentHit ? " is-hit" : ""}`;
+
+    const glove = element("incoming-glove");
+    glove.className = `incoming-glove attack-${fight.currentAttack}${fight.attackCommitted ? " is-impact" : ""}`;
+    glove.style.setProperty("--telegraph-duration", `${fight.telegraphDuration}s`);
+    glove.hidden = !(fight.phase === "telegraph" || fight.phase === "defend");
+
+    const target = element("punch-target");
+    target.hidden = !(fight.phase === "counter" || fight.phase === "opening");
+    target.classList.toggle("target-left", fight.phase === "opening" && /LEFT|JAB/.test(fight.phaseValue || ""));
+    target.classList.toggle("target-right", fight.phase === "opening" && /RIGHT|CROSS/.test(fight.phaseValue || ""));
+
+    const callout = element("action-callout");
+    setVisible(callout, true);
+    callout.className = `action-callout phase-${fight.phase}`;
+    let title = fight.phaseValue || "";
+    let detail = fight.phaseDetail || "";
+    if (fight.phase === "telegraph" || fight.phase === "defend") {
+      title = (fight.phaseDetail || "MOVE").toUpperCase();
+      detail = fight.phase === "defend" ? "NOW!" : "GET READY";
+    }
+    if (fight.phase === "feedback") title = title.toUpperCase();
+    const comboProgress = fight.comboStep && fight.comboTotal ? ` · ${fight.comboStep}/${fight.comboTotal}` : "";
+    text("action-title", title);
+    text("action-detail", `${detail}${comboProgress}`);
+  }
+
+  function renderCricket(cricket) {
+    text("cricket-runs", cricket.runs.toLocaleString("en-US"));
+    text("cricket-wickets", `${cricket.wicketsLost}/${cricket.wicketLimit}`);
+    text("cricket-ball", `BALL ${Math.min(cricket.ballsFaced + 1, cricket.totalBalls)}/${cricket.totalBalls}`);
+    text("cricket-chase", cricket.runsNeeded == null ? "" : `NEED ${cricket.runsNeeded} OFF ${cricket.ballsRemaining}`);
+    text("cricket-title", (cricket.phaseValue || "").toUpperCase());
+    text("cricket-detail", (cricket.phaseDetail || "").toUpperCase());
+  }
+
+  function renderVersusSetup(setup) {
+    text("versus-setup-title", setup.instruction.toUpperCase());
+    element("red-corner-guide").classList.toggle("is-ready", setup.isLeftReady);
+    element("blue-corner-guide").classList.toggle("is-ready", setup.isRightReady);
+    element("red-corner-guide").querySelector("span").textContent = setup.isLeftReady ? "READY" : "STEP IN";
+    element("blue-corner-guide").querySelector("span").textContent = setup.isRightReady ? "READY" : "STEP IN";
+    text("versus-setup-status", setup.isReady ? "✓ STARTING FIGHT…" : "ONE FIGHTER IN EACH FRAME");
+  }
+
+  function renderVersus(versus) {
+    text("versus-left-score", versus.left.score.toLocaleString("en-US"));
+    text("versus-right-score", versus.right.score.toLocaleString("en-US"));
+    text("versus-timer", core.formatTime(versus.timeRemaining));
+    element("versus-left-health").style.width = `${versus.left.health}%`;
+    element("versus-right-health").style.width = `${versus.right.health}%`;
+    element("versus-left-figure").className = `versus-figure red pose-${versus.left.action}`;
+    element("versus-right-figure").className = `versus-figure blue pose-${versus.right.action}`;
+    let title = versus.phaseValue || "";
+    let detail = versus.phaseDetail || "";
+    if (versus.phase === "telegraph" || versus.phase === "defend") {
+      title = (versus.phaseDetail || "MOVE").toUpperCase();
+      detail = versus.phase === "defend" ? "NOW — BOTH PLAYERS" : "GET READY";
+    }
+    const comboProgress = versus.comboStep && versus.comboTotal ? ` · ${versus.comboStep}/${versus.comboTotal}` : "";
+    text("versus-title", title.toUpperCase());
+    text("versus-detail", `${detail}${comboProgress}`.toUpperCase());
+    text("versus-left-feedback", versus.left.feedback || "");
+    text("versus-right-feedback", versus.right.feedback || "");
+  }
+
+  function renderResult(result) {
+    text("result-mode", result.mode);
+    text("result-headline", result.headline.toUpperCase());
+    text("result-score", result.score.toLocaleString("en-US"));
+    text("result-caption", result.caption);
+    // Build 123 phones send the innings' own score and words ("97/1",
+    // "Raise both hands to bat again"); older ones only the number.
+    if (result.scoreText) text("result-score", result.scoreText);
+    text("result-hint", result.hint || "Raise both hands to go again · Results saved on your iPhone");
+    const host = element("result-stats");
+    host.replaceChildren(...result.stats.map((stat) => {
+      const card = document.createElement("div");
+      card.className = "result-stat";
+      const value = document.createElement("strong");
+      value.textContent = stat.value;
+      const label = document.createElement("span");
+      label.textContent = stat.label;
+      card.append(value, label);
+      return card;
+    }));
+  }
+
+  function renderVersusResult(result) {
+    text("versus-result-headline", result.headline);
+    text("versus-result-detail", result.detail);
+    text("versus-result-left-score", result.leftScore.toLocaleString("en-US"));
+    text("versus-result-right-score", result.rightScore.toLocaleString("en-US"));
+    text("versus-result-left-stats", `${result.leftDefense}% DEFENSE · ${result.leftCounters} COUNTERS`);
+    text("versus-result-right-stats", `${result.rightDefense}% DEFENSE · ${result.rightCounters} COUNTERS`);
+    element("versus-result-left").classList.toggle("is-winner", result.winner === "left");
+    element("versus-result-right").classList.toggle("is-winner", result.winner === "right");
+  }
+
+  function renderDuelHandoff(handoff) {
+    // Play a friend names who bats next and says where the chase goes.
+    text("duel-handoff-title", handoff.title || "PLAYER 2 — YOUR CHASE");
+    text("duel-target", handoff.target.toLocaleString("en-US"));
+    text("duel-rules", handoff.rules || `${handoff.balls} BALLS · ${handoff.wickets} WICKETS · SAME DELIVERIES`);
+    text("duel-handoff-note", handoff.note || "Raise both hands at the crease to begin");
+  }
+
+  function renderDuelResult(result) {
+    text("duel-result-eyebrow", result.eyebrow || "CHASE DUEL");
+    text("duel-result-first-name", result.firstName || "PLAYER 1");
+    text("duel-result-second-name", result.secondName || "PLAYER 2");
+    text("duel-result-note", result.note || "Raise both hands for another duel");
+    text("duel-result-headline", result.headline);
+    text("duel-result-margin", result.margin);
+    text("duel-result-first-score", result.firstRuns.toLocaleString("en-US"));
+    text("duel-result-second-score", result.secondRuns.toLocaleString("en-US"));
+    text("duel-result-first-wickets", `${result.firstWickets} WICKET${result.firstWickets === 1 ? "" : "S"} DOWN`);
+    text("duel-result-second-wickets", `${result.secondWickets} WICKET${result.secondWickets === 1 ? "" : "S"} DOWN`);
+    element("duel-result-first").classList.toggle("is-winner", result.winner === "first");
+    element("duel-result-second").classList.toggle("is-winner", result.winner === "second");
   }
 
   const VERDICT_WORDS = {

@@ -555,7 +555,7 @@
         setText("hud-int-detail", interruption.detail);
         show("hud-int-progress", interruption.progress != null);
         if (interruption.progress != null && window.RallycadeHold) {
-          window.RallycadeHold(el("hud-int-progress"), interruption.progress, "Raise both hands to play on");
+          window.RallycadeHold(el("hud-int-progress"), interruption.progress, "");
         }
       }
     }

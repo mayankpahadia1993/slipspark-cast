@@ -204,7 +204,9 @@
         score: Math.floor(clamp(result.score, 0, 999999999)),
         caption: boundedString(result.caption, "FINAL SCORE", 48),
         isPersonalBest: result.isPersonalBest === true,
-        stats: normalizeStats(result.stats)
+        stats: normalizeStats(result.stats),
+        scoreText: result.scoreText == null ? null : boundedString(result.scoreText, "", 24),
+        hint: result.hint == null ? null : boundedString(result.hint, "", 120)
       };
     }
 

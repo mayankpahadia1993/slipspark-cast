@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800;900&family=Nunito:wght@600;700;800;900&display=swap">
-  <link rel="stylesheet" href="receiver.css?v=43">
+  <link rel="stylesheet" href="receiver.css?v=44">
   <script src="https://www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>
 </head>
 <body>
@@ -34,14 +34,14 @@
         <h1 id="positioning-title">Step into view.</h1>
         <p id="positioning-detail" class="card-detail"></p>
         <span id="positioning-hand" class="card-note" hidden></span>
-        <!-- The hold ring, as on the phone: fills while both hands stay up. -->
+        <!-- As on the phone: the words, and once both hands are up a ring
+             that fills while they stay up. -->
         <div id="positioning-hold" class="hold" hidden>
-        <svg class="hold-ring" viewBox="0 0 100 100" aria-hidden="true">
-          <circle class="hold-track" cx="50" cy="50" r="44"></circle>
-          <circle class="hold-fill" cx="50" cy="50" r="44"></circle>
-          <g class="hold-figure"><circle cx="50" cy="27" r="7"></circle><path d="M50 37v24M50 41l-13-15M50 41l13-15M50 61l-8 16M50 61l8 16"></path></g>
-        </svg>
-          <span id="positioning-hold-label" class="hold-label">Raise both hands and hold</span>
+          <span id="positioning-hold-label" class="hold-label">Raise both hands to play</span>
+          <svg class="hold-ring" viewBox="0 0 100 100" aria-hidden="true">
+            <circle class="hold-track" cx="50" cy="50" r="44"></circle>
+            <circle class="hold-fill" cx="50" cy="50" r="44"></circle>
+          </svg>
         </div>
       </div>
     </section>
@@ -120,7 +120,7 @@
       <strong id="result-score" class="hero-score">0</strong>
       <span id="result-caption" class="score-caption">FINAL SCORE</span>
       <div id="result-stats" class="result-stats"></div>
-      <p>Raise both hands to go again · Results saved on your iPhone</p>
+      <p id="result-hint">Raise both hands to go again · Results saved on your iPhone</p>
     </section>
 
     <section id="versus-result-screen" class="screen scorecard-screen" hidden>
@@ -216,23 +216,23 @@
         <span id="hud-int-title" class="hud-int-title"></span>
         <strong id="hud-int-instruction" class="hud-int-instruction" hidden></strong>
         <span id="hud-int-detail" class="hud-int-detail"></span>
+        <!-- The card already says how to play on: only the ring, while hands are up. -->
         <div id="hud-int-progress" class="hold" hidden>
-        <svg class="hold-ring" viewBox="0 0 100 100" aria-hidden="true">
+          <span id="hud-int-hold-label" class="hold-label" hidden></span>
+          <svg class="hold-ring" viewBox="0 0 100 100" aria-hidden="true">
             <circle class="hold-track" cx="50" cy="50" r="44"></circle>
             <circle class="hold-fill" cx="50" cy="50" r="44"></circle>
-            <g class="hold-figure"><circle cx="50" cy="27" r="7"></circle><path d="M50 37v24M50 41l-13-15M50 41l13-15M50 61l-8 16M50 61l8 16"></path></g>
           </svg>
-          <span id="hud-int-hold-label" class="hold-label">Raise both hands to play on</span>
         </div>
       </div>
     </div>
     </div>
   </section>
   <!-- ?v= keeps a Chromecast from mixing cached files of two receiver versions. -->
-  <script src="receiver-core.js?v=43"></script>
-  <script src="receiver-video.js?v=43"></script>
-  <script src="receiver-scene-core.js?v=43"></script>
-  <script src="receiver-scene.js?v=43"></script>
-  <script src="receiver.js?v=43"></script>
+  <script src="receiver-core.js?v=44"></script>
+  <script src="receiver-video.js?v=44"></script>
+  <script src="receiver-scene-core.js?v=44"></script>
+  <script src="receiver-scene.js?v=44"></script>
+  <script src="receiver.js?v=44"></script>
 </body>
 </html>
