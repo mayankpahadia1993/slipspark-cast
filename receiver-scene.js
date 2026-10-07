@@ -589,7 +589,30 @@
 
     function snapshot(quality) {
       try {
-        const data = canvas.toDataURL("image/jpeg", quality || 0.7).split(",")[1] || "";
+        // The picture as the TV shows it, less the HUD: the backdrop, the
+        // canvas and the shading.
+        const shot = document.createElement("canvas");
+        shot.width = canvas.width;
+        shot.height = canvas.height;
+        const c = shot.getContext("2d");
+        c.fillStyle = "#0c1a17";
+        c.fillRect(0, 0, shot.width, shot.height);
+        if (backdrop && !backdrop.hidden && backdropKey && images.get(backdropKey)) {
+          const m = (backdropTransform.match(/[-0-9.]+/g) || []).map(Number);
+          const k = shot.width / window.innerWidth;
+          if (m.length === 6) c.setTransform(m[0] * k, 0, 0, m[3] * k, m[4] * k, m[5] * k);
+          c.drawImage(images.get(backdropKey), 0, 0);
+          c.setTransform(1, 0, 0, 1, 0, 0);
+        }
+        c.drawImage(canvas, 0, 0);
+        const shade = c.createLinearGradient(0, 0, 0, shot.height);
+        shade.addColorStop(0, "rgba(0,0,0,0.22)");
+        shade.addColorStop(1 / 3, "rgba(0,0,0,0)");
+        shade.addColorStop(2 / 3, "rgba(0,0,0,0)");
+        shade.addColorStop(1, "rgba(0,0,0,0.24)");
+        c.fillStyle = shade;
+        c.fillRect(0, 0, shot.width, shot.height);
+        const data = shot.toDataURL("image/jpeg", quality || 0.7).split(",")[1] || "";
         const parts = Math.ceil(data.length / 30000);
         for (let index = 0; index < parts; index += 1) {
           send({ t: "snap", n: index, of: parts, d: data.slice(index * 30000, (index + 1) * 30000) });
