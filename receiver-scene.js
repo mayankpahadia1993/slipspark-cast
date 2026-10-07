@@ -22,6 +22,9 @@
     const canvas = options.canvas;
     const hud = options.hud;
     const send = options.send;
+    // The 16:9 box the stadium fills, in CSS pixels.
+    const stageBox = options.stage || root;
+    const boxWidth = () => stageBox.clientWidth || window.innerWidth;
     const ctx = canvas.getContext("2d");
     // The opaque photo a frame starts from (the stadium, or the replay's
     // outfield) sits behind the canvas as an image the TV's GPU composites:
@@ -60,7 +63,7 @@
 
     function resize() {
       const ratio = Math.min(window.devicePixelRatio || 1, 1.5);
-      const width = Math.round(Math.min(maxCanvasWidth, window.innerWidth * ratio));
+      const width = Math.round(Math.min(maxCanvasWidth, boxWidth() * ratio));
       const height = Math.round(width * STAGE.height / STAGE.width);
       if (canvas.width !== width || canvas.height !== height) {
         canvas.width = width;
@@ -70,7 +73,7 @@
         backdropTransform = "";
       }
       scale = canvas.width / STAGE.width;
-      const stageScale = Math.min(window.innerWidth / HUD_STAGE.width, window.innerHeight / HUD_STAGE.height);
+      const stageScale = boxWidth() / HUD_STAGE.width;
       hud.style.transform = "scale(" + stageScale + ")";
     }
     window.addEventListener("resize", resize);
@@ -269,7 +272,7 @@
         backdrop.src = image.src;
       }
       // Stage points to the screen's CSS pixels.
-      const css = window.innerWidth / STAGE.width;
+      const css = boxWidth() / STAGE.width;
       const m = op[4];
       const transform = "matrix(" + [m[0] / 10000 * css, 0, 0, m[3] / 10000 * css, m[4] / 10 * css, m[5] / 10 * css]
         .map((v) => v.toFixed(4)).join(",") + ")";
@@ -598,6 +601,8 @@
       on = !!value;
       root.hidden = !on;
       document.body.dataset.scene = on ? "on" : "off";
+      // Measured once it is on screen: hidden, the stage has no size.
+      if (on) resize();
       if (!on) timeline.clear();
     }
 
@@ -624,7 +629,7 @@
         c.fillRect(0, 0, shot.width, shot.height);
         if (backdrop && !backdrop.hidden && backdropKey && images.get(backdropKey)) {
           const m = (backdropTransform.match(/[-0-9.]+/g) || []).map(Number);
-          const k = shot.width / window.innerWidth;
+          const k = shot.width / boxWidth();
           if (m.length === 6) c.setTransform(m[0] * k, 0, 0, m[3] * k, m[4] * k, m[5] * k);
           c.drawImage(images.get(backdropKey), 0, 0);
           c.setTransform(1, 0, 0, 1, 0, 0);
@@ -710,6 +715,12 @@
             window.__sceneFilm = {
               start: sorted[0].s,
               end: sorted[sorted.length - 1].s,
+              // The recording's own frame `index`, exactly (the parity check).
+              drawIndex(index) {
+                const before = backdropKey;
+                drawFrame(frames[index]);
+                return before !== backdropKey && backdrop && backdrop.decode ? backdrop.decode().catch(() => null) : null;
+              },
               drawAt(t) {
                 let low = 0, high = sorted.length - 1;
                 while (low < high) { const mid = (low + high + 1) >> 1; if (sorted[mid].s <= t) low = mid; else high = mid - 1; }

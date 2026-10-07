@@ -213,6 +213,7 @@
   const scene = sceneModule && sceneModule.createScene({
     root: document.getElementById("scene"),
     canvas: document.getElementById("scene-canvas"),
+    stage: document.getElementById("scene-stage"),
     backdrop: document.getElementById("scene-backdrop"),
     hud: document.getElementById("scene-hud"),
     send: (message) => sendScene(message)
