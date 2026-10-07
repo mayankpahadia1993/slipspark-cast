@@ -202,10 +202,30 @@
     if (state.cricketDuelResult) renderDuelResult(state.cricketDuelResult);
   }
 
-  const preview = new URLSearchParams(window.location.search).get("preview");
+  const query = new URLSearchParams(window.location.search);
+  const preview = query.get("preview");
   render(core.sampleState(preview || "ready"));
 
-  if (!preview && window.cast && window.cast.framework) {
+  // The stadium the TV draws itself, from the phone's drawing commands.
+  const sceneModule = window.RallycadeReceiverScene;
+  let sceneSender = null;
+  let sendScene = () => {};
+  const scene = sceneModule && sceneModule.createScene({
+    root: document.getElementById("scene"),
+    canvas: document.getElementById("scene-canvas"),
+    hud: document.getElementById("scene-hud"),
+    send: (message) => sendScene(message)
+  });
+  window.__rallycadeScene = scene;
+
+  // ?scene=<recording.json> plays frames recorded from the phone, for
+  // checking the drawing in a browser (scripts/cast-scene-check).
+  if (scene && query.get("scene")) {
+    if (query.get("hud") === "0") document.getElementById("scene-hud").hidden = true;
+    scene.playRecordingAt(query.get("scene"), Number(query.get("at") || -1));
+  }
+
+  if (!preview && !query.get("scene") && window.cast && window.cast.framework) {
     const context = window.cast.framework.CastReceiverContext.getInstance();
     let reportFailure = () => {};
     context.addCustomMessageListener(NAMESPACE, (event) => {
@@ -240,10 +260,25 @@
       window.addEventListener("error", (event) => player.report("script", event.message + " @" + event.lineno));
       window.addEventListener("unhandledrejection", (event) => player.report("promise", event.reason));
     }
+    if (scene) {
+      sendScene = (message) => {
+        if (sceneSender) context.sendCustomMessage(sceneModule.NAMESPACE, sceneSender, message);
+      };
+      context.addCustomMessageListener(sceneModule.NAMESPACE, (event) => {
+        sceneSender = event.senderId;
+        try { scene.handle(event.data); } catch (error) { scene.report("handle", error); }
+      });
+      window.addEventListener("error", (event) => scene.report("script", event.message + " @" + event.lineno));
+      // A phone that leaves takes its stadium with it.
+      context.addEventListener(window.cast.framework.system.EventType.SENDER_DISCONNECTED, (event) => {
+        if (event.senderId === sceneSender) { sceneSender = null; scene.setOn(false); }
+      });
+    }
     const options = new window.cast.framework.CastReceiverOptions();
     options.customNamespaces = {};
     options.customNamespaces[NAMESPACE] = window.cast.framework.system.MessageType.JSON;
     if (videoModule) options.customNamespaces[videoModule.NAMESPACE] = window.cast.framework.system.MessageType.JSON;
+    if (scene) options.customNamespaces[sceneModule.NAMESPACE] = window.cast.framework.system.MessageType.JSON;
     options.disableIdleTimeout = true;
     options.skipPlayersLoad = true;
     options.statusText = "Rallycade is ready";

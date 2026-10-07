@@ -4,7 +4,10 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Rallycade TV</title>
-  <link rel="stylesheet" href="receiver.css?v=32">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800;900&family=Nunito:wght@600;700;800;900&display=swap">
+  <link rel="stylesheet" href="receiver.css?v=33">
   <script src="https://www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>
 </head>
 <body>
@@ -171,9 +174,61 @@
   </main>
 
   <video id="stream" muted autoplay playsinline disablepictureinpicture aria-label="Rallycade on your iPhone"></video>
+
+  <!-- The stadium the TV draws from the phone's drawing commands, and its HUD. -->
+  <section id="scene" class="scene" hidden aria-label="Rallycade stadium">
+    <canvas id="scene-canvas"></canvas>
+    <div id="scene-hud" class="scene-hud">
+      <div class="hud-top">
+        <div class="hud-left">
+          <div id="hud-score" class="hud-scorebug">
+            <strong id="hud-runs">0/0</strong>
+            <span class="hud-overs"><small>OVERS</small><b id="hud-overs">0.0 of 2</b></span>
+          </div>
+          <div id="hud-check" class="hud-scorebug hud-check" hidden>
+            <small>TIMING CHECK</small><strong id="hud-check-ball">Ball 1 of 6</strong>
+          </div>
+          <div id="hud-friend" class="hud-friend" hidden></div>
+        </div>
+        <div id="hud-status" class="hud-status">
+          <strong id="hud-status-title"></strong>
+          <span id="hud-status-detail" hidden></span>
+        </div>
+        <div class="hud-right">
+          <div class="hud-over-card">
+            <div id="hud-over"><small>THIS OVER</small><div id="hud-over-dots" class="hud-dots"><i></i><i></i><i></i><i></i><i></i><i></i></div></div>
+            <div id="hud-verdicts" hidden><small>YOUR TIMING</small><div id="hud-verdict-dots" class="hud-dots hud-verdict-dots"></div></div>
+          </div>
+          <div id="hud-speed" class="hud-speed" hidden></div>
+        </div>
+      </div>
+      <div id="hud-cards" class="hud-cards" hidden>
+        <div id="hud-timing" class="hud-timing"></div>
+        <div id="hud-cue" class="hud-cue" hidden>
+          <strong id="hud-cue-title"></strong>
+          <b id="hud-cue-direction"></b>
+          <span id="hud-cue-detail"></span>
+        </div>
+      </div>
+      <div id="hud-moves" class="hud-moves" hidden></div>
+      <div id="hud-caption" class="hud-caption" hidden>
+        <svg class="hud-mic" viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="2" width="8" height="13" rx="4"/><path d="M5 11a7 7 0 0 0 14 0" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/><rect x="10.8" y="18" width="2.4" height="4" rx="1"/></svg>
+        <span id="hud-caption-text"></span>
+      </div>
+      <div id="hud-interruption" class="hud-interruption" hidden>
+        <svg class="hud-pause" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="3" width="5" height="18" rx="1.6"/><rect x="14" y="3" width="5" height="18" rx="1.6"/></svg>
+        <span id="hud-int-title" class="hud-int-title"></span>
+        <strong id="hud-int-instruction" class="hud-int-instruction" hidden></strong>
+        <span id="hud-int-detail" class="hud-int-detail"></span>
+        <div id="hud-int-progress" class="hud-int-progress" hidden><i id="hud-int-bar"></i></div>
+      </div>
+    </div>
+  </section>
   <!-- ?v= keeps a Chromecast from mixing cached files of two receiver versions. -->
-  <script src="receiver-core.js?v=32"></script>
-  <script src="receiver-video.js?v=32"></script>
-  <script src="receiver.js?v=32"></script>
+  <script src="receiver-core.js?v=33"></script>
+  <script src="receiver-video.js?v=33"></script>
+  <script src="receiver-scene-core.js?v=33"></script>
+  <script src="receiver-scene.js?v=33"></script>
+  <script src="receiver.js?v=33"></script>
 </body>
 </html>
