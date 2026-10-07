@@ -35,6 +35,11 @@
     let debug = false;
     let scale = 1;
     let lastStamp = null;
+    // The canvas's most pixels across: the Chromecast's software raster
+    // can't fill 1920 x 1080 thirty times a second. The phone can set it.
+    let maxCanvasWidth = 1280;
+    let smoothing = "low";
+    let lastLoop = 0;
     // A picture arrived or the screen changed size: draw the frame again.
     let needsRedraw = false;
     let lastAck = 0;
@@ -42,13 +47,13 @@
     let lastNeed = 0;
     let readyToAnswer = false;
     let pendingHello = false;
-    const counters = { draws: 0, blended: 0, frames: 0, late: [], drawMs: [], missing: 0, redraws: 0 };
+    const counters = { draws: 0, blended: 0, frames: 0, late: [], drawMs: [], missing: 0, redraws: 0, gaps: [] };
 
     // MARK: Sizing
 
     function resize() {
       const ratio = Math.min(window.devicePixelRatio || 1, 1.5);
-      const width = Math.round(Math.min(HUD_STAGE.width, window.innerWidth * ratio));
+      const width = Math.round(Math.min(maxCanvasWidth, window.innerWidth * ratio));
       const height = Math.round(width * STAGE.height / STAGE.width);
       if (canvas.width !== width || canvas.height !== height) {
         canvas.width = width;
@@ -254,7 +259,7 @@
       ctx.filter = "none";
       ctx.fillStyle = "#0c1a17";
       ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.imageSmoothingQuality = "medium";
+      ctx.imageSmoothingQuality = smoothing;
       const stack = [{ c: ctx }];
       let c = ctx;
       for (const op of frame.o) {
@@ -432,6 +437,8 @@
       window.requestAnimationFrame(frameLoop);
       if (!on) return;
       const local = performance.now();
+      if (lastLoop) counters.gaps.push(local - lastLoop);
+      lastLoop = local;
       const phoneNow = clock.phoneNow(local);
       if (phoneNow == null) return;
       const result = timeline.at(phoneNow);
@@ -468,12 +475,14 @@
           drawMs: Number(core.percentile(counters.drawMs, 0.5).toFixed(1)),
           drawMax: Number(Math.max(0, ...counters.drawMs).toFixed(1)),
           missing: counters.missing, images: images.size, queue: timeline.length,
-          synced: clock.synced ? 1 : 0, w: canvas.width
+          synced: clock.synced ? 1 : 0, w: canvas.width,
+          gap: Number(core.percentile(counters.gaps, 0.5).toFixed(1)),
+          gap90: Number(core.percentile(counters.gaps, 0.9).toFixed(1))
         };
         send(stats);
         if (debug) setDebug(stats);
         counters.draws = 0; counters.blended = 0; counters.frames = 0; counters.redraws = 0;
-        counters.late = []; counters.drawMs = []; counters.missing = 0;
+        counters.late = []; counters.drawMs = []; counters.missing = 0; counters.gaps = [];
       }
     }
 
@@ -530,6 +539,8 @@
       switch (message.t) {
         case "hello":
           debug = message.debug === 1;
+          if (Number(message.canvas) >= 320) { maxCanvasWidth = Math.min(1920, Number(message.canvas)); resize(); }
+          if (["low", "medium", "high"].indexOf(message.smooth) >= 0) smoothing = message.smooth;
           clock.reset();
           timeline.clear();
           if (readyToAnswer) answerHello(); else pendingHello = true;
