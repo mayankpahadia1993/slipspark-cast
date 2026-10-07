@@ -266,6 +266,12 @@
         if (sceneSender) context.sendCustomMessage(sceneModule.NAMESPACE, sceneSender, message);
       };
       context.addCustomMessageListener(sceneModule.NAMESPACE, (event) => {
+        // A snapshot goes back to whoever asked (a test bench beside the
+        // phone), which never becomes the stadium's sender.
+        if (event.data && event.data.t === "snap") {
+          scene.snapshot(event.data.q, (message) => context.sendCustomMessage(sceneModule.NAMESPACE, event.senderId, message));
+          return;
+        }
         sceneSender = event.senderId;
         try { scene.handle(event.data); } catch (error) { scene.report("handle", error); }
       });

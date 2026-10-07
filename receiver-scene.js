@@ -587,7 +587,8 @@
       send({ t: "error", where, message: String((error && error.message) || error).slice(0, 300) });
     }
 
-    function snapshot(quality) {
+    function snapshot(quality, reply) {
+      const answer = reply || send;
       try {
         // The picture as the TV shows it, less the HUD: the backdrop, the
         // canvas and the shading.
@@ -615,7 +616,7 @@
         const data = shot.toDataURL("image/jpeg", quality || 0.7).split(",")[1] || "";
         const parts = Math.ceil(data.length / 30000);
         for (let index = 0; index < parts; index += 1) {
-          send({ t: "snap", n: index, of: parts, d: data.slice(index * 30000, (index + 1) * 30000) });
+          answer({ t: "snap", n: index, of: parts, d: data.slice(index * 30000, (index + 1) * 30000) });
         }
       } catch (error) { report("snap", error); }
     }
@@ -723,7 +724,7 @@
     });
     window.requestAnimationFrame(frameLoop);
 
-    return { NAMESPACE, handle, report, setOn, renderHUD, drawFrame, playRecording, playRecordingAt, timeline, clock, images };
+    return { NAMESPACE, handle, report, setOn, renderHUD, drawFrame, playRecording, playRecordingAt, snapshot, timeline, clock, images };
   }
 
   window.RallycadeReceiverScene = { NAMESPACE, createScene };
