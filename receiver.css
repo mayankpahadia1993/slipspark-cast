@@ -297,7 +297,7 @@ body[data-scene="on"] #stream { visibility: hidden; }
 #app {
   background:
     linear-gradient(180deg, rgba(6, 14, 12, .55) 0%, rgba(6, 14, 12, .72) 55%, rgba(6, 14, 12, .86) 100%),
-    url("scene-images/stadium-backdrop-1672x941.jpg") center / cover no-repeat,
+    url("scene-images/stadium-ground-1672x941.jpg") center / cover no-repeat,
     #0c1a17;
 }
 #app[data-screen="fight"], #app[data-screen="versus"], #app[data-screen="versusSetup"], #app[data-screen="versusResult"] {
