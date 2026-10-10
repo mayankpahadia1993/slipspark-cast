@@ -123,7 +123,9 @@
         detail: positioning.detail == null ? null : boundedString(positioning.detail, "", 240),
         hand: positioning.hand == null ? null : boundedString(positioning.hand, "", 60),
         canHold: positioning.canHold === true,
-        progress: Math.max(0, Math.min(1, Number(positioning.progress) || 0))
+        progress: Math.max(0, Math.min(1, Number(positioning.progress) || 0)),
+        // Build 134 phones name the gesture; older ones need both hands.
+        holdLabel: boundedString(positioning.holdLabel, "Raise both hands to play", 60)
       };
     }
 
@@ -265,7 +267,7 @@
           .map((verdict) => verdicts.has(verdict) ? verdict : "noSwing"),
         lines: (Array.isArray(check.lines) ? check.lines : []).slice(0, 6)
           .map((line) => optionalString(line, 200)).filter(Boolean),
-        note: boundedString(check.note, "Raise a hand to play your innings", 120)
+        note: boundedString(check.note, "Raise both hands to play your innings", 120)
       };
     }
 
