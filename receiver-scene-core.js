@@ -271,6 +271,82 @@
     return sorted[Math.min(sorted.length - 1, Math.floor(p * sorted.length))];
   }
 
+  // MARK: Pictures
+
+  // A named picture's key ends in its size on the phone ("bowler-3-119x301"),
+  // and the phone's matrices map that many pixels onto the stage. The TV
+  // draws whatever file it has into that rect, so a sharper copy of the same
+  // art (more pixels) lands in the same place. Keys without a size (pictures
+  // known by a hash of their pixels) are drawn at the file's own size.
+  function pictureSize(key) {
+    const match = /-(\d+)x(\d+)$/.exec(String(key == null ? "" : key));
+    if (!match) return null;
+    const width = Number(match[1]), height = Number(match[2]);
+    return width > 0 && height > 0 ? { width, height } : null;
+  }
+
+  // MARK: Canvas size
+
+  // How wide the canvas is drawn. A Chromecast Ultra rasterises the canvas
+  // in software: 13–15 frames a second at 1920 x 1080, 25–30 at 1280 x 720.
+  // Devices running Android TV (the Google TV Streamer, Chromecast with
+  // Google TV 4K and HD, TVs with Cast built in) start at 1920 and drop to
+  // 1280 for good if they can't keep `minFps`; the Linux Cast dongles
+  // (Chromecast 1st–3rd generation, Ultra) stay at 1280 and never try.
+  const CANVAS = { wide: 1920, narrow: 1280, minFps: 25 };
+
+  // `device`: `ua` (navigator.userAgent), `pinned` (a width the phone or the
+  // bench asked for in `hello`), `wide` (the phone's hello allows 1920: build
+  // 134 on), `remembered` (what this TV found last time: `{ua, width}`).
+  // Returns the most pixels across, whether to keep watching the frame
+  // rate, and why (sent in `stats`). Phones that don't allow it (the App
+  // Store's 2.6) keep the 1280 canvas they were released with.
+  function canvasPlan(device) {
+    const ua = String((device && device.ua) || "");
+    const pinned = Number(device && device.pinned);
+    if (pinned >= 320) return { width: Math.min(CANVAS.wide, Math.round(pinned)), adaptive: false, why: "asked" };
+    if (!(device && device.wide)) return { width: CANVAS.narrow, adaptive: false, why: "phone" };
+    const remembered = device && device.remembered;
+    if (remembered && remembered.ua === ua && Number(remembered.width) <= CANVAS.narrow) {
+      return { width: CANVAS.narrow, adaptive: false, why: "slow-before" };
+    }
+    if (/Android|GoogleTV|Google TV/i.test(ua)) return { width: CANVAS.wide, adaptive: true, why: "tv" };
+    return { width: CANVAS.narrow, adaptive: false, why: "dongle" };
+  }
+
+  // The canvas's width for a stage box `box` CSS pixels wide: the screen's
+  // own pixels, at most `max`, never more than the screen has.
+  function canvasWidth(box, pixelRatio, max) {
+    const ratio = Math.min(Number(pixelRatio) || 1, 2);
+    return Math.max(1, Math.round(Math.min(max, (Number(box) || 0) * ratio)));
+  }
+
+  // Watches a wide canvas's frame rate: how long from each animation frame
+  // that drew to the next frame. `tick(now, drew)` once per animation frame
+  // while the stadium is on; it answers true when `strikes` batches in a row
+  // had a median slower than `minFps`. A gap over a second (the stadium
+  // waiting, a hidden page) is no measure of drawing and is skipped.
+  function createRateWatch(options) {
+    const batch = (options && options.batch) || 20;
+    const strikesToDrop = (options && options.strikes) || 2;
+    const slowest = 1000 / ((options && options.minFps) || CANVAS.minFps);
+    let samples = [];
+    let strikes = 0;
+    let lastDrew = null;
+    return {
+      get strikes() { return strikes; },
+      tick(now, drew) {
+        if (lastDrew !== null && now - lastDrew < 1000) samples.push(now - lastDrew);
+        lastDrew = drew ? now : null;
+        if (samples.length < batch) return false;
+        strikes = percentile(samples, 0.5) > slowest ? strikes + 1 : 0;
+        samples = [];
+        return strikes >= strikesToDrop;
+      },
+      reset() { samples = []; strikes = 0; lastDrew = null; }
+    };
+  }
+
   // Path commands and their points (tenths) to drawing calls, given a target
   // with moveTo/lineTo/quadraticCurveTo/bezierCurveTo/closePath (Path2D).
   function tracePath(target, commands, points) {
@@ -299,7 +375,7 @@
   }
 
   return {
-    STAGE, MAX_BLEND_GAP, normalizeFrame, shapeKey, blendFrames, blendFramesInto, cloneFrame, createTimeline, createClock,
-    percentile, tracePath, cssColor
+    STAGE, MAX_BLEND_GAP, CANVAS, normalizeFrame, shapeKey, blendFrames, blendFramesInto, cloneFrame, createTimeline, createClock,
+    percentile, tracePath, cssColor, pictureSize, canvasPlan, canvasWidth, createRateWatch
   };
 });

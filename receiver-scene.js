@@ -50,9 +50,14 @@
     let debug = false;
     let scale = 1;
     let lastStamp = null;
-    // The canvas's most pixels across: the Chromecast's software raster
+    // The canvas's most pixels across (core.canvasPlan): 1920 on devices
+    // that keep up, 1280 on the Chromecast dongles, whose software raster
     // can't fill 1920 x 1080 thirty times a second. The phone can set it.
-    let maxCanvasWidth = 1280;
+    let plan = core.canvasPlan({ ua: navigator.userAgent, pinned: options.canvasWidth, remembered: rememberedCanvas() });
+    let maxCanvasWidth = plan.width;
+    const rateWatch = core.createRateWatch({ minFps: core.CANVAS.minFps });
+    // The last frame drawn, drawn again at once when the canvas narrows.
+    let shownFrame = null;
     let smoothing = "low";
     let lastLoop = 0;
     // A picture arrived or the screen changed size: draw the frame again.
@@ -66,9 +71,31 @@
 
     // MARK: Sizing
 
+    // What this TV found last time (a device too slow for 1920), so the next
+    // cast starts narrow. Local storage may be missing or blocked.
+    function rememberedCanvas() {
+      try { return JSON.parse(window.localStorage.getItem("rallycade-scene-canvas") || "null"); } catch (error) { return null; }
+    }
+
+    function rememberCanvas(width) {
+      try {
+        window.localStorage.setItem("rallycade-scene-canvas", JSON.stringify({ ua: navigator.userAgent, width }));
+      } catch (error) { /* the next cast measures again */ }
+    }
+
+    // The wide canvas fell below the frame rate: narrow it for good. The
+    // frame on screen is drawn again in the same animation frame, so the TV
+    // never shows the cleared canvas.
+    function narrowCanvas() {
+      plan = { width: core.CANVAS.narrow, adaptive: false, why: "slow" };
+      maxCanvasWidth = plan.width;
+      rememberCanvas(plan.width);
+      resize();
+      if (shownFrame) { drawFrame(shownFrame); needsRedraw = false; }
+    }
+
     function resize() {
-      const ratio = Math.min(window.devicePixelRatio || 1, 1.5);
-      const width = Math.round(Math.min(maxCanvasWidth, boxWidth() * ratio));
+      const width = core.canvasWidth(boxWidth(), window.devicePixelRatio, maxCanvasWidth);
       const height = Math.round(width * STAGE.height / STAGE.width);
       if (canvas.width !== width || canvas.height !== height) {
         canvas.width = width;
@@ -92,9 +119,14 @@
     const bundled = new Map();
     const cached = new Set();
     const loading = new Set();
+    // The size each picture is drawn at, in the phone's pixels: the size in
+    // its key, whatever the size of the file (core.pictureSize).
+    const sizes = new Map();
 
     function addImage(key, source) {
       images.set(key, source);
+      sizes.set(key, core.pictureSize(key)
+        || { width: source.naturalWidth || source.width, height: source.naturalHeight || source.height });
       needsRedraw = true;
       loading.delete(key);
       wanted.delete(key);
@@ -256,12 +288,12 @@
         if (op[0] === "L") { depth += 1; continue; }
         if (op[0] === "l") { depth -= 1; continue; }
         if (depth || op[0] !== "i" || op[1] < 1000 || (op[2] && op[2] !== "source-over") || op[5] >= 0 || op[6] >= 0) continue;
-        const image = images.get(op[3]);
-        if (!image || !opaque.has(op[3])) continue;
+        const size = sizes.get(op[3]);
+        if (!images.has(op[3]) || !size || !opaque.has(op[3])) continue;
         const m = op[4];
         if (m[1] !== 0 || m[2] !== 0 || m[0] <= 0 || m[3] <= 0) continue;
-        const width = image.naturalWidth || image.width;
-        const height = image.naturalHeight || image.height;
+        const width = size.width;
+        const height = size.height;
         const left = m[4] / 10, top = m[5] / 10;
         const right = left + width * m[0] / 10000, bottom = top + height * m[3] / 10000;
         if (left <= 0.5 && top <= 0.5 && right >= STAGE.width - 0.5 && bottom >= STAGE.height - 0.5) found = index;
@@ -295,10 +327,16 @@
     function showBackdrop(op) {
       const entry = backdropLayer(op[3]);
       if (!entry) return false;
-      // Stage points to the screen's CSS pixels.
+      // Stage points to the screen's CSS pixels. The layer is laid out at
+      // the file's own size, so a file sharper than the key's size keeps
+      // its pixels until the GPU scales it.
       const css = boxWidth() / STAGE.width;
       const m = op[4];
-      const transform = "matrix(" + [m[0] / 10000 * css, 0, 0, m[3] / 10000 * css, m[4] / 10 * css, m[5] / 10 * css]
+      const image = images.get(op[3]);
+      const size = sizes.get(op[3]);
+      const fx = size.width / (image.naturalWidth || image.width || size.width);
+      const fy = size.height / (image.naturalHeight || image.height || size.height);
+      const transform = "matrix(" + [m[0] / 10000 * css * fx, 0, 0, m[3] / 10000 * css * fy, m[4] / 10 * css, m[5] / 10 * css]
         .map((v) => v.toFixed(4)).join(",") + ")";
       if (transform !== entry.transform) {
         entry.transform = transform;
@@ -439,7 +477,10 @@
             const m = op[4];
             c.setTransform(scale * m[0] / 10000, scale * m[1] / 10000, scale * m[2] / 10000, scale * m[3] / 10000,
               scale * m[4] / 10, scale * m[5] / 10);
-            c.drawImage(multiply ? tint(key, image, multiply) : image, 0, 0);
+            // Into the rect the phone's matrix is for (the key's size), not
+            // the file's: a sharper file is drawn in the same place.
+            const size = sizes.get(key);
+            c.drawImage(multiply ? tint(key, image, multiply) : image, 0, 0, size.width, size.height);
             c.restore();
             break;
           }
@@ -573,12 +614,17 @@
       if (phoneNow == null) return;
       const result = timeline.at(phoneNow);
       // A frame already on screen is drawn again only while blending.
+      let drew = false;
       if (result && (result.blended || result.stamp !== lastStamp || needsRedraw)) {
         drawFrame(result.frame);
+        shownFrame = result.frame;
+        drew = true;
         needsRedraw = false;
         if (result.blended) counters.blended += 1;
         lastStamp = result.stamp;
       }
+      // A wide canvas the device can't keep up with narrows to 1280.
+      if (plan.adaptive && canvas.width > core.CANVAS.narrow && rateWatch.tick(local, drew)) narrowCanvas();
       const h = timeline.hudAt(phoneNow);
       if (h) renderHUD(h);
       housekeeping(local);
@@ -605,7 +651,7 @@
           drawMs: Number(core.percentile(counters.drawMs, 0.5).toFixed(1)),
           drawMax: Number(Math.max(0, ...counters.drawMs).toFixed(1)),
           missing: counters.missing, images: images.size, queue: timeline.length,
-          synced: clock.synced ? 1 : 0, w: canvas.width,
+          synced: clock.synced ? 1 : 0, w: canvas.width, canvas: plan.why,
           gap: Number(core.percentile(counters.gaps, 0.5).toFixed(1)),
           gap90: Number(core.percentile(counters.gaps, 0.9).toFixed(1))
         };
@@ -624,7 +670,8 @@
         root.appendChild(debugLine);
       }
       debugLine.textContent = "scene " + stats.fps + " fps · draw " + stats.drawMs + "/" + stats.drawMax + " ms · late "
-        + stats.behind + " ms · queue " + stats.queue + " · images " + stats.images + (stats.synced ? "" : " · not synced");
+        + stats.behind + " ms · queue " + stats.queue + " · images " + stats.images + " · " + stats.w + " wide (" + stats.canvas + ")"
+        + (stats.synced ? "" : " · not synced");
     }
 
     function noteArrival(frame) {
@@ -696,7 +743,13 @@
       switch (message.t) {
         case "hello":
           debug = message.debug === 1;
-          if (Number(message.canvas) >= 320) { maxCanvasWidth = Math.min(1920, Number(message.canvas)); resize(); }
+          // A width the phone or the bench asks for is kept as asked; else
+          // the device's own plan, and a wide canvas is measured afresh.
+          plan = core.canvasPlan({ ua: navigator.userAgent, pinned: message.canvas || options.canvasWidth,
+            wide: message.wide === 1, remembered: rememberedCanvas() });
+          maxCanvasWidth = plan.width;
+          rateWatch.reset();
+          resize();
           if (["low", "medium", "high"].indexOf(message.smooth) >= 0) smoothing = message.smooth;
           clock.reset();
           timeline.reset();

@@ -45,7 +45,7 @@
     element("positioning-hand").hidden = !positioning.hand;
     const hold = element("positioning-hold");
     hold.hidden = !positioning.canHold;
-    if (positioning.canHold) renderHold(hold, positioning.progress, "Raise both hands to play");
+    if (positioning.canHold) renderHold(hold, positioning.progress, positioning.holdLabel || "Raise both hands to play");
   }
 
   function renderFight(fight) {
@@ -238,7 +238,9 @@
     stage: document.getElementById("scene-stage"),
     backdrop: document.getElementById("scene-backdrop"),
     hud: document.getElementById("scene-hud"),
-    send: (message) => sendScene(message)
+    send: (message) => sendScene(message),
+    // ?canvas=1920 draws previews and films that wide (a Mac counts as a dongle).
+    canvasWidth: Number(query.get("canvas")) || undefined
   });
   window.__rallycadeScene = scene;
 
