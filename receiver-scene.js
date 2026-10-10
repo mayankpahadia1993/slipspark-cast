@@ -485,6 +485,7 @@
         setText("hud-overs", h.score.overs + " of " + h.score.of);
       }
       if (h.check) setText("hud-check-ball", "Ball " + h.check.ball + " of " + h.check.of);
+      setText("hud-check-title", h.check && h.check.title === "NETS PRACTICE" ? "NETS PRACTICE" : "TIMING CHECK");
       show("hud-friend", !!h.friend);
       setText("hud-friend", h.friend);
       // The status card hides while the pause or lost card is up.
