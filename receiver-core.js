@@ -265,7 +265,7 @@
           .map((verdict) => verdicts.has(verdict) ? verdict : "noSwing"),
         lines: (Array.isArray(check.lines) ? check.lines : []).slice(0, 6)
           .map((line) => optionalString(line, 200)).filter(Boolean),
-        note: boundedString(check.note, "Raise both hands to play your innings", 120)
+        note: boundedString(check.note, "Raise a hand to play your innings", 120)
       };
     }
 

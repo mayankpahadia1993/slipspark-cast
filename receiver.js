@@ -131,7 +131,7 @@
     // Build 123 phones send the innings' own score and words ("97/1",
     // "Raise both hands to bat again"); older ones only the number.
     if (result.scoreText) text("result-score", result.scoreText);
-    text("result-hint", result.hint || "Raise both hands to go again · Results saved on your iPhone");
+    text("result-hint", result.hint || "Raise a hand to go again · Results saved on your iPhone");
     const host = element("result-stats");
     host.replaceChildren(...result.stats.map((stat) => {
       const card = document.createElement("div");
