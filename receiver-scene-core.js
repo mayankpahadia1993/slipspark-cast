@@ -296,13 +296,16 @@
   const CANVAS = { wide: 1920, narrow: 1280, minFps: 25 };
 
   // `device`: `ua` (navigator.userAgent), `pinned` (a width the phone or the
-  // bench asked for in `hello`), `remembered` (what this TV found last time:
-  // `{ua, width}`). Returns the most pixels across, whether to keep
-  // watching the frame rate, and why (sent in `stats`).
+  // bench asked for in `hello`), `wide` (the phone's hello allows 1920: build
+  // 134 on), `remembered` (what this TV found last time: `{ua, width}`).
+  // Returns the most pixels across, whether to keep watching the frame
+  // rate, and why (sent in `stats`). Phones that don't allow it (the App
+  // Store's 2.6) keep the 1280 canvas they were released with.
   function canvasPlan(device) {
     const ua = String((device && device.ua) || "");
     const pinned = Number(device && device.pinned);
     if (pinned >= 320) return { width: Math.min(CANVAS.wide, Math.round(pinned)), adaptive: false, why: "asked" };
+    if (!(device && device.wide)) return { width: CANVAS.narrow, adaptive: false, why: "phone" };
     const remembered = device && device.remembered;
     if (remembered && remembered.ua === ua && Number(remembered.width) <= CANVAS.narrow) {
       return { width: CANVAS.narrow, adaptive: false, why: "slow-before" };

@@ -745,7 +745,7 @@
           // A width the phone or the bench asks for is kept as asked; else
           // the device's own plan, and a wide canvas is measured afresh.
           plan = core.canvasPlan({ ua: navigator.userAgent, pinned: message.canvas || options.canvasWidth,
-            remembered: rememberedCanvas() });
+            wide: message.wide === 1, remembered: rememberedCanvas() });
           maxCanvasWidth = plan.width;
           rateWatch.reset();
           resize();
