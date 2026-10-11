@@ -42,6 +42,15 @@
     const clock = core.createClock();
     const images = new Map();
     const tinted = new Map();
+    // Pictures the phone draws from commands ("pic": a dyed kit's pieces,
+    // the practice net), by key: drawn here once into a canvas of their
+    // own and then drawn as any photo, one drawImage a frame.
+    const pictures = new Map();
+    // Composed pictures in the order they were made: the oldest are let go
+    // past `MAX_COMPOSED` (a Chromecast's memory is small) and made again
+    // from their commands if a frame wants one.
+    const composed = [];
+    const MAX_COMPOSED = 36;
     const uploads = new Map();
     const wanted = new Set();
     const requested = new Set();
@@ -131,6 +140,68 @@
       loading.delete(key);
       wanted.delete(key);
       requested.delete(key);
+      // A picture waiting for this photo can be made now.
+      pictures.forEach((entry, pictureKey) => {
+        if (!entry.ready && entry.uses.indexOf(key) >= 0) compose(pictureKey);
+      });
+    }
+
+    // MARK: Composed pictures
+
+    // A picture from the phone: the commands that draw it in its own pixels.
+    function receivePicture(message) {
+      const key = String(message.k || "");
+      const width = Math.round(Number(message.w));
+      const height = Math.round(Number(message.h));
+      if (!key || !(width > 0) || !(height > 0) || !Array.isArray(message.o)) return;
+      const existing = pictures.get(key);
+      if (existing && existing.ready && images.has(key)) { send({ t: "got", k: key }); return; }
+      const frame = core.normalizeFrame({ s: 0, o: message.o, fl: message.fl, cl: message.cl });
+      if (!frame) return;
+      const uses = [];
+      for (const op of frame.o) if (op[0] === "i" && uses.indexOf(op[3]) < 0) uses.push(op[3]);
+      pictures.set(key, { frame, width, height, opaque: message.op === 1, fallback: message.fb || null, uses, ready: false });
+      loading.add(key);
+      wanted.delete(key);
+      requested.delete(key);
+      compose(key);
+    }
+
+    // Draws a picture into its canvas once every photo it uses is here.
+    function compose(key) {
+      const entry = pictures.get(key);
+      if (!entry || entry.ready) return;
+      const missing = entry.uses.filter((use) => !images.has(use));
+      if (missing.length) { missing.forEach(ensure); return; }
+      const target = document.createElement("canvas");
+      target.width = entry.width;
+      target.height = entry.height;
+      paint(target.getContext("2d"), entry.frame, 0, { s: 1, width: entry.width, height: entry.height, layers: [] });
+      // The tinted copies were for this picture: frames draw the picture.
+      tinted.clear();
+      entry.ready = true;
+      loading.delete(key);
+      addImage(key, target);
+      composed.push(key);
+      while (composed.length > MAX_COMPOSED) {
+        const old = composed.shift();
+        const gone = pictures.get(old);
+        if (gone && old !== key) { gone.ready = false; images.delete(old); opaque.delete(old); }
+      }
+      send({ t: "got", k: key });
+      // An opaque picture (the practice net) goes on the GPU layer as a
+      // photo does: an image with a source, not a canvas.
+      if (entry.opaque && typeof target.toBlob === "function") {
+        target.toBlob((blob) => {
+          if (!blob || images.get(key) !== target) return;
+          loadImage(URL.createObjectURL(blob)).then((image) => {
+            if (images.get(key) !== target) return;
+            images.set(key, image);
+            opaque.add(key);
+            needsRedraw = true;
+          }, () => {});
+        }, "image/jpeg", 0.92);
+      }
     }
 
     // Decoded before it is first drawn, so a frame never waits on a photo.
@@ -214,7 +285,11 @@
 
     // Starts fetching a picture a frame uses, from wherever it is.
     function ensure(key) {
-      if (images.has(key) || loading.has(key) || requested.has(key)) return;
+      if (images.has(key) || requested.has(key)) return;
+      // A picture let go to save memory is made again from its commands.
+      const picture = pictures.get(key);
+      if (picture) { compose(key); return; }
+      if (loading.has(key)) return;
       const ask = () => { loading.delete(key); cached.delete(key); bundled.delete(key); wanted.add(key); };
       if (bundled.has(key)) {
         loading.add(key);
@@ -372,7 +447,7 @@
 
     // Sets up a command's opacity, blending, filters and clip; returns the
     // colour any `colorMultiply` filter asks for.
-    function begin(c, frame, alpha, blend, filterRef, clipRef) {
+    function begin(c, frame, alpha, blend, filterRef, clipRef, scale) {
       c.save();
       if (clipRef >= 0 && frame.cl[clipRef]) {
         c.setTransform(scale, 0, 0, scale, 0, 0);
@@ -424,13 +499,23 @@
       }
       // A photo whose layer isn't decoded yet is drawn on the canvas, over
       // whichever layer was showing: never an empty frame.
-      const stack = [{ c: ctx }];
-      let c = ctx;
+      paint(ctx, frame, from, { s: scale, width: canvas.width, height: canvas.height, layers: null });
+      counters.drawMs.push(performance.now() - started);
+      counters.draws += 1;
+    }
+
+    // Draws a frame's commands from `from` on into `target`: the TV's
+    // canvas (`surface.s` canvas pixels a stage point), or a composed
+    // picture's own canvas (one pixel a point).
+    function paint(target, frame, from, surface) {
+      const scale = surface.s;
+      const stack = [{ c: target }];
+      let c = target;
       for (let index = from; index < frame.o.length; index += 1) {
         const op = frame.o[index];
         switch (op[0]) {
           case "L": {
-            const layer = layerCanvas(stack.length);
+            const layer = surface.layers ? layerCanvas(stack.length) : pictureLayer(surface, stack.length);
             stack.push({ c: layer.getContext("2d"), layer, alpha: op[1], blend: op[2], filterRef: op[3], clipRef: op[4] });
             c = stack[stack.length - 1].c;
             break;
@@ -439,14 +524,14 @@
             if (stack.length < 2) break;
             const top = stack.pop();
             c = stack[stack.length - 1].c;
-            begin(c, frame, top.alpha, top.blend, top.filterRef, top.clipRef);
+            begin(c, frame, top.alpha, top.blend, top.filterRef, top.clipRef, scale);
             c.setTransform(1, 0, 0, 1, 0, 0);
             c.drawImage(top.layer, 0, 0);
             c.restore();
             break;
           }
           case "f": {
-            const multiply = begin(c, frame, op[1], op[2], op[7], op[8]);
+            const multiply = begin(c, frame, op[1], op[2], op[7], op[8], scale);
             c.setTransform(scale, 0, 0, scale, 0, 0);
             c.fillStyle = shading(c, op[5], multiply);
             c.fill(core.tracePath(new Path2D(), op[3], op[4]), op[6] ? "evenodd" : "nonzero");
@@ -454,7 +539,7 @@
             break;
           }
           case "s": {
-            const multiply = begin(c, frame, op[1], op[2], op[9], op[10]);
+            const multiply = begin(c, frame, op[1], op[2], op[9], op[10], scale);
             c.setTransform(scale, 0, 0, scale, 0, 0);
             const geometry = op[6];
             c.lineWidth = Math.max(0.01, geometry[0] / 10);
@@ -469,23 +554,33 @@
             break;
           }
           case "i": {
-            const key = op[3];
-            const image = images.get(key);
-            if (!image) { ensure(key); counters.missing += 1; break; }
-            const multiply = begin(c, frame, op[1], op[2], op[5], op[6]);
+            let key = op[3];
+            let image = images.get(key);
+            // Into the rect the phone's matrix is for (the key's size), not
+            // the file's: a sharper file is drawn in the same place.
+            let size = sizes.get(key);
+            if (!image) {
+              ensure(key);
+              counters.missing += 1;
+              // A picture still being made: its undyed photo meanwhile.
+              const picture = pictures.get(key);
+              const fallback = picture && picture.fallback && images.get(picture.fallback);
+              if (!fallback) break;
+              image = fallback;
+              size = { width: picture.width, height: picture.height };
+              key = picture.fallback;
+            }
+            const multiply = begin(c, frame, op[1], op[2], op[5], op[6], scale);
             if (multiply) c.globalAlpha *= Math.max(0, Math.min(1, multiply[3] / 1000));
             const m = op[4];
             c.setTransform(scale * m[0] / 10000, scale * m[1] / 10000, scale * m[2] / 10000, scale * m[3] / 10000,
               scale * m[4] / 10, scale * m[5] / 10);
-            // Into the rect the phone's matrix is for (the key's size), not
-            // the file's: a sharper file is drawn in the same place.
-            const size = sizes.get(key);
             c.drawImage(multiply ? tint(key, image, multiply) : image, 0, 0, size.width, size.height);
             c.restore();
             break;
           }
           case "t": {
-            begin(c, frame, op[1], op[2], -1, op[10]);
+            begin(c, frame, op[1], op[2], -1, op[10], scale);
             c.setTransform(scale, 0, 0, scale, 0, 0);
             c.font = op[5] + " " + (op[4] / 10).toFixed(1) + "px " + (op[6] ? ROUNDED : PLAIN);
             const anchor = op[9] || [500, 500];
@@ -503,8 +598,21 @@
           default: break;
         }
       }
-      counters.drawMs.push(performance.now() - started);
-      counters.draws += 1;
+    }
+
+    // A layer inside a composed picture, made for it and dropped with it.
+    function pictureLayer(surface, depth) {
+      let layer = surface.layers[depth];
+      if (!layer) {
+        layer = document.createElement("canvas");
+        layer.width = surface.width;
+        layer.height = surface.height;
+        surface.layers[depth] = layer;
+      }
+      const c = layer.getContext("2d");
+      c.setTransform(1, 0, 0, 1, 0, 0);
+      c.clearRect(0, 0, layer.width, layer.height);
+      return layer;
     }
 
     // MARK: HUD
@@ -694,7 +802,8 @@
 
     function answerHello() {
       const have = Array.from(new Set([...bundled.keys(), ...cached, ...images.keys()]));
-      send({ t: "ready", scene: 1, version: VERSION, ua: navigator.userAgent, have });
+      // `pic`: this receiver composes pictures from commands (receiver 47, build 142).
+      send({ t: "ready", scene: 1, pic: 1, version: VERSION, ua: navigator.userAgent, have });
       preloadBundled();
     }
 
@@ -779,6 +888,9 @@
         case "img":
           receivePart(message);
           break;
+        case "pic":
+          receivePicture(message);
+          break;
         case "snap":
           snapshot(message.q);
           break;
@@ -796,6 +908,8 @@
       return Promise.all(entries.map(([key, file]) => loadImage(resolve(file)).then((image) => addImage(key, image))))
         .then(() => fontsReady)
         .then(() => {
+          // Pictures the phone sent as commands ("pic" messages).
+          ((data && data.pictures) || []).forEach(receivePicture);
           const frames = (data.frames || []).map(core.normalizeFrame).filter(Boolean);
           if (!frames.length) return;
           setOn(true);
@@ -876,7 +990,7 @@
     });
     window.requestAnimationFrame(frameLoop);
 
-    return { NAMESPACE, handle, report, setOn, renderHUD, drawFrame, playRecording, playRecordingAt, snapshot, timeline, clock, images };
+    return { NAMESPACE, handle, report, setOn, renderHUD, drawFrame, playRecording, playRecordingAt, snapshot, timeline, clock, images, pictures, counters };
   }
 
   window.RallycadeReceiverScene = { NAMESPACE, createScene };
