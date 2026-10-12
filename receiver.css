@@ -364,4 +364,8 @@ body[data-scene="on"] #stream { visibility: hidden; }
 .result-reward .eyebrow { color: var(--gold, #f5c14b); }
 .result-reward-amounts { display: flex; gap: 2.4vw; margin-top: .8vh; font-size: clamp(28px, 3.4vw, 64px); font-weight: 900; }
 .result-reward-amounts .gold { color: var(--gold, #f5c14b); }
+.result-reward-level { display: block; margin-top: .8vh; color: var(--gold, #f5c14b); font-size: clamp(22px, 2.4vw, 46px); font-weight: 900; letter-spacing: .04em; }
+.result-reward-level[hidden] { display: none; }
+.result-reward-milestones { margin: .6vh 0 0; padding: 0; list-style: none; }
+.result-reward-milestones li { margin-top: .4vh; font-size: clamp(18px, 1.9vw, 36px); font-weight: 800; }
 .result-reward small { display: block; margin-top: .8vh; color: var(--muted); font-size: clamp(14px, 1.4vw, 28px); font-weight: 700; }

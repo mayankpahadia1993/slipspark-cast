@@ -139,6 +139,14 @@
       text("result-reward-xp", `+${result.reward.xp.toLocaleString("en-US")} XP`);
       text("result-reward-coins", `+${result.reward.coins.toLocaleString("en-US")} coins`);
       text("result-reward-detail", result.reward.detail);
+      const level = element("result-reward-level");
+      level.hidden = !result.reward.levelUp;
+      text("result-reward-level", result.reward.levelUp);
+      element("result-reward-milestones").replaceChildren(...result.reward.milestones.map((line) => {
+        const item = document.createElement("li");
+        item.textContent = line;
+        return item;
+      }));
     }
     const host = element("result-stats");
     host.replaceChildren(...result.stats.map((stat) => {
