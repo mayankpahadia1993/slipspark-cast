@@ -238,6 +238,8 @@ body[data-scene="on"] #stream { visibility: hidden; }
 .hud-check { display: block; }
 .hud-check strong { display: block; margin-top: 3px; font-size: 41px; font-weight: 900; line-height: 1.05; }
 .hud-friend { position: absolute; left: 0; top: 112px; padding: 10px 20px; border-radius: 999px; background: var(--gold); color: rgb(var(--ink)); white-space: nowrap; font-size: 19px; font-weight: 800; letter-spacing: 2px; font-variant-numeric: tabular-nums; }
+/* Boundary over sends no scorebug: its line takes the scorebug's place. */
+#hud-score[hidden] + #hud-check[hidden] + .hud-friend { position: static; }
 .hud-status { max-width: 730px; display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 20px 31px; border-radius: 27px; background: rgba(var(--ink), .9); text-align: center; transition: opacity .2s ease; }
 .hud-status strong { font-size: 31px; font-weight: 900; line-height: 1.15; }
 .hud-status span { font-size: 20px; font-weight: 600; white-space: pre-line; }
