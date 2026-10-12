@@ -800,10 +800,19 @@
       if (!on) timeline.clear();
     }
 
+    function screenPixels() {
+      const ratio = window.devicePixelRatio || 1;
+      const width = Math.round((window.innerWidth || 1280) * ratio);
+      const height = Math.round((window.innerHeight || (window.innerWidth || 1280) * 9 / 16) * ratio);
+      return [width, height];
+    }
+
     function answerHello() {
       const have = Array.from(new Set([...bundled.keys(), ...cached, ...images.keys()]));
       // `pic`: this receiver composes pictures from commands (receiver 47, build 142).
-      send({ t: "ready", scene: 1, pic: 1, version: VERSION, ua: navigator.userAgent, have });
+      // `card`: it shows a result as the phone's scorecard picture, drawn
+      // for `screen`, its page in device pixels (receiver 50, build 154).
+      send({ t: "ready", scene: 1, pic: 1, card: 1, screen: screenPixels(), version: VERSION, ua: navigator.userAgent, have });
       preloadBundled();
     }
 

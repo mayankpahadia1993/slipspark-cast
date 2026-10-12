@@ -283,6 +283,12 @@
       };
     }
 
+    // Build 154: a result screen's picture from the phone (receiver-card-
+    // core.js) and the raise-hand ring drawn live over it.
+    const resultScreen = ["result", "versusResult", "cricketDuelResult", "timingCheck"].includes(screen);
+    normalized.card = resultScreen && typeof value.card === "string" && /^[0-9a-z]{1,32}\.[0-9a-z]{1,32}$/.test(value.card) ? value.card : null;
+    normalized.hold = resultScreen && Number(value.hold) > 0 ? Math.min(1, Number(value.hold)) : null;
+
     return normalized;
   }
 
@@ -323,6 +329,10 @@
     // The build 152 Chromecast photo's screen, with a level-up and milestones
     // too: the fullest result screen there is.
     if (kind === "cricketResultLong") return normalizeState({ ...base, screen: "result", result: { mode: "WORLD CUP · INDIA · GROUP 3/3 vs IRELAND", headline: "Fell short. Lost by 17 runs.", score: 18, scoreText: "18/3", caption: "RUNS", isPersonalBest: false, stats: [{ label: "TARGET", value: "36" }, { label: "OVERS", value: "2.1" }, { label: "RUN RATE", value: "8.3" }, { label: "GROUP", value: "3RD · 2 PTS" }], hint: "Raise a hand for the next match", reward: { title: "YOU EARNED", xp: 92, coins: 23, detail: "Out of the World Cup. Pick a country and try again.", levelUp: "LEVEL UP · Level 13 · +65 coins", milestones: ["Milestone: 25 innings · +40 XP · +20 coins"] } } });
+    // The two results of the build 153 photos (a chase won, Nets), for
+    // before/after pictures of the phone's scorecard.
+    if (kind === "chaseWon") return normalizeState({ ...base, screen: "result", result: { mode: "STADIUM INNINGS", headline: "Chased it down! Won with 12 balls to spare.", score: 37, scoreText: "37/1", caption: "NEW PERSONAL BEST", isPersonalBest: true, stats: [{ label: "TARGET", value: "35" }, { label: "OVERS", value: "2.0" }, { label: "RUN RATE", value: "18.5" }], hint: "Raise a hand for another chase", reward: { title: "CHASE WON", xp: 160, coins: 39, detail: "Target beaten. Bonus included." } } });
+    if (kind === "nets") return normalizeState({ ...base, screen: "result", result: { mode: "STADIUM INNINGS", headline: "Nets complete", score: 42, scoreText: "42", caption: "RUNS", isPersonalBest: false, stats: [{ label: "BALLS", value: "12" }, { label: "SCORING SHOTS", value: "10" }], hint: "Raise a hand for more Nets" } });
     if (kind === "versusResult") return normalizeState({ ...base, screen: "versusResult", versusResult: { headline: "RED CORNER WINS", detail: "ON POINTS", winner: "left", leftScore: 4200, rightScore: 3700, leftDefense: 88, rightDefense: 76, leftCounters: 5, rightCounters: 3 } });
     if (kind === "cricketDuelHandoff") return normalizeState({ ...base, screen: "cricketDuelHandoff", cricketDuelHandoff: { target: 32, balls: 12, wickets: 3 } });
     if (kind === "cricketDuelResult") return normalizeState({ ...base, screen: "cricketDuelResult", cricketDuelResult: { headline: "PLAYER 2 WINS", margin: "BY 2 WICKETS · 1 BALL TO SPARE", winner: "second", firstRuns: 31, firstWickets: 3, secondRuns: 32, secondWickets: 1 } });

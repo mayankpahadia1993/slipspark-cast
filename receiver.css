@@ -388,3 +388,14 @@ body[data-scene="on"] #stream { visibility: hidden; }
 #result-screen .result-reward-milestones li { font-size: clamp(16px, 1.5vw, 30px); }
 #result-screen .result-reward small { font-size: clamp(14px, 1.3vw, 26px); }
 #result-screen p { margin-top: 2vh; font-size: clamp(14px, 1.3vw, 26px); }
+
+/* Build 154: a result is the phone's own TV scorecard picture, whole on the
+   screen (letterboxed on any other shape), over this page's result, which
+   stays for older phones and as the fallback. While it is on its way (at
+   most 1.5 s) the TV shows the stadium's dark ground, not the HTML. */
+.card-screen { position: fixed; inset: 0; z-index: 11; background: #0c1a17; }
+.card-image { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+.card-hold { position: absolute; left: 50%; bottom: 4vh; margin: 0; padding: 1vh 1.6vw; transform: translateX(-50%); border-radius: 999px; background: rgba(9, 22, 19, .82); }
+.card-hold .hold-ring { width: clamp(56px, 5vw, 96px); height: clamp(56px, 5vw, 96px); }
+.card-hold .hold-label { font-size: clamp(20px, 1.8vw, 34px); }
+body[data-card="picture"] #app, body[data-card="waiting"] #app { visibility: hidden; }

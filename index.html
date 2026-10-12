@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800;900&family=Nunito:wght@600;700;800;900&display=swap">
-  <link rel="stylesheet" href="receiver.css?v=49">
+  <link rel="stylesheet" href="receiver.css?v=50">
   <script src="https://www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>
 </head>
 <body>
@@ -171,6 +171,19 @@
     </section>
   </main>
 
+  <!-- Build 154: a result as the phone's own TV scorecard, drawn on the
+       phone (receiver-card-core.js), with the raise-hand ring live over it. -->
+  <section id="card" class="card-screen" hidden aria-label="Rallycade scorecard">
+    <img id="card-image" class="card-image" alt="" hidden>
+    <div id="card-hold" class="hold card-hold" hidden>
+      <svg class="hold-ring" viewBox="0 0 100 100" aria-hidden="true">
+        <circle class="hold-track" cx="50" cy="50" r="44"></circle>
+        <circle class="hold-fill" cx="50" cy="50" r="44"></circle>
+      </svg>
+      <span class="hold-label" hidden></span>
+    </div>
+  </section>
+
   <video id="stream" muted autoplay playsinline disablepictureinpicture aria-label="Rallycade on your iPhone"></video>
 
   <!-- The stadium the TV draws from the phone's drawing commands, and its HUD. -->
@@ -236,10 +249,11 @@
     </div>
   </section>
   <!-- ?v= keeps a Chromecast from mixing cached files of two receiver versions. -->
-  <script src="receiver-core.js?v=49"></script>
-  <script src="receiver-video.js?v=49"></script>
-  <script src="receiver-scene-core.js?v=49"></script>
-  <script src="receiver-scene.js?v=49"></script>
-  <script src="receiver.js?v=49"></script>
+  <script src="receiver-core.js?v=50"></script>
+  <script src="receiver-card-core.js?v=50"></script>
+  <script src="receiver-video.js?v=50"></script>
+  <script src="receiver-scene-core.js?v=50"></script>
+  <script src="receiver-scene.js?v=50"></script>
+  <script src="receiver.js?v=50"></script>
 </body>
 </html>

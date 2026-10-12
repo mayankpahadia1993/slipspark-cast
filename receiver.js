@@ -238,6 +238,30 @@
     text("timing-note", check.note);
   }
 
+  // Build 154: a result is the phone's own scorecard picture when the phone
+  // sends one (receiver-card-core.js); this page's result screens stay
+  // underneath for older phones and as the fallback.
+  const cardCore = window.RallycadeCardCore;
+  const cardView = cardCore && cardCore.createCardView({
+    root: element("card"), image: element("card-image"), hold: element("card-hold"), body: document.body,
+    renderHold, now: () => performance.now(),
+    setTimer: (callback, ms) => setTimeout(callback, ms), clearTimer: (id) => clearTimeout(id),
+    toUrl(data) {
+      const binary = atob(data);
+      const bytes = new Uint8Array(binary.length);
+      for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
+      return URL.createObjectURL(new Blob([bytes], { type: "image/jpeg" }));
+    },
+    revoke(url) { if (url && url.indexOf("blob:") === 0) URL.revokeObjectURL(url); },
+    decode(url) {
+      const probe = new Image();
+      probe.src = url;
+      return probe.decode ? probe.decode() : new Promise((ok, fail) => { probe.onload = ok; probe.onerror = fail; });
+    },
+    report: (where, error) => cardFailure(where, error)
+  });
+  let cardFailure = () => {};
+
   function render(rawState) {
     const state = core.normalizeState(rawState);
     window.__slipsparkReceiverState = state;
@@ -255,11 +279,17 @@
     if (state.cricketDuelHandoff) renderDuelHandoff(state.cricketDuelHandoff);
     if (state.cricketDuelResult) renderDuelResult(state.cricketDuelResult);
     if (state.timingCheck) renderTimingCheck(state.timingCheck);
+    if (cardView) cardView.update(state);
   }
 
   const query = new URLSearchParams(window.location.search);
   const preview = query.get("preview");
   render(core.sampleState(preview || "ready"));
+  // ?preview=…&card=<picture>: that picture as the phone's scorecard.
+  if (preview && query.get("card") && cardView) {
+    render(Object.assign({}, core.sampleState(preview), { card: "0.0" }));
+    cardView.keep("0.0", query.get("card"));
+  }
   // ?preview=…&measure=1: the result screen's layout written onto the page,
   // for the receiver render test (a headless browser dumps the page).
   if (preview && query.get("measure")) {
@@ -347,6 +377,10 @@
       context.addCustomMessageListener(sceneModule.NAMESPACE, (event) => {
         // A snapshot goes back to whoever asked (a test bench beside the
         // phone), which never becomes the stadium's sender.
+        if (event.data && event.data.t === "card") {
+          if (cardView) cardView.receive(event.data);
+          return;
+        }
         if (event.data && event.data.t === "snap") {
           scene.snapshot(event.data.q, (message) => context.sendCustomMessage(sceneModule.NAMESPACE, event.senderId, message));
           return;
@@ -355,6 +389,7 @@
         try { scene.handle(event.data); } catch (error) { scene.report("handle", error); }
       });
       window.addEventListener("error", (event) => scene.report("script", event.message + " @" + event.lineno));
+      cardFailure = (where, error) => scene.report(where, error);
       // A phone that leaves takes its stadium with it.
       context.addEventListener(window.cast.framework.system.EventType.SENDER_DISCONNECTED, (event) => {
         if (event.senderId === sceneSender) { sceneSender = null; scene.setOn(false); }
