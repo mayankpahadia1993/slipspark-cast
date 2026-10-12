@@ -214,7 +214,12 @@
           title: boundedString(result.reward.title, "YOU EARNED", 40),
           xp: Math.floor(clamp(result.reward.xp, 0, 1000000)),
           coins: Math.floor(clamp(result.reward.coins, 0, 1000000)),
-          detail: boundedString(result.reward.detail, "", 120)
+          detail: boundedString(result.reward.detail, "", 120),
+          // Career-9 phones add a level-up line and the milestones reached.
+          levelUp: result.reward.levelUp == null ? null : boundedString(result.reward.levelUp, "", 60),
+          milestones: Array.isArray(result.reward.milestones)
+            ? result.reward.milestones.filter((line) => typeof line === "string" && line).slice(0, 4).map((line) => boundedString(line, "", 80))
+            : []
         } : null
       };
     }
