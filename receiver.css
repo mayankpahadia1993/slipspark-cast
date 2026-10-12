@@ -369,3 +369,22 @@ body[data-scene="on"] #stream { visibility: hidden; }
 .result-reward-milestones { margin: .6vh 0 0; padding: 0; list-style: none; }
 .result-reward-milestones li { margin-top: .4vh; font-size: clamp(18px, 1.9vw, 36px); font-weight: 800; }
 .result-reward small { display: block; margin-top: .8vh; color: var(--muted); font-size: clamp(14px, 1.4vw, 28px); font-weight: 700; }
+
+/* Build 153, a Chromecast's result: "the text is way too large". The
+   headline is sized in receiver.js by its length (at most 5.6vw, two lines at
+   most); the score, stats and reward share what is left of a 16:9 screen,
+   with margins, still big enough to read from the sofa. */
+#result-screen { padding: 4.5vh 7vw; justify-content: center; }
+#result-screen .eyebrow { font-size: clamp(14px, 1.3vw, 26px); }
+#result-screen h1 { max-width: 86vw; margin: 1.2vh 0 0; font-size: clamp(36px, 5.6vw, 120px); line-height: 1.02; letter-spacing: -.01em; }
+#result-screen .hero-score { margin-top: 1.4vh; font-size: clamp(84px, min(11.5vw, 20vh), 230px); }
+#result-screen .score-caption { margin-top: .8vh; font-size: clamp(16px, 1.6vw, 32px); }
+#result-screen .result-stats { margin-top: 2vh; gap: 1.2vw; }
+#result-screen .result-stat { min-width: 12vw; padding: 1.3vh 1.6vw; }
+#result-screen .result-stat strong { font-size: clamp(22px, 2.4vw, 46px); }
+#result-screen .result-reward { margin-top: 2vh; padding: 1.5vh 2vw; max-width: 72vw; }
+#result-screen .result-reward-amounts { font-size: clamp(24px, 2.6vw, 52px); }
+#result-screen .result-reward-level { font-size: clamp(18px, 1.8vw, 36px); }
+#result-screen .result-reward-milestones li { font-size: clamp(16px, 1.5vw, 30px); }
+#result-screen .result-reward small { font-size: clamp(14px, 1.3vw, 26px); }
+#result-screen p { margin-top: 2vh; font-size: clamp(14px, 1.3vw, 26px); }

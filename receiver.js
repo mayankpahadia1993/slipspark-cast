@@ -125,7 +125,11 @@
 
   function renderResult(result) {
     text("result-mode", result.mode);
-    text("result-headline", result.headline.toUpperCase());
+    const headline = result.headline.toUpperCase();
+    text("result-headline", headline);
+    // Sized by its length (build 153): one line if it can, two at most.
+    const size = core.resultHeadlineSize(headline, window.innerWidth || 1280);
+    element("result-headline").style.fontSize = size.fontPx + "px";
     text("result-score", result.score.toLocaleString("en-US"));
     text("result-caption", result.caption);
     // Build 123 phones send the innings' own score and words ("97/1",
@@ -243,6 +247,27 @@
   const query = new URLSearchParams(window.location.search);
   const preview = query.get("preview");
   render(core.sampleState(preview || "ready"));
+  // ?preview=…&measure=1: the result screen's layout written onto the page,
+  // for the receiver render test (a headless browser dumps the page).
+  if (preview && query.get("measure")) {
+    requestAnimationFrame(() => {
+      const shown = screens[core.sampleState(preview).screen];
+      const headline = element("result-headline");
+      const style = getComputedStyle(headline);
+      const lineHeight = parseFloat(style.lineHeight) || parseFloat(style.fontSize);
+      const box = shown.getBoundingClientRect();
+      const children = [...shown.children].filter((child) => !child.hidden).map((child) => child.getBoundingClientRect());
+      const report = {
+        width: window.innerWidth, height: window.innerHeight,
+        headlineLines: Math.round(headline.getBoundingClientRect().height / lineHeight),
+        headlineFont: parseFloat(style.fontSize),
+        top: Math.min(...children.map((rect) => rect.top)), bottom: Math.max(...children.map((rect) => rect.bottom)),
+        right: Math.max(...children.map((rect) => rect.right)), left: Math.min(...children.map((rect) => rect.left)),
+        overflow: shown.scrollHeight > box.height + 1
+      };
+      document.body.setAttribute("data-measure", JSON.stringify(report));
+    });
+  }
 
   // The stadium the TV draws itself, from the phone's drawing commands.
   const sceneModule = window.RallycadeReceiverScene;

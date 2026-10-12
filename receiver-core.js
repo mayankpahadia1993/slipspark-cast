@@ -320,6 +320,9 @@
     if (kind === "versusSetup") return normalizeState({ ...base, screen: "versusSetup", versusSetup: { isLeftReady: true, isRightReady: false, instruction: "RED CORNER SET — ONE MORE" } });
     if (kind === "versus") return normalizeState({ ...base, screen: "versus", versus: { phase: "defend", phaseValue: "leftHook", phaseDetail: "DUCK", timeRemaining: 41, currentAttack: "leftHook", calledDefense: "Duck", telegraphDuration: 1.3, left: { score: 1700, health: 82, combo: 1.5, action: "duck" }, right: { score: 1450, health: 70, combo: 1.25, action: "duck" } } });
     if (kind === "result") return normalizeState({ ...base, screen: "result", result: { mode: "QUICK FIGHT", headline: "You win", score: 4820, caption: "NEW PERSONAL BEST", isPersonalBest: true, stats: [{ label: "DEFENSE", value: "86%" }, { label: "REACTION", value: "312 MS" }, { label: "BEST COMBO", value: "×2.50" }] } });
+    // The build 152 Chromecast photo's screen, with a level-up and milestones
+    // too: the fullest result screen there is.
+    if (kind === "cricketResultLong") return normalizeState({ ...base, screen: "result", result: { mode: "WORLD CUP · INDIA · GROUP 3/3 vs IRELAND", headline: "Fell short. Lost by 17 runs.", score: 18, scoreText: "18/3", caption: "RUNS", isPersonalBest: false, stats: [{ label: "TARGET", value: "36" }, { label: "OVERS", value: "2.1" }, { label: "RUN RATE", value: "8.3" }, { label: "GROUP", value: "3RD · 2 PTS" }], hint: "Raise a hand for the next match", reward: { title: "YOU EARNED", xp: 92, coins: 23, detail: "Out of the World Cup. Pick a country and try again.", levelUp: "LEVEL UP · Level 13 · +65 coins", milestones: ["Milestone: 25 innings · +40 XP · +20 coins"] } } });
     if (kind === "versusResult") return normalizeState({ ...base, screen: "versusResult", versusResult: { headline: "RED CORNER WINS", detail: "ON POINTS", winner: "left", leftScore: 4200, rightScore: 3700, leftDefense: 88, rightDefense: 76, leftCounters: 5, rightCounters: 3 } });
     if (kind === "cricketDuelHandoff") return normalizeState({ ...base, screen: "cricketDuelHandoff", cricketDuelHandoff: { target: 32, balls: 12, wickets: 3 } });
     if (kind === "cricketDuelResult") return normalizeState({ ...base, screen: "cricketDuelResult", cricketDuelResult: { headline: "PLAYER 2 WINS", margin: "BY 2 WICKETS · 1 BALL TO SPARE", winner: "second", firstRuns: 31, firstWickets: 3, secondRuns: 32, secondWickets: 1 } });
@@ -328,5 +331,42 @@
     return normalizeState({ ...base, screen: "fight", fight: fightSample(kind) });
   }
 
-  return { clamp, formatTime, normalizeJoints, normalizeState, parseMessage, sampleState };
+  // Build 153, a Chromecast: "the text is way too large" — "FELL SHORT. LOST
+  // BY 17 RUNS." filled two lines at 7vw over the score. The result headline
+  // is sized by its length: as large as one line allows (at most 5.6vw),
+  // two lines only for a long one, never more. Widths are estimated from the
+  // rounded heavy type (uppercase averages ~0.66em, a space ~0.3em).
+  const HEADLINE = { maxVw: 5.6, oneLineMinVw: 3.8, minVw: 2.8, widthVw: 84 };
+  function estimateWidth(text, fontPx) {
+    let ems = 0;
+    for (const ch of String(text)) ems += ch === " " ? 0.3 : /[.,·:'!]/.test(ch) ? 0.34 : /[0-9]/.test(ch) ? 0.62 : 0.68;
+    return ems * fontPx;
+  }
+  function wrapLines(text, fontPx, maxWidth) {
+    const words = String(text).split(/\s+/).filter(Boolean);
+    const lines = [];
+    let line = "";
+    for (const word of words) {
+      const next = line ? line + " " + word : word;
+      if (line && estimateWidth(next, fontPx) > maxWidth) { lines.push(line); line = word; } else { line = next; }
+    }
+    if (line) lines.push(line);
+    return lines;
+  }
+  function resultHeadlineSize(text, viewportWidth) {
+    const vw = viewportWidth / 100;
+    const maxWidth = HEADLINE.widthVw * vw;
+    const max = Math.min(HEADLINE.maxVw * vw, 120);
+    for (let px = max; px >= HEADLINE.oneLineMinVw * vw; px -= 1) {
+      if (wrapLines(text, px, maxWidth).length <= 1) return { fontPx: Math.floor(px), lines: 1 };
+    }
+    for (let px = HEADLINE.oneLineMinVw * vw; px >= HEADLINE.minVw * vw; px -= 1) {
+      const lines = wrapLines(text, px, maxWidth).length;
+      if (lines <= 2) return { fontPx: Math.floor(px), lines };
+    }
+    const px = Math.floor(HEADLINE.minVw * vw);
+    return { fontPx: px, lines: wrapLines(text, px, maxWidth).length };
+  }
+
+  return { clamp, formatTime, normalizeJoints, normalizeState, parseMessage, sampleState, resultHeadlineSize, estimateWidth, wrapLines };
 });
