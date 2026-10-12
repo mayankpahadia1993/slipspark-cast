@@ -368,5 +368,16 @@
     return { fontPx: px, lines: wrapLines(text, px, maxWidth).length };
   }
 
-  return { clamp, formatTime, normalizeJoints, normalizeState, parseMessage, sampleState, resultHeadlineSize, estimateWidth, wrapLines };
+  // The setup eyebrow with its target hidden for its reveal, or null.
+  const TARGET_REVEAL_MS = 700;
+  function hideTarget(line) {
+    const value = String(line || "");
+    for (const pattern of [/\d+(?= TO WIN)/, /(?<=CHASING )\d+/]) {
+      if (pattern.test(value)) return value.replace(pattern, "?");
+    }
+    return null;
+  }
+
+  return { clamp, formatTime, normalizeJoints, normalizeState, parseMessage, sampleState, resultHeadlineSize, estimateWidth, wrapLines,
+    hideTarget, TARGET_REVEAL_MS };
 });

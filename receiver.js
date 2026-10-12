@@ -35,9 +35,22 @@
   }
   window.RallycadeHold = renderHold;
 
+  // Build 153: a chase's target is a surprise until the crease, and even
+  // there it lands a beat after the line ("… · ? TO WIN" → "… · 24 TO WIN"),
+  // as on the phone (TargetRevealText).
+  let eyebrowShown = null, eyebrowReveal = null;
+  function renderEyebrow(line) {
+    if (line === eyebrowShown) return;
+    eyebrowShown = line;
+    clearTimeout(eyebrowReveal);
+    const hidden = core.hideTarget(line);
+    text("positioning-eyebrow", hidden || line);
+    if (hidden) eyebrowReveal = setTimeout(() => text("positioning-eyebrow", line), core.TARGET_REVEAL_MS);
+  }
+
   // Setup: the phone's words and its hold ring. Never the batter's skeleton.
   function renderPositioning(positioning) {
-    text("positioning-eyebrow", positioning.eyebrow || "FIND YOUR CREASE");
+    renderEyebrow(positioning.eyebrow || "FIND YOUR CREASE");
     text("positioning-title", positioning.title || positioning.instruction);
     text("positioning-detail", positioning.detail || "");
     element("positioning-detail").hidden = !positioning.detail;
