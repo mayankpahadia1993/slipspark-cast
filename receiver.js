@@ -132,6 +132,14 @@
     // "Raise both hands to bat again"); older ones only the number.
     if (result.scoreText) text("result-score", result.scoreText);
     text("result-hint", result.hint || "Raise both hands to go again · Results saved on your iPhone");
+    const reward = element("result-reward");
+    reward.hidden = !result.reward;
+    if (result.reward) {
+      text("result-reward-title", result.reward.title);
+      text("result-reward-xp", `+${result.reward.xp.toLocaleString("en-US")} XP`);
+      text("result-reward-coins", `+${result.reward.coins.toLocaleString("en-US")} coins`);
+      text("result-reward-detail", result.reward.detail);
+    }
     const host = element("result-stats");
     host.replaceChildren(...result.stats.map((stat) => {
       const card = document.createElement("div");

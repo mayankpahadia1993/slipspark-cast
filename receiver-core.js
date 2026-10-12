@@ -208,7 +208,14 @@
         isPersonalBest: result.isPersonalBest === true,
         stats: normalizeStats(result.stats),
         scoreText: result.scoreText == null ? null : boundedString(result.scoreText, "", 24),
-        hint: result.hint == null ? null : boundedString(result.hint, "", 120)
+        hint: result.hint == null ? null : boundedString(result.hint, "", 120),
+        // Build 145 phones send what the innings earned.
+        reward: result.reward && typeof result.reward === "object" ? {
+          title: boundedString(result.reward.title, "YOU EARNED", 40),
+          xp: Math.floor(clamp(result.reward.xp, 0, 1000000)),
+          coins: Math.floor(clamp(result.reward.coins, 0, 1000000)),
+          detail: boundedString(result.reward.detail, "", 120)
+        } : null
       };
     }
 

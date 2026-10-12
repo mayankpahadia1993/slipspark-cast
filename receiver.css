@@ -357,3 +357,11 @@ body[data-scene="on"] #stream { visibility: hidden; }
 .positioning-screen .hold { margin-top: 3vh; gap: 1.8vw; }
 .positioning-screen .hold-ring { width: clamp(96px, 10vw, 200px); height: clamp(96px, 10vw, 200px); }
 .positioning-screen .hold-label { font-size: clamp(26px, 2.8vw, 56px); font-weight: 900; }
+
+/* Build 145: what the innings earned, as large as the stats. */
+.result-reward { margin-top: 3vh; padding: 2vh 2.4vw; border-radius: 1.4vw; background: var(--stadium-ink, rgba(0,0,0,.6)); text-align: left; }
+.result-reward[hidden] { display: none; }
+.result-reward .eyebrow { color: var(--gold, #f5c14b); }
+.result-reward-amounts { display: flex; gap: 2.4vw; margin-top: .8vh; font-size: clamp(28px, 3.4vw, 64px); font-weight: 900; }
+.result-reward-amounts .gold { color: var(--gold, #f5c14b); }
+.result-reward small { display: block; margin-top: .8vh; color: var(--muted); font-size: clamp(14px, 1.4vw, 28px); font-weight: 700; }
