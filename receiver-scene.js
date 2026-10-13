@@ -78,7 +78,7 @@
     let lastNeed = 0;
     let readyToAnswer = false;
     let pendingHello = false;
-    const counters = { draws: 0, blended: 0, frames: 0, late: [], drawMs: [], missing: 0, redraws: 0, gaps: [], live: 0, pose: [] };
+    const counters = { draws: 0, blended: 0, frames: 0, late: [], drawMs: [], missing: 0, redraws: 0, gaps: [], live: 0, pose: [], ahead: [], eff: [] };
 
     // MARK: Sizing
 
@@ -770,7 +770,13 @@
       // How old the batter's pose on screen is: what the live batter is for.
       if (result) {
         const age = core.poseAge(phoneNow, result.frame, live.current);
-        if (age != null) counters.pose.push(age);
+        if (age != null) {
+          counters.pose.push(age);
+          // Drawn ahead (receiver 55): the hands shown are that much younger.
+          const ahead = core.poseAhead(result.frame, live.current) || 0;
+          counters.ahead.push(ahead);
+          counters.eff.push(age - ahead);
+        }
       }
       // A wide canvas the device can't keep up with narrows to 1280.
       if (plan.adaptive && canvas.width > core.CANVAS.narrow && rateWatch.tick(local, drew)) narrowCanvas();
@@ -810,12 +816,17 @@
         if (counters.pose.length) {
           stats.pose = Math.round(core.percentile(counters.pose, 0.5));
           stats.pose90 = Math.round(core.percentile(counters.pose, 0.9));
+          // How far ahead of their poses the batters were drawn, and what
+          // that leaves: camera to the TV's canvas, before its display lag.
+          stats.ahead = Math.round(core.percentile(counters.ahead, 0.5));
+          stats.eff = Math.round(core.percentile(counters.eff, 0.5));
+          stats.eff90 = Math.round(core.percentile(counters.eff, 0.9));
         }
         send(stats);
         if (debug) setDebug(stats);
         counters.draws = 0; counters.blended = 0; counters.frames = 0; counters.redraws = 0;
         counters.late = []; counters.drawMs = []; counters.missing = 0; counters.gaps = [];
-        counters.live = 0; counters.pose = [];
+        counters.live = 0; counters.pose = []; counters.ahead = []; counters.eff = [];
       }
     }
 
@@ -827,7 +838,7 @@
         root.appendChild(debugLine);
       }
       debugLine.textContent = "scene " + stats.fps + " fps · draw " + stats.drawMs + "/" + stats.drawMax + " ms · late "
-        + stats.behind + " ms" + (stats.pose != null ? " · pose " + stats.pose + "/" + stats.pose90 + " ms" : "") + " · queue " + stats.queue + " · images " + stats.images + " · " + stats.w + " wide (" + stats.canvas + ")"
+        + stats.behind + " ms" + (stats.pose != null ? " · pose " + stats.pose + "/" + stats.pose90 + " ms" + (stats.ahead ? " − ahead " + stats.ahead + " = " + stats.eff + "/" + stats.eff90 + " ms" : "") : "") + " · queue " + stats.queue + " · images " + stats.images + " · " + stats.w + " wide (" + stats.canvas + ")"
         + (stats.synced ? "" : " · not synced");
     }
 
@@ -868,7 +879,10 @@
       // the hold ring drawn live where the picture says (receiver 52, build 158).
       // `whole`: it says when the stadium's first frame has every picture
       // (receiver 53, build 159).
-      send({ t: "ready", scene: 1, pic: 1, card: 1, live: 1, setup: 1, whole: 1, screen: screenPixels(), version: VERSION, ua: navigator.userAgent, have });
+      // `predict`: it reports how far ahead of its pose the live batter was
+      // drawn (`ph`) and the age that leaves (`ahead`, `eff` in stats), so the
+      // phone may draw it ahead (receiver 55).
+      send({ t: "ready", scene: 1, pic: 1, card: 1, live: 1, setup: 1, whole: 1, predict: 1, screen: screenPixels(), version: VERSION, ua: navigator.userAgent, have });
       preloadBundled();
     }
 
