@@ -26,6 +26,10 @@
   // "the screen is still different than phone"). The phone's draft now
   // arrives inside a second; the longer wait covers a slow channel.
   const TIMEOUT_MS = 4000;
+  // The setup waits longer (receiver 53, build 159): its first picture
+  // shares the channel with the stadium's photos, and the HTML setup it
+  // would fall back to is the "older chromecast screen" the user saw.
+  const SETUP_TIMEOUT_MS = 12000;
   // A picture in more parts than this is refused (the phone sends 1–3 for a
   // draft and up to ~11 for the sharp picture).
   const MAX_PARTS = 64;
@@ -135,20 +139,27 @@
     let since = 0;
     let shown = null;
 
-    function expect(id, now) {
+    let wait = timeoutMs;
+    function expect(id, now, limit) {
       const next = validId(id) ? id : null;
       if (next === expected) return;
       expected = next;
       since = now;
+      wait = limit || timeoutMs;
     }
 
     function arrived(id) { ready.add(id); }
     function forget(id) { ready.delete(id); if (shown === id) shown = null; }
 
-    function decide(now) {
-      if (!expected) return { mode: "html", wait: 0 };
+    // `hold`: no picture wanted, but the last one stays up rather than an
+    // HTML screen (the innings starting before the stadium draws).
+    function decide(now, hold) {
+      if (!expected) {
+        if (hold && shown && ready.has(shown)) return { mode: "picture", id: shown, wait: 0 };
+        return { mode: "html", wait: 0 };
+      }
       if (ready.has(expected)) { shown = expected; return { mode: "picture", id: expected, wait: 0 }; }
-      const left = Math.max(0, timeoutMs - (now - since));
+      const left = Math.max(0, wait - (now - since));
       // The same scorecard drawn again (its reward arrived): its last
       // picture stays until the new one is here, however long that takes.
       if (shown && family(shown) === family(expected) && ready.has(shown)) {
@@ -184,7 +195,7 @@
 
     function apply() {
       if (timer != null) { o.clearTimer(timer); timer = null; }
-      const decision = display.decide(o.now());
+      const decision = display.decide(o.now(), !!(o.holdLast && o.holdLast(state)));
       o.body.dataset.card = decision.mode;
       // The waiting backdrop matches the screen the picture will show.
       o.root.dataset.screen = state && state.screen ? state.screen : "";
@@ -216,7 +227,7 @@
 
     function update(next) {
       state = next;
-      display.expect(cardId(next), o.now());
+      display.expect(cardId(next), o.now(), next && next.screen === "positioning" ? SETUP_TIMEOUT_MS : undefined);
       return apply();
     }
 
@@ -262,5 +273,5 @@
     return { receive, update, apply, keep, get decision() { return last; }, get urls() { return urls; } };
   }
 
-  return { TIMEOUT_MS, MAX_PARTS, CARD_SCREENS, checksum, family, validId, cardId, validRing, ringPlacement, createAssembler, createDisplay, prune, createCardView };
+  return { TIMEOUT_MS, SETUP_TIMEOUT_MS, MAX_PARTS, CARD_SCREENS, checksum, family, validId, cardId, validRing, ringPlacement, createAssembler, createDisplay, prune, createCardView };
 });
