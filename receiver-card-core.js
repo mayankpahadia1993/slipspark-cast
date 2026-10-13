@@ -11,13 +11,23 @@
   // result: "Why are you not just showing the phone screen as is?"
   //
   // The game state names the picture its screen wants (`state.card`). The
-  // TV waits a moment for it, shows it once it is here and whole, and draws
-  // its own HTML result if it never comes. Phones before build 154 name
-  // none and keep the HTML result.
+  // TV waits for it on a quiet backdrop, shows it once it is here and whole,
+  // and draws its own HTML result if it never comes. Phones before build 154
+  // name none and keep the HTML result.
+  //
+  // Receiver 51: a picture may come again under the same id, sharper (the
+  // phone sends a small draft first, then the full picture); the newest
+  // whole one shows. A scorecard drawn again (its reward arrived) keeps its
+  // last picture for as long as the new one takes, never the HTML.
 
   // How long a result waits for its picture before the HTML result shows.
-  const TIMEOUT_MS = 1500;
-  // A picture in more parts than this is refused (the phone sends ~8–14).
+  // Receiver 50 waited 1.5 s, and build 156's single 393 KB picture often
+  // took longer: the TV flashed its own, different result first (the user:
+  // "the screen is still different than phone"). The phone's draft now
+  // arrives inside a second; the longer wait covers a slow channel.
+  const TIMEOUT_MS = 4000;
+  // A picture in more parts than this is refused (the phone sends 1–3 for a
+  // draft and up to ~11 for the sharp picture).
   const MAX_PARTS = 64;
   const MAX_LENGTH = 4 * 1024 * 1024;
   // Pictures half-received at once: a newer one replaces the oldest.
@@ -112,9 +122,9 @@
       if (ready.has(expected)) { shown = expected; return { mode: "picture", id: expected, wait: 0 }; }
       const left = Math.max(0, timeoutMs - (now - since));
       // The same scorecard drawn again (its reward arrived): its last
-      // picture stays until the new one is here.
-      if (left > 0 && shown && family(shown) === family(expected) && ready.has(shown)) {
-        return { mode: "picture", id: shown, wait: left };
+      // picture stays until the new one is here, however long that takes.
+      if (shown && family(shown) === family(expected) && ready.has(shown)) {
+        return { mode: "picture", id: shown, wait: 0 };
       }
       if (left > 0) return { mode: "waiting", wait: left };
       return { mode: "html", wait: 0 };
@@ -146,6 +156,8 @@
       if (timer != null) { o.clearTimer(timer); timer = null; }
       const decision = display.decide(o.now());
       o.body.dataset.card = decision.mode;
+      // The waiting backdrop matches the screen the picture will show.
+      o.root.dataset.screen = state && state.screen ? state.screen : "";
       o.root.hidden = decision.mode === "html";
       if (decision.mode === "picture") {
         const url = urls.get(decision.id);
@@ -169,6 +181,9 @@
     }
 
     function keep(id, url) {
+      // A sharper picture under the same id replaces the draft.
+      const previous = urls.get(id);
+      if (previous && previous !== url) o.revoke(previous);
       urls.set(id, url);
       display.arrived(id);
       prune(Array.from(urls.keys()), KEEP, [display.expected, last.id, id]).forEach((old) => {
