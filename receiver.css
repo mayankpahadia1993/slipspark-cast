@@ -391,9 +391,19 @@ body[data-scene="on"] #stream { visibility: hidden; }
 
 /* Build 154: a result is the phone's own TV scorecard picture, whole on the
    screen (letterboxed on any other shape), over this page's result, which
-   stays for older phones and as the fallback. While it is on its way (at
-   most 1.5 s) the TV shows the stadium's dark ground, not the HTML. */
+   stays for older phones and as the fallback. While it is on its way (up
+   to 4 s, receiver 51) the TV shows the stadium's dark ground, not the
+   HTML; for an innings or a timing check, the phone's own backdrop (the
+   stadium photograph under its ink shade, `StadiumBackdrop(shade: true)`),
+   so the picture lands on the same ground. */
 .card-screen { position: fixed; inset: 0; z-index: 11; background: #0c1a17; }
+body[data-card="waiting"] .card-screen[data-screen="result"],
+body[data-card="waiting"] .card-screen[data-screen="timingCheck"] {
+  background:
+    linear-gradient(90deg, rgba(18, 43, 38, .94) 0%, rgba(18, 43, 38, .7) 50%, rgba(18, 43, 38, 0) 100%),
+    url("scene-images/stadium-ground-1672x941.jpg") center / cover no-repeat,
+    #0c1a17;
+}
 .card-image { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
 .card-hold { position: absolute; left: 50%; bottom: 4vh; margin: 0; padding: 1vh 1.6vw; transform: translateX(-50%); border-radius: 999px; background: rgba(9, 22, 19, .82); }
 .card-hold .hold-ring { width: clamp(56px, 5vw, 96px); height: clamp(56px, 5vw, 96px); }
