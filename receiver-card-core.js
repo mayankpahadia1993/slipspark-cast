@@ -32,8 +32,36 @@
   const MAX_LENGTH = 4 * 1024 * 1024;
   // Pictures half-received at once: a newer one replaces the oldest.
   const MAX_PENDING = 2;
-  // Screens a picture may stand for.
-  const CARD_SCREENS = new Set(["result", "versusResult", "cricketDuelResult", "timingCheck"]);
+  // Screens a picture may stand for. Build 158 phones send the stadium
+  // setup too (the user, on the receiver's own setup screen: "very different
+  // ui than the rest of the screens"), to receivers that say `setup: 1`
+  // (receiver 52).
+  const CARD_SCREENS = new Set(["result", "versusResult", "cricketDuelResult", "timingCheck", "positioning"]);
+
+  // The setup's hold ring on its picture (`ring`: [x, y, diameter], the
+  // centre as fractions of the picture's width and height, the diameter as
+  // a fraction of its width), or null.
+  function validRing(value) {
+    if (!Array.isArray(value) || value.length !== 3) return null;
+    const [x, y, d] = value.map(Number);
+    if (![x, y, d].every(Number.isFinite) || x < 0 || x > 1 || y < 0 || y > 1 || d <= 0 || d > 0.5) return null;
+    return { x, y, d };
+  }
+
+  // Where the ring goes on the TV, in CSS pixels: the picture fills the
+  // screen as `object-fit: contain` does, and the phone's ring is a circle
+  // of the diameter, its stroke a tenth of it, centred on its edge. Returns
+  // the box of an SVG drawn with viewBox "-5 -5 110 110" (the stroke's outer
+  // half included).
+  function ringPlacement(ring, picture, view) {
+    if (!ring || !picture || !(picture.width > 0) || !(picture.height > 0) || !(view.width > 0) || !(view.height > 0)) return null;
+    const scale = Math.min(view.width / picture.width, view.height / picture.height);
+    const width = picture.width * scale, height = picture.height * scale;
+    const left = (view.width - width) / 2, top = (view.height - height) / 2;
+    const diameter = ring.d * width;
+    const box = diameter * 1.1;
+    return { left: left + ring.x * width - box / 2, top: top + ring.y * height - box / 2, size: box, diameter };
+  }
 
   // FNV-1a over the base64 text, as the phone computes it.
   function checksum(text) {
@@ -82,7 +110,7 @@
       }
       if (!entry) {
         while (pending.size >= MAX_PENDING) pending.delete(pending.keys().next().value);
-        entry = { of, len, sum, width: Number(m.w) || 0, height: Number(m.h) || 0, parts: new Array(of), count: 0 };
+        entry = { of, len, sum, width: Number(m.w) || 0, height: Number(m.h) || 0, ring: validRing(m.ring), parts: new Array(of), count: 0 };
         pending.set(id, entry);
       }
       if (entry.parts[n] == null) entry.count += 1;
@@ -91,7 +119,7 @@
       pending.delete(id);
       const data = entry.parts.join("");
       if (data.length !== len || checksum(data) !== sum) return { status: "invalid", id };
-      return { status: "complete", id, picture: { id, width: entry.width, height: entry.height, data } };
+      return { status: "complete", id, picture: { id, width: entry.width, height: entry.height, ring: entry.ring, data } };
     }
 
     return { add, get pendingCount() { return pending.size; } };
@@ -147,6 +175,8 @@
     const assembler = createAssembler();
     const display = createDisplay({ timeoutMs: o.timeoutMs });
     const urls = new Map();
+    // Each picture's size and the setup's ring on it.
+    const meta = new Map();
     const KEEP = 3;
     let state = null;
     let timer = null;
@@ -169,6 +199,16 @@
       const hold = decision.mode === "picture" && state && state.hold > 0 ? state.hold : 0;
       o.hold.hidden = !hold;
       if (hold) o.renderHold(o.hold, hold, "Keep holding");
+      // The setup: its hold ring where the picture has it, filling live as
+      // on the phone, and hidden at rest as there.
+      if (o.ring) {
+        const setup = decision.mode === "picture" && state && state.positioning;
+        const picture = setup ? meta.get(decision.id) : null;
+        const progress = setup && state.positioning.canHold ? state.positioning.progress : 0;
+        const place = progress > 0 && picture ? ringPlacement(picture.ring, picture, o.view()) : null;
+        o.ring.hidden = !place;
+        if (place) o.renderRing(o.ring, place, progress);
+      }
       if (decision.wait > 0) timer = o.setTimer(apply, decision.wait + 20);
       last = decision;
       return decision;
@@ -180,15 +220,17 @@
       return apply();
     }
 
-    function keep(id, url) {
+    function keep(id, url, picture) {
       // A sharper picture under the same id replaces the draft.
       const previous = urls.get(id);
       if (previous && previous !== url) o.revoke(previous);
       urls.set(id, url);
+      meta.set(id, picture ? { width: picture.width, height: picture.height, ring: picture.ring || null } : { width: 0, height: 0, ring: null });
       display.arrived(id);
       prune(Array.from(urls.keys()), KEEP, [display.expected, last.id, id]).forEach((old) => {
         o.revoke(urls.get(old));
         urls.delete(old);
+        meta.delete(old);
         display.forget(old);
       });
       return apply();
@@ -208,7 +250,7 @@
       }
       // Decoded before it is shown: no half-drawn picture on the TV.
       return Promise.resolve(o.decode ? o.decode(url) : null).then(() => {
-        keep(result.id, url);
+        keep(result.id, url, result.picture);
         return result;
       }, (error) => {
         o.revoke(url);
@@ -220,5 +262,5 @@
     return { receive, update, apply, keep, get decision() { return last; }, get urls() { return urls; } };
   }
 
-  return { TIMEOUT_MS, MAX_PARTS, CARD_SCREENS, checksum, family, validId, cardId, createAssembler, createDisplay, prune, createCardView };
+  return { TIMEOUT_MS, MAX_PARTS, CARD_SCREENS, checksum, family, validId, cardId, validRing, ringPlacement, createAssembler, createDisplay, prune, createCardView };
 });

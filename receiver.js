@@ -242,8 +242,20 @@
   // sends one (receiver-card-core.js); this page's result screens stay
   // underneath for older phones and as the fallback.
   const cardCore = window.RallycadeCardCore;
+  // The setup's ring (index.html `#card-ring`): the phone's StadiumHoldRing,
+  // a circle with its stroke a tenth of its size, filling clockwise from
+  // the top.
+  const SETUP_RING = 2 * Math.PI * 50;
+  function renderRing(ring, place, progress) {
+    ring.style.left = place.left + "px";
+    ring.style.top = place.top + "px";
+    ring.style.width = ring.style.height = place.size + "px";
+    const value = Math.max(0, Math.min(1, Number(progress) || 0));
+    ring.querySelector(".card-ring-fill").style.strokeDashoffset = String(SETUP_RING * (1 - value));
+  }
   const cardView = cardCore && cardCore.createCardView({
     root: element("card"), image: element("card-image"), hold: element("card-hold"), body: document.body,
+    ring: element("card-ring"), renderRing, view: () => ({ width: window.innerWidth, height: window.innerHeight }),
     renderHold, now: () => performance.now(),
     setTimer: (callback, ms) => setTimeout(callback, ms), clearTimer: (id) => clearTimeout(id),
     toUrl(data) {

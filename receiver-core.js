@@ -284,9 +284,12 @@
     }
 
     // Build 154: a result screen's picture from the phone (receiver-card-
-    // core.js) and the raise-hand ring drawn live over it.
+    // core.js) and the raise-hand ring drawn live over it. Build 158
+    // (receiver 52): the stadium setup's picture too, its hold ring drawn
+    // live from `positioning.progress`.
     const resultScreen = ["result", "versusResult", "cricketDuelResult", "timingCheck"].includes(screen);
-    normalized.card = resultScreen && typeof value.card === "string" && /^[0-9a-z]{1,32}\.[0-9a-z]{1,32}$/.test(value.card) ? value.card : null;
+    const pictureScreen = resultScreen || screen === "positioning";
+    normalized.card = pictureScreen && typeof value.card === "string" && /^[0-9a-z]{1,32}\.[0-9a-z]{1,32}$/.test(value.card) ? value.card : null;
     normalized.hold = resultScreen && Number(value.hold) > 0 ? Math.min(1, Number(value.hold)) : null;
 
     return normalized;

@@ -843,7 +843,9 @@
       // for `screen`, its page in device pixels (receiver 50, build 154).
       // `live`: it draws the batter from live messages into each frame's
       // "B" slot (receiver 51, build 157).
-      send({ t: "ready", scene: 1, pic: 1, card: 1, live: 1, screen: screenPixels(), version: VERSION, ua: navigator.userAgent, have });
+      // `setup`: it shows the stadium setup as the phone's picture too, with
+      // the hold ring drawn live where the picture says (receiver 52, build 158).
+      send({ t: "ready", scene: 1, pic: 1, card: 1, live: 1, setup: 1, screen: screenPixels(), version: VERSION, ua: navigator.userAgent, have });
       preloadBundled();
     }
 
