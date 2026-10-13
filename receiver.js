@@ -2,6 +2,8 @@
   "use strict";
 
   const NAMESPACE = "urn:x-cast:com.slipspark.game";
+  // How long a disconnected phone's stadium stays on screen.
+  const SCENE_GRACE_MS = 20000;
   const core = window.SlipSparkReceiverCore;
   const app = document.getElementById("app");
   const screens = {
@@ -265,6 +267,10 @@
       return URL.createObjectURL(new Blob([bytes], { type: "image/jpeg" }));
     },
     revoke(url) { if (url && url.indexOf("blob:") === 0) URL.revokeObjectURL(url); },
+    // A phone that draws the stadium: as its innings starts, its setup
+    // picture stays up until the stadium draws over it, never the HTML
+    // scoreboard (receiver 53).
+    holdLast: (state) => !!(state && state.screen === "cricket" && stadiumPhone),
     decode(url) {
       const probe = new Image();
       probe.src = url;
@@ -273,6 +279,8 @@
     report: (where, error) => cardFailure(where, error)
   });
   let cardFailure = () => {};
+  // A phone has said hello on the scene channel this cast.
+  let stadiumPhone = false;
 
   function render(rawState) {
     const state = core.normalizeState(rawState);
@@ -383,6 +391,7 @@
       window.addEventListener("unhandledrejection", (event) => player.report("promise", event.reason));
     }
     if (scene) {
+      let sceneGone = 0;
       sendScene = (message) => {
         if (sceneSender) context.sendCustomMessage(sceneModule.NAMESPACE, sceneSender, message);
       };
@@ -398,13 +407,23 @@
           return;
         }
         sceneSender = event.senderId;
+        if (event.data && event.data.t === "hello") {
+          stadiumPhone = true;
+          window.clearTimeout(sceneGone);
+        }
         try { scene.handle(event.data); } catch (error) { scene.report("handle", error); }
       });
       window.addEventListener("error", (event) => scene.report("script", event.message + " @" + event.lineno));
       cardFailure = (where, error) => scene.report(where, error);
-      // A phone that leaves takes its stadium with it.
+      // A phone that leaves takes its stadium with it, but not at once: a
+      // dropped Wi-Fi connection comes back within seconds, and meanwhile
+      // the stadium's last frame stays up rather than the HTML scoreboard
+      // (build 158: "still some older chromecast screen showed up").
       context.addEventListener(window.cast.framework.system.EventType.SENDER_DISCONNECTED, (event) => {
-        if (event.senderId === sceneSender) { sceneSender = null; scene.setOn(false); }
+        if (event.senderId !== sceneSender) return;
+        sceneSender = null;
+        window.clearTimeout(sceneGone);
+        sceneGone = window.setTimeout(() => { if (!sceneSender) { scene.setOn(false); stadiumPhone = false; } }, SCENE_GRACE_MS);
       });
     }
     const options = new window.cast.framework.CastReceiverOptions();

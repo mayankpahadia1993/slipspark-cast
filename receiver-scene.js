@@ -222,7 +222,10 @@
     // The receiver's own pictures, two at a time, as soon as a phone says
     // hello: by the first ball every one is ready.
     function preloadBundled() {
-      const keys = Array.from(bundled.keys());
+      // This TV's own copies of pictures earlier casts sent too (receiver
+      // 53): build 158's innings opened with 22–59 draws a second missing a
+      // photo the TV had cached but not yet loaded.
+      const keys = Array.from(bundled.keys()).concat(Array.from(cached).filter((key) => !bundled.has(key)).slice(0, MAX_CACHED_PRELOAD));
       let next = 0;
       const pump = () => {
         while (next < keys.length && (images.has(keys[next]) || loading.has(keys[next]))) next += 1;
@@ -230,13 +233,28 @@
         const key = keys[next];
         next += 1;
         loading.add(key);
-        loadImage("scene-images/" + bundled.get(key))
+        const source = bundled.has(key) ? Promise.resolve("scene-images/" + bundled.get(key))
+          : database ? loadCached(key) : Promise.reject(new Error("no cache"));
+        source.then(loadImage)
           .then((image) => addImage(key, image), () => loading.delete(key))
           .then(() => window.setTimeout(pump, 20));
       };
       pump();
       pump();
+      pump();
     }
+
+    // The first frame after the stadium comes on drawn with every picture
+    // it needs: the phone holds the first ball until then (receiver 53).
+    let wholeSent = false;
+    function noteWhole(missingBefore) {
+      if (wholeSent || !on || counters.missing !== missingBefore) return;
+      wholeSent = true;
+      send({ t: "whole" });
+    }
+
+    // Cached pictures loaded at hello, at most.
+    const MAX_CACHED_PRELOAD = 48;
 
     function loadBundled() {
       return fetch("scene-images/manifest.json").then((response) => response.ok ? response.json() : { images: {} })
@@ -740,7 +758,9 @@
       // A frame already on screen is drawn again only while blending.
       let drew = false;
       if (result && (result.blended || result.stamp !== lastStamp || needsRedraw)) {
+        const missingBefore = counters.missing;
         drawFrame(result.frame);
+        noteWhole(missingBefore);
         shownFrame = result.frame;
         drew = true;
         needsRedraw = false;
@@ -821,6 +841,7 @@
     }
 
     function setOn(value) {
+      if (!!value && !on) wholeSent = false;
       on = !!value;
       root.hidden = !on;
       document.body.dataset.scene = on ? "on" : "off";
@@ -845,7 +866,9 @@
       // "B" slot (receiver 51, build 157).
       // `setup`: it shows the stadium setup as the phone's picture too, with
       // the hold ring drawn live where the picture says (receiver 52, build 158).
-      send({ t: "ready", scene: 1, pic: 1, card: 1, live: 1, setup: 1, screen: screenPixels(), version: VERSION, ua: navigator.userAgent, have });
+      // `whole`: it says when the stadium's first frame has every picture
+      // (receiver 53, build 159).
+      send({ t: "ready", scene: 1, pic: 1, card: 1, live: 1, setup: 1, whole: 1, screen: screenPixels(), version: VERSION, ua: navigator.userAgent, have });
       preloadBundled();
     }
 
@@ -906,6 +929,7 @@
           timeline.reset();
           live.clear();
           lastStamp = null;
+          wholeSent = false;
           if (readyToAnswer) answerHello(); else pendingHello = true;
           break;
         case "ping":
