@@ -40,6 +40,8 @@
     let backdropTransform = "";
     const timeline = core.createTimeline();
     const clock = core.createClock();
+    // The batter, drawn for now and shown as soon as it arrives ("b").
+    const live = core.createLiveLayer();
     const images = new Map();
     const tinted = new Map();
     // Pictures the phone draws from commands ("pic": a dyed kit's pieces,
@@ -76,7 +78,7 @@
     let lastNeed = 0;
     let readyToAnswer = false;
     let pendingHello = false;
-    const counters = { draws: 0, blended: 0, frames: 0, late: [], drawMs: [], missing: 0, redraws: 0, gaps: [] };
+    const counters = { draws: 0, blended: 0, frames: 0, late: [], drawMs: [], missing: 0, redraws: 0, gaps: [], live: 0, pose: [] };
 
     // MARK: Sizing
 
@@ -499,23 +501,28 @@
       }
       // A photo whose layer isn't decoded yet is drawn on the canvas, over
       // whichever layer was showing: never an empty frame.
-      paint(ctx, frame, from, { s: scale, width: canvas.width, height: canvas.height, layers: null });
+      paint(ctx, frame, from, { s: scale, width: canvas.width, height: canvas.height, layers: null, live: live.current });
       counters.drawMs.push(performance.now() - started);
       counters.draws += 1;
     }
 
     // Draws a frame's commands from `from` on into `target`: the TV's
     // canvas (`surface.s` canvas pixels a stage point), or a composed
-    // picture's own canvas (one pixel a point).
-    function paint(target, frame, from, surface) {
+    // picture's own canvas (one pixel a point). `depth` is how many layers
+    // are already open below `target` (the live batter drawn inside one).
+    function paint(target, frame, from, surface, depth) {
       const scale = surface.s;
+      const base = depth || 0;
       const stack = [{ c: target }];
       let c = target;
       for (let index = from; index < frame.o.length; index += 1) {
         const op = frame.o[index];
         switch (op[0]) {
           case "L": {
-            const layer = surface.layers ? layerCanvas(stack.length) : pictureLayer(surface, stack.length);
+            // A composed picture's layers are its own size (`surface.layers`);
+            // the TV's canvas shares `layers`. Build 142 had these swapped,
+            // unseen because no stadium frame drew a layer.
+            const layer = surface.layers ? pictureLayer(surface, base + stack.length) : layerCanvas(base + stack.length);
             stack.push({ c: layer.getContext("2d"), layer, alpha: op[1], blend: op[2], filterRef: op[3], clipRef: op[4] });
             c = stack[stack.length - 1].c;
             break;
@@ -577,6 +584,15 @@
               scale * m[4] / 10, scale * m[5] / 10);
             c.drawImage(multiply ? tint(key, image, multiply) : image, 0, 0, size.width, size.height);
             c.restore();
+            break;
+          }
+          case "B": {
+            // The live batter's own commands, filters and clips, where the
+            // frame drawn ahead left room for it.
+            const batter = surface.live;
+            if (batter && batter.o.length) {
+              paint(c, batter, 0, Object.assign({}, surface, { live: null }), base + stack.length - 1);
+            }
             break;
           }
           case "t": {
@@ -731,6 +747,11 @@
         if (result.blended) counters.blended += 1;
         lastStamp = result.stamp;
       }
+      // How old the batter's pose on screen is: what the live batter is for.
+      if (result) {
+        const age = core.poseAge(phoneNow, result.frame, live.current);
+        if (age != null) counters.pose.push(age);
+      }
       // A wide canvas the device can't keep up with narrows to 1280.
       if (plan.adaptive && canvas.width > core.CANVAS.narrow && rateWatch.tick(local, drew)) narrowCanvas();
       const h = timeline.hudAt(phoneNow);
@@ -761,12 +782,20 @@
           missing: counters.missing, images: images.size, queue: timeline.length,
           synced: clock.synced ? 1 : 0, w: canvas.width, canvas: plan.why,
           gap: Number(core.percentile(counters.gaps, 0.5).toFixed(1)),
-          gap90: Number(core.percentile(counters.gaps, 0.9).toFixed(1))
+          gap90: Number(core.percentile(counters.gaps, 0.9).toFixed(1)),
+          // Live batters received; and how old the pose of the batter on
+          // screen was (camera capture to drawn, ms) when the phone says.
+          live: counters.live
         };
+        if (counters.pose.length) {
+          stats.pose = Math.round(core.percentile(counters.pose, 0.5));
+          stats.pose90 = Math.round(core.percentile(counters.pose, 0.9));
+        }
         send(stats);
         if (debug) setDebug(stats);
         counters.draws = 0; counters.blended = 0; counters.frames = 0; counters.redraws = 0;
         counters.late = []; counters.drawMs = []; counters.missing = 0; counters.gaps = [];
+        counters.live = 0; counters.pose = [];
       }
     }
 
@@ -778,7 +807,7 @@
         root.appendChild(debugLine);
       }
       debugLine.textContent = "scene " + stats.fps + " fps · draw " + stats.drawMs + "/" + stats.drawMax + " ms · late "
-        + stats.behind + " ms · queue " + stats.queue + " · images " + stats.images + " · " + stats.w + " wide (" + stats.canvas + ")"
+        + stats.behind + " ms" + (stats.pose != null ? " · pose " + stats.pose + "/" + stats.pose90 + " ms" : "") + " · queue " + stats.queue + " · images " + stats.images + " · " + stats.w + " wide (" + stats.canvas + ")"
         + (stats.synced ? "" : " · not synced");
     }
 
@@ -797,7 +826,7 @@
       document.body.dataset.scene = on ? "on" : "off";
       // Measured once it is on screen: hidden, the stage has no size.
       if (on) resize();
-      if (!on) timeline.clear();
+      if (!on) { timeline.clear(); live.clear(); }
     }
 
     function screenPixels() {
@@ -812,7 +841,9 @@
       // `pic`: this receiver composes pictures from commands (receiver 47, build 142).
       // `card`: it shows a result as the phone's scorecard picture, drawn
       // for `screen`, its page in device pixels (receiver 50, build 154).
-      send({ t: "ready", scene: 1, pic: 1, card: 1, screen: screenPixels(), version: VERSION, ua: navigator.userAgent, have });
+      // `live`: it draws the batter from live messages into each frame's
+      // "B" slot (receiver 51, build 157).
+      send({ t: "ready", scene: 1, pic: 1, card: 1, live: 1, screen: screenPixels(), version: VERSION, ua: navigator.userAgent, have });
       preloadBundled();
     }
 
@@ -871,6 +902,7 @@
           if (["low", "medium", "high"].indexOf(message.smooth) >= 0) smoothing = message.smooth;
           clock.reset();
           timeline.reset();
+          live.clear();
           lastStamp = null;
           if (readyToAnswer) answerHello(); else pendingHello = true;
           break;
@@ -892,6 +924,15 @@
           const frames = timeline.replace(message.frames, message.e);
           frames.forEach(noteArrival);
           if (frames.length) counters.redraws += 1;
+          break;
+        }
+        case "b": {
+          const batter = live.set(message);
+          if (batter) {
+            prefetch(batter);
+            counters.live += 1;
+            needsRedraw = true;
+          }
           break;
         }
         case "img":
@@ -926,6 +967,8 @@
             // Film mode: a script draws each moment in turn (scripts/cast-scene-film.mjs).
             on = false;
             const sorted = frames.slice().sort((x, y) => x.s - y.s);
+            // Live batters, shown from their moment as the TV would on arrival.
+            const liveFrames = ((data && data.live) || []).map(core.normalizeFrame).filter(Boolean).sort((x, y) => x.s - y.s);
             let shownHUD = null;
             window.__sceneFilm = {
               start: sorted[0].s,
@@ -942,6 +985,10 @@
                 let frame = a;
                 if (b && t > a.s && b.s - a.s <= core.MAX_BLEND_GAP && core.shapeKey(a) === core.shapeKey(b)) {
                   frame = core.blendFrames(a, b, Math.min(1, (t - a.s) / (b.s - a.s)));
+                }
+                live.clear();
+                for (let k = liveFrames.length - 1; k >= 0; k -= 1) {
+                  if (liveFrames[k].s <= t) { live.set(liveFrames[k]); break; }
                 }
                 drawFrame(frame);
                 for (let k = low; k >= 0; k -= 1) {
@@ -999,7 +1046,7 @@
     });
     window.requestAnimationFrame(frameLoop);
 
-    return { NAMESPACE, handle, report, setOn, renderHUD, drawFrame, playRecording, playRecordingAt, snapshot, timeline, clock, images, pictures, counters };
+    return { NAMESPACE, handle, report, setOn, renderHUD, drawFrame, playRecording, playRecordingAt, snapshot, timeline, clock, live, images, pictures, counters };
   }
 
   window.RallycadeReceiverScene = { NAMESPACE, createScene };

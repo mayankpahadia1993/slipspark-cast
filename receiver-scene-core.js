@@ -11,7 +11,9 @@
   // ten-thousandths, opacities thousandths: all whole numbers, so two frames
   // of the same shapes blend number by number.
   const STAGE = { width: 1280, height: 720 };
-  const OPS = new Set(["f", "s", "i", "t", "L", "l"]);
+  // "B" marks where the live batter goes (receiver 51): the phone draws the
+  // frame ahead but the batter for now, in its own message ("b").
+  const OPS = new Set(["f", "s", "i", "t", "L", "l", "B"]);
   // Fields that name things rather than measure them: never blended, and a
   // difference means the frames are not the same shapes.
   const DISCRETE = {
@@ -20,7 +22,8 @@
     i: [2, 3, 5, 6],
     t: [2, 3, 5, 6, 10],
     L: [2, 3, 4],
-    l: []
+    l: [],
+    B: []
   };
   // Frames further apart than this are not blended: something happened between.
   const MAX_BLEND_GAP = 120;
@@ -30,7 +33,9 @@
   function isArray(value) { return Array.isArray(value); }
 
   // A frame from the phone: `s` its moment (phone milliseconds), `o` the
-  // commands, `fl` filter lists, `cl` clip lists, `h` the HUD when it changed.
+  // commands, `fl` filter lists, `cl` clip lists, `h` the HUD when it changed,
+  // `p` when the camera saw the pose its batter follows (phone milliseconds;
+  // build 157 on). A live batter ("b") has the same members but `h`.
   function normalizeFrame(raw) {
     if (!raw || typeof raw !== "object" || !Number.isFinite(Number(raw.s)) || !isArray(raw.o)) return null;
     const ops = raw.o.filter((op) => isArray(op) && OPS.has(op[0]));
@@ -39,8 +44,20 @@
       o: ops,
       fl: isArray(raw.fl) ? raw.fl : [],
       cl: isArray(raw.cl) ? raw.cl : [],
-      h: raw.h && typeof raw.h === "object" ? raw.h : null
+      h: raw.h && typeof raw.h === "object" ? raw.h : null,
+      p: raw.p != null && Number.isFinite(Number(raw.p)) ? Number(raw.p) : null
     };
+  }
+
+  // Whether a frame leaves its batter to the live layer.
+  function hasLiveSlot(frame) {
+    if (frame.__live === undefined) frame.__live = frame.o.some((op) => op[0] === "B");
+    return frame.__live;
+  }
+
+  // Between two frames' poses, as between their moments.
+  function blendPose(a, b, u) {
+    return a.p != null && b.p != null ? a.p + (b.p - a.p) * u : a.p;
   }
 
   // The frame's shapes without their measurements: two frames with the same
@@ -106,7 +123,8 @@
       }
       ops[index] = op;
     }
-    return { s: a.s + (b.s - a.s) * u, o: ops, fl: blendValue(a.fl, b.fl, u), cl: blendValue(a.cl, b.cl, u), h: null };
+    return { s: a.s + (b.s - a.s) * u, o: ops, fl: blendValue(a.fl, b.fl, u), cl: blendValue(a.cl, b.cl, u), h: null,
+      p: blendPose(a, b, u) };
   }
 
   // Blends `a` toward `b` into `out`, a frame of the same shapes from
@@ -128,7 +146,7 @@
   }
 
   function cloneFrame(frame) {
-    return { s: frame.s, o: frame.o.map(cloneValue), fl: cloneValue(frame.fl), cl: cloneValue(frame.cl), h: null };
+    return { s: frame.s, o: frame.o.map(cloneValue), fl: cloneValue(frame.fl), cl: cloneValue(frame.cl), h: null, p: frame.p };
   }
 
   function blendFramesInto(out, a, b, u) {
@@ -147,6 +165,7 @@
       }
     }
     out.s = a.s + (b.s - a.s) * u;
+    out.p = blendPose(a, b, u);
     blendInto(out.fl, a.fl, b.fl, u);
     blendInto(out.cl, a.cl, b.cl, u);
     return out;
@@ -240,6 +259,36 @@
       // A new phone (or the same one, started again) counts epochs afresh.
       reset() { frames = []; huds = []; epoch = 0; }
     };
+  }
+
+  // The live batter (receiver 51): the newest "b" message, drawn into each
+  // frame's "B" slot from the moment it arrives. It is not held for its
+  // moment or blended with the one before: either would show an older pose.
+  // The phone draws it for about the moment it lands here.
+  function createLiveLayer() {
+    let current = null;
+    return {
+      get current() { return current; },
+      // Newest wins; one older than the batter held (out of order) is dropped.
+      set(raw) {
+        const frame = normalizeFrame(raw);
+        if (!frame) return null;
+        if (current && frame.s < current.s) return null;
+        frame.h = null;
+        current = frame;
+        return frame;
+      },
+      clear() { current = null; }
+    };
+  }
+
+  // How old the pose of the batter drawn at phone moment `now` is, in ms:
+  // the live batter's for a frame with a slot, the frame's own otherwise.
+  // Null when the phone didn't say (before build 157, or no camera).
+  function poseAge(now, frame, live) {
+    if (!frame || !Number.isFinite(now)) return null;
+    const pose = hasLiveSlot(frame) ? (live ? live.p : null) : frame.p;
+    return pose == null ? null : now - pose;
   }
 
   // Maps the phone's moments to this TV's clock. The phone measures the
@@ -376,6 +425,6 @@
 
   return {
     STAGE, MAX_BLEND_GAP, CANVAS, normalizeFrame, shapeKey, blendFrames, blendFramesInto, cloneFrame, createTimeline, createClock,
-    percentile, tracePath, cssColor, pictureSize, canvasPlan, canvasWidth, createRateWatch
+    percentile, tracePath, cssColor, pictureSize, canvasPlan, canvasWidth, createRateWatch, createLiveLayer, hasLiveSlot, poseAge
   };
 });
