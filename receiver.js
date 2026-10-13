@@ -414,8 +414,8 @@
     if (scene) options.customNamespaces[sceneModule.NAMESPACE] = window.cast.framework.system.MessageType.JSON;
     options.disableIdleTimeout = true;
     options.skipPlayersLoad = true;
-    options.statusText = "Rallycade is ready";
-    context.setApplicationState("Rallycade is ready");
+    options.statusText = "RallyCade is ready";
+    context.setApplicationState("RallyCade is ready");
     context.start(options);
   }
 })();

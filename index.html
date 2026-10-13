@@ -3,11 +3,11 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Rallycade TV</title>
+  <title>RallyCade TV</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800;900&family=Nunito:wght@600;700;800;900&display=swap">
-  <link rel="stylesheet" href="receiver.css?v=52">
+  <link rel="stylesheet" href="receiver.css?v=53">
   <script src="https://www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>
 </head>
 <body>
@@ -19,7 +19,7 @@
     </div>
 
     <section id="ready-screen" class="screen ready-screen">
-      <div class="brand-mark" aria-label="Rallycade">
+      <div class="brand-mark" aria-label="RallyCade">
         <img class="brand-icon" src="rallycade-icon.png" alt="">
         <span>RALLYCADE</span>
       </div>
@@ -173,7 +173,7 @@
 
   <!-- Build 154: a result as the phone's own TV scorecard, drawn on the
        phone (receiver-card-core.js), with the raise-hand ring live over it. -->
-  <section id="card" class="card-screen" hidden aria-label="Rallycade scorecard">
+  <section id="card" class="card-screen" hidden aria-label="RallyCade scorecard">
     <img id="card-image" class="card-image" alt="" hidden>
     <div id="card-hold" class="hold card-hold" hidden>
       <svg class="hold-ring" viewBox="0 0 100 100" aria-hidden="true">
@@ -190,10 +190,10 @@
     </svg>
   </section>
 
-  <video id="stream" muted autoplay playsinline disablepictureinpicture aria-label="Rallycade on your iPhone"></video>
+  <video id="stream" muted autoplay playsinline disablepictureinpicture aria-label="RallyCade on your iPhone"></video>
 
   <!-- The stadium the TV draws from the phone's drawing commands, and its HUD. -->
-  <section id="scene" class="scene" hidden aria-label="Rallycade stadium">
+  <section id="scene" class="scene" hidden aria-label="RallyCade stadium">
     <!-- 16:9, letterboxed on any other screen shape. -->
     <div id="scene-stage" class="scene-stage">
     <img id="scene-backdrop" alt="" hidden>
@@ -256,11 +256,11 @@
     </div>
   </section>
   <!-- ?v= keeps a Chromecast from mixing cached files of two receiver versions. -->
-  <script src="receiver-core.js?v=52"></script>
-  <script src="receiver-card-core.js?v=52"></script>
-  <script src="receiver-video.js?v=52"></script>
-  <script src="receiver-scene-core.js?v=52"></script>
-  <script src="receiver-scene.js?v=52"></script>
-  <script src="receiver.js?v=52"></script>
+  <script src="receiver-core.js?v=53"></script>
+  <script src="receiver-card-core.js?v=53"></script>
+  <script src="receiver-video.js?v=53"></script>
+  <script src="receiver-scene-core.js?v=53"></script>
+  <script src="receiver-scene.js?v=53"></script>
+  <script src="receiver.js?v=53"></script>
 </body>
 </html>
