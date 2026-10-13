@@ -45,7 +45,10 @@
       fl: isArray(raw.fl) ? raw.fl : [],
       cl: isArray(raw.cl) ? raw.cl : [],
       h: raw.h && typeof raw.h === "object" ? raw.h : null,
-      p: raw.p != null && Number.isFinite(Number(raw.p)) ? Number(raw.p) : null
+      p: raw.p != null && Number.isFinite(Number(raw.p)) ? Number(raw.p) : null,
+      // How far ahead of its pose the phone drew the live batter (ms,
+      // receiver 55): it shows the hands that much later than `p`.
+      ph: raw.ph != null && Number.isFinite(Number(raw.ph)) ? Math.max(0, Number(raw.ph)) : 0
     };
   }
 
@@ -291,6 +294,16 @@
     return pose == null ? null : now - pose;
   }
 
+  // How far ahead of its pose the batter drawn for this frame was drawn
+  // (ms): the live batter's for a frame with a slot, else none. Null when
+  // its pose age is unknown, as `poseAge`.
+  function poseAhead(frame, live) {
+    if (!frame) return null;
+    const source = hasLiveSlot(frame) ? live : frame;
+    if (!source || source.p == null) return null;
+    return source.ph || 0;
+  }
+
   // Maps the phone's moments to this TV's clock. The phone measures the
   // offset (this clock minus its own) from round trips and sends it; until
   // then, a frame is shown as soon as it arrives.
@@ -425,6 +438,6 @@
 
   return {
     STAGE, MAX_BLEND_GAP, CANVAS, normalizeFrame, shapeKey, blendFrames, blendFramesInto, cloneFrame, createTimeline, createClock,
-    percentile, tracePath, cssColor, pictureSize, canvasPlan, canvasWidth, createRateWatch, createLiveLayer, hasLiveSlot, poseAge
+    percentile, tracePath, cssColor, pictureSize, canvasPlan, canvasWidth, createRateWatch, createLiveLayer, hasLiveSlot, poseAge, poseAhead
   };
 });
