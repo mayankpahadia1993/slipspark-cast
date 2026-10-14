@@ -175,10 +175,14 @@
       if (!entry || entry.ready) return;
       const missing = entry.uses.filter((use) => !images.has(use));
       if (missing.length) { missing.forEach(ensure); return; }
+      // Made at the size its bitmap would be kept at (receiver 57): a dyed
+      // kit's eleven pieces, made as the stadium comes on, cost a quarter.
+      // An opaque one (the practice lane) is shown on the GPU layer, sharp.
+      const factor = entry.opaque ? 1 : pictureFactor(key, entry.width, entry.height, false);
       const target = document.createElement("canvas");
-      target.width = entry.width;
-      target.height = entry.height;
-      paint(target.getContext("2d"), entry.frame, 0, { s: 1, width: entry.width, height: entry.height, layers: [] });
+      target.width = Math.max(1, Math.round(entry.width * factor));
+      target.height = Math.max(1, Math.round(entry.height * factor));
+      paint(target.getContext("2d"), entry.frame, 0, { s: factor, width: target.width, height: target.height, layers: [] });
       // The tinted copies were for this picture: frames draw the picture.
       tinted.clear();
       entry.ready = true;
@@ -232,11 +236,18 @@
     const bitmaps = new Map();
     const canBitmap = typeof window.createImageBitmap === "function";
 
+    // How much of its own size a picture is kept at: on a 1280 canvas half
+    // for a sprite, the stage's size for a photo; all of it drawing 1920.
+    function pictureFactor(key, width, height, isOpaque) {
+      if (maxCanvasWidth > core.CANVAS.narrow) return 1;
+      if (isOpaque) return Math.min(1, STAGE.width / width);
+      return Math.max(width, height) >= 200 ? 0.5 : 1;
+    }
+
     function bitmapOptions(key) {
       const size = core.pictureSize(key);
-      if (!size || maxCanvasWidth > core.CANVAS.narrow) return null;
-      const factor = opaque.has(key) ? Math.min(1, STAGE.width / size.width)
-        : Math.max(size.width, size.height) >= 200 ? 0.5 : 1;
+      if (!size) return null;
+      const factor = pictureFactor(key, size.width, size.height, opaque.has(key));
       if (factor >= 1) return null;
       return { resizeWidth: Math.max(1, Math.round(size.width * factor)), resizeHeight: Math.max(1, Math.round(size.height * factor)),
         resizeQuality: "high" };
