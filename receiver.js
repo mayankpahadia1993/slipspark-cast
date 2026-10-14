@@ -150,7 +150,7 @@
     // Build 123 phones send the innings' own score and words ("97/1",
     // "Raise both hands to bat again"); older ones only the number.
     if (result.scoreText) text("result-score", result.scoreText);
-    text("result-hint", result.hint || "Raise both hands to go again · Results saved on your iPhone");
+    text("result-hint", result.hint || "Raise both hands to go again · Results saved on your phone");
     const reward = element("result-reward");
     reward.hidden = !result.reward;
     if (result.reward) {
