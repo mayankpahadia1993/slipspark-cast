@@ -452,6 +452,13 @@
         sceneGone = window.setTimeout(() => { if (!sceneSender) { scene.setOn(false); stadiumPhone = false; } }, SCENE_GRACE_MS);
       });
     }
+    // Receiver 59: the stadium's bitmaps and canvases are let go as the
+    // receiver stops, so the TV can start it again at once.
+    if (scene) {
+      context.addEventListener(window.cast.framework.system.EventType.SHUTDOWN, () => scene.release());
+      window.addEventListener("pagehide", () => scene.release());
+      window.addEventListener("unload", () => scene.release());
+    }
     const options = new window.cast.framework.CastReceiverOptions();
     options.customNamespaces = {};
     options.customNamespaces[NAMESPACE] = window.cast.framework.system.MessageType.JSON;

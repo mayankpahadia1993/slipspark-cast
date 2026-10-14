@@ -1295,6 +1295,8 @@
           resize();
           if (["low", "medium", "high"].indexOf(message.smooth) >= 0) smoothing = message.smooth;
           setTune(message.x);
+          // A hello after a release (the page kept after all) starts afresh.
+          released = false;
           clock.reset();
           timeline.reset();
           live.clear();
@@ -1442,7 +1444,31 @@
     });
     window.requestAnimationFrame(frameLoop);
 
-    return { NAMESPACE, handle, report, setOn, renderHUD, drawFrame, playRecording, playRecordingAt, snapshot, timeline, clock, live, images, bitmaps,
+    // The receiver is going away (CAF's SHUTDOWN, the page hidden): every
+    // decoded bitmap and canvas let go at once (receiver 59). After a stop,
+    // the Living Room TV refused to start RallyCade again for minutes
+    // (LAUNCH_ERROR CANCELLED) once a session had held its bitmaps.
+    let released = false;
+    function release() {
+      if (released) return;
+      released = true;
+      on = false;
+      bitmaps.forEach((bitmap) => { try { if (bitmap.close) bitmap.close(); } catch (error) { /* gone */ } });
+      bitmaps.clear();
+      const empty = (target) => { try { if (target && target.getContext) { target.width = 0; target.height = 0; } } catch (error) { /* gone */ } };
+      layers.forEach(empty);
+      layers.length = 0;
+      scratches.forEach(empty);
+      scratches.clear();
+      tinted.forEach(empty);
+      tinted.clear();
+      images.forEach(empty);
+      images.clear();
+      backdropLayers.forEach((entry) => { try { entry.element.removeAttribute("src"); } catch (error) { /* gone */ } });
+      empty(canvas);
+    }
+
+    return { NAMESPACE, handle, report, setOn, renderHUD, drawFrame, playRecording, playRecordingAt, snapshot, timeline, clock, live, images, bitmaps, release,
       pictures, counters, tune, setTune };
   }
 
