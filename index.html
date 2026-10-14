@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800;900&family=Nunito:wght@600;700;800;900&display=swap">
-  <link rel="stylesheet" href="receiver.css?v=55">
+  <link rel="stylesheet" href="receiver.css?v=56">
   <script src="https://www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>
 </head>
 <body>
@@ -190,6 +190,32 @@
     </svg>
   </section>
 
+  <!-- Receiver 56: the app-open welcome, played here while the phone plays
+       it (receiver-welcome.js): the stadium's floodlights coming on, the
+       logo landing and the commentator's lines. Over the ready screen. -->
+  <section id="welcome" class="welcome" hidden aria-hidden="true">
+    <div id="welcome-stage" class="welcome-stage">
+      <div id="welcome-canvas" class="welcome-canvas">
+        <img class="welcome-photo welcome-dark" src="welcome-stadium.jpg" alt="">
+        <img class="welcome-photo welcome-lit" src="welcome-stadium.jpg" alt="">
+        <img class="welcome-photo welcome-lit" src="welcome-stadium.jpg" alt="">
+        <img class="welcome-photo welcome-lit" src="welcome-stadium.jpg" alt="">
+        <img class="welcome-photo welcome-lit" src="welcome-stadium.jpg" alt="">
+        <img id="welcome-lit-all" class="welcome-photo" src="welcome-stadium.jpg" alt="">
+        <div class="welcome-glow"></div><div class="welcome-glow"></div><div class="welcome-glow"></div><div class="welcome-glow"></div>
+        <div class="welcome-vignette"></div>
+        <div id="welcome-scrim" class="welcome-scrim"></div>
+        <div id="welcome-halo" class="welcome-halo"></div>
+        <img id="welcome-icon" class="welcome-icon" src="rallycade-icon.png" alt="">
+        <div id="welcome-wordmark" class="welcome-wordmark">RALLYCADE</div>
+      </div>
+    </div>
+    <div id="welcome-caption" class="welcome-caption" hidden>
+      <svg class="hud-mic" viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="2" width="8" height="13" rx="4"/><path d="M5 11a7 7 0 0 0 14 0" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/><rect x="10.8" y="18" width="2.4" height="4" rx="1"/></svg>
+      <span id="welcome-caption-text"></span>
+    </div>
+  </section>
+
   <video id="stream" muted autoplay playsinline disablepictureinpicture aria-label="RallyCade on your phone"></video>
 
   <!-- The stadium the TV draws from the phone's drawing commands, and its HUD. -->
@@ -256,11 +282,12 @@
     </div>
   </section>
   <!-- ?v= keeps a Chromecast from mixing cached files of two receiver versions. -->
-  <script src="receiver-core.js?v=55"></script>
-  <script src="receiver-card-core.js?v=55"></script>
-  <script src="receiver-video.js?v=55"></script>
-  <script src="receiver-scene-core.js?v=55"></script>
-  <script src="receiver-scene.js?v=55"></script>
-  <script src="receiver.js?v=55"></script>
+  <script src="receiver-core.js?v=56"></script>
+  <script src="receiver-card-core.js?v=56"></script>
+  <script src="receiver-video.js?v=56"></script>
+  <script src="receiver-scene-core.js?v=56"></script>
+  <script src="receiver-scene.js?v=56"></script>
+  <script src="receiver-welcome.js?v=56"></script>
+  <script src="receiver.js?v=56"></script>
 </body>
 </html>
