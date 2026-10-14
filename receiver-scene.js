@@ -541,7 +541,9 @@
     // (receiver 56's), `layers` "bounded" or "full", `cover` "clip" (a
     // stage-sized clip still covers) or "strict", `bitmaps` 1 or 0, `shade`
     // "thirds", "full" or "none".
-    const TUNED = Object.freeze({ blur: "shadow", layers: "bounded", cover: "clip", bitmaps: 1, shade: "thirds" });
+    // Bitmaps are off by default (receiver 59b): with them the Living Room
+    // TV refused to start RallyCade again for minutes after a stop.
+    const TUNED = Object.freeze({ blur: "shadow", layers: "bounded", cover: "clip", bitmaps: 0, shade: "thirds" });
     const tune = Object.assign({}, TUNED);
     // Each hello starts from the defaults; the bench's `x` changes them.
     function setTune(x) {
