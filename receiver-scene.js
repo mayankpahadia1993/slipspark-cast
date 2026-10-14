@@ -175,14 +175,10 @@
       if (!entry || entry.ready) return;
       const missing = entry.uses.filter((use) => !images.has(use));
       if (missing.length) { missing.forEach(ensure); return; }
-      // Made at the size its bitmap would be kept at (receiver 58): a dyed
-      // kit's eleven pieces, made as the stadium comes on, cost a quarter.
-      // An opaque one (the practice lane) is shown on the GPU layer, sharp.
-      const factor = entry.opaque ? 1 : pictureFactor(key, entry.width, entry.height, false);
       const target = document.createElement("canvas");
-      target.width = Math.max(1, Math.round(entry.width * factor));
-      target.height = Math.max(1, Math.round(entry.height * factor));
-      paint(target.getContext("2d"), entry.frame, 0, { s: factor, width: target.width, height: target.height, layers: [] });
+      target.width = entry.width;
+      target.height = entry.height;
+      paint(target.getContext("2d"), entry.frame, 0, { s: 1, width: entry.width, height: entry.height, layers: [] });
       // The tinted copies were for this picture: frames draw the picture.
       tinted.clear();
       entry.ready = true;
@@ -210,71 +206,16 @@
       }
     }
 
-    // Decoded before it is first drawn, so a frame never waits on a photo
-    // (unless `decode` is false: its bitmap is drawn instead).
-    function loadImage(url, decode) {
+    // Decoded before it is first drawn, so a frame never waits on a photo.
+    function loadImage(url) {
       return new Promise((resolve, reject) => {
         const image = new Image();
         image.onerror = () => reject(new Error("image " + url));
         image.onload = () => {
-          if (image.decode && decode !== false) image.decode().then(() => resolve(image), () => resolve(image));
+          if (image.decode) image.decode().then(() => resolve(image), () => resolve(image));
           else resolve(image);
         };
         image.src = url;
-      });
-    }
-
-    // Decoded copies of the pictures, drawn in their place (receiver 57).
-    // A Chromecast Ultra keeps few pictures decoded: by the time the stadium
-    // came on, most of those decoded at hello had been let go, and its first
-    // frame decoded ~40 of them again on the spot (30–190 ms each, measured
-    // on the TV): iOS 161's stadium opened on one 3.2 s frame. A bitmap is
-    // decoded once, off the page's thread, and stays decoded. On a 1280
-    // canvas a sprite is kept at half its size (drawn at most ~0.4 of it:
-    // the bowler 0.13–0.20, fielders 0.18–0.39, the batter 0.07–0.33) and a
-    // photo at the stage's size: about 21 MB for all 65 pictures, not 50.
-    const bitmaps = new Map();
-    const canBitmap = typeof window.createImageBitmap === "function";
-
-    // How much of its own size a picture is kept at: on a 1280 canvas half
-    // for a sprite, the stage's size for a photo; all of it drawing 1920.
-    function pictureFactor(key, width, height, isOpaque) {
-      if (maxCanvasWidth > core.CANVAS.narrow) return 1;
-      if (isOpaque) return Math.min(1, STAGE.width / width);
-      return Math.max(width, height) >= 200 ? 0.5 : 1;
-    }
-
-    function bitmapOptions(key) {
-      const size = core.pictureSize(key);
-      if (!size) return null;
-      const factor = pictureFactor(key, size.width, size.height, opaque.has(key));
-      if (factor >= 1) return null;
-      return { resizeWidth: Math.max(1, Math.round(size.width * factor)), resizeHeight: Math.max(1, Math.round(size.height * factor)),
-        resizeQuality: "high" };
-    }
-
-    // A picture from `url` (its bytes in `blob` if at hand): the image, the
-    // GPU layer's source, and its decoded bitmap, both in before a frame
-    // draws it.
-    function loadPicture(key, url, blob) {
-      if (!canBitmap || !tune.bitmaps) return loadImage(url).then((image) => { addImage(key, image); return image; });
-      const bytes = blob ? Promise.resolve(blob)
-        : fetch(url).then((response) => { if (!response.ok) throw new Error("fetch " + url); return response.blob(); });
-      const bitmap = bytes.then((data) => {
-        const options = bitmapOptions(key);
-        // A browser that can't resize makes it at its own size.
-        return options ? window.createImageBitmap(data, options).catch(() => window.createImageBitmap(data)) : window.createImageBitmap(data);
-      }).then((made) => (made && made.width > 0 && made.height > 0 ? made : null)).catch(() => null);
-      return Promise.all([loadImage(url, false), bitmap]).then(([image, decoded]) => {
-        if (!decoded) {
-          // No bitmap: the image, decoded as before.
-          return (image.decode ? image.decode().catch(() => {}) : Promise.resolve()).then(() => { addImage(key, image); return image; });
-        }
-        const old = bitmaps.get(key);
-        if (old && old.close) old.close();
-        bitmaps.set(key, decoded);
-        addImage(key, image);
-        return image;
       });
     }
 
@@ -294,8 +235,8 @@
         loading.add(key);
         const source = bundled.has(key) ? Promise.resolve("scene-images/" + bundled.get(key))
           : database ? loadCached(key) : Promise.reject(new Error("no cache"));
-        source.then((url) => loadPicture(key, url))
-          .then(() => {}, () => loading.delete(key))
+        source.then(loadImage)
+          .then((image) => addImage(key, image), () => loading.delete(key))
           .then(() => window.setTimeout(pump, 20));
       };
       pump();
@@ -372,10 +313,10 @@
       const ask = () => { loading.delete(key); cached.delete(key); bundled.delete(key); wanted.add(key); };
       if (bundled.has(key)) {
         loading.add(key);
-        loadPicture(key, "scene-images/" + bundled.get(key)).catch(ask);
+        loadImage("scene-images/" + bundled.get(key)).then((image) => addImage(key, image)).catch(ask);
       } else if (cached.has(key) && database) {
         loading.add(key);
-        loadCached(key).then((url) => loadPicture(key, url)).catch(ask);
+        loadCached(key).then(loadImage).then((image) => addImage(key, image)).catch(ask);
       } else {
         wanted.add(key);
       }
@@ -401,7 +342,8 @@
       const blob = new Blob([array], { type: upload.type });
       if (upload.type === "image/jpeg") opaque.add(key);
       const url = URL.createObjectURL(blob);
-      loadPicture(key, url, blob).then(() => {
+      loadImage(url).then((image) => {
+        addImage(key, image);
         cacheImage(key, blob);
         send({ t: "got", k: key });
       }).catch((error) => report("image", error));
@@ -432,8 +374,7 @@
     const opaque = new Set();
 
     // The last top-level command that paints a whole opaque picture over the
-    // stage, plainly: everything before it is hidden. A clip to the stage
-    // itself (iOS's stadium photo has one) hides nothing (receiver 57).
+    // stage, plainly: everything before it is hidden.
     function coverIndex(frame) {
       let depth = 0;
       let found = -1;
@@ -441,8 +382,7 @@
         const op = frame.o[index];
         if (op[0] === "L") { depth += 1; continue; }
         if (op[0] === "l") { depth -= 1; continue; }
-        if (depth || op[0] !== "i" || op[1] < 1000 || (op[2] && op[2] !== "source-over") || op[5] >= 0) continue;
-        if (op[6] >= 0 && (tune.cover === "strict" || !core.clipsWholeStage(frame.cl[op[6]]))) continue;
+        if (depth || op[0] !== "i" || op[1] < 1000 || (op[2] && op[2] !== "source-over") || op[5] >= 0 || op[6] >= 0) continue;
         const size = sizes.get(op[3]);
         if (!images.has(op[3]) || !size || !opaque.has(op[3])) continue;
         const m = op[4];
@@ -511,74 +451,13 @@
       if (except == null) backdropKey = null;
     }
 
-    // MARK: Cheap drawing on a Chromecast (receiver 57)
-    //
-    // A Chromecast Ultra (Chrome 90, a Vivante GC2000) takes 370–400 ms for
-    // any canvas `filter: blur()` drawn on the screen's canvas or a layer its
-    // size, however small the shape: iOS's contact flash (and any glow)
-    // froze the stadium for a frame of 0.4 s at every hit. A shadow's blur
-    // costs it under a millisecond, so a blurred plain shape is drawn as a
-    // shadow, the shape itself off the canvas; anything else blurred is
-    // blurred in a small canvas of its own. A layer is cleared and
-    // composited only where something was drawn into it, not the whole
-    // 1280 x 720 canvas (the bowler's dissolve is a layer every frame of his
-    // run-up), and a layer that changes nothing about how its content lands
-    // isn't made at all.
-
-    // Composite operations that clear what they don't cover: a layer drawn
-    // with one of them is composited whole.
-    const UNBOUNDED = new Set(["copy", "source-in", "source-out", "destination-in", "destination-atop"]);
-    // How far left of the canvas a shape blurred as its shadow is drawn
-    // (canvas pixels); its shadow is cast back into place.
-    const OFFSTAGE = 40000;
-    // The most pixels a blurred picture is blurred with: the blur costs as
-    // many pixels as it covers (~35 ms for 400 x 300 on the Ultra), so a
-    // bigger piece is blurred at a lower resolution and drawn back up.
-    const SCRATCH_PIXELS = 10000;
-    const scratches = new Map();
-    // Bench switches (`x` in hello; no phone sends it), for A/B runs on a
-    // TV: `blur` "shadow", "scratch" (small canvases only) or "filter"
-    // (receiver 56's), `layers` "bounded" or "full", `cover` "clip" (a
-    // stage-sized clip still covers) or "strict", `bitmaps` 1 or 0, `shade`
-    // "thirds", "full" or "none".
-    const TUNED = Object.freeze({ blur: "shadow", layers: "bounded", cover: "clip", bitmaps: 1, shade: "thirds" });
-    const tune = Object.assign({}, TUNED);
-    // Each hello starts from the defaults; the bench's `x` changes them.
-    function setTune(x) {
-      Object.assign(tune, TUNED);
-      if (x && typeof x === "object") Object.keys(TUNED).forEach((name) => { if (x[name] !== undefined) tune[name] = x[name]; });
-      document.body.dataset.sceneShade = tune.shade;
-    }
-    setTune(null);
-
     function layerCanvas(depth) {
       let layer = layers[depth];
       if (!layer || layer.width !== canvas.width || layer.height !== canvas.height) {
         layer = document.createElement("canvas");
         layer.width = canvas.width;
         layer.height = canvas.height;
-        layer.dirty = null;
         layers[depth] = layer;
-      }
-      const c = layer.getContext("2d");
-      c.setTransform(1, 0, 0, 1, 0, 0);
-      // Only where the last drawing went (all of it if unknown).
-      const dirty = tune.layers === "full" ? undefined : layer.dirty;
-      if (dirty === undefined) c.clearRect(0, 0, layer.width, layer.height);
-      else if (dirty) c.clearRect(dirty[0], dirty[1], dirty[2] - dirty[0], dirty[3] - dirty[1]);
-      // Until it is composited, anything may be in it.
-      layer.dirty = undefined;
-      return layer;
-    }
-
-    // A layer inside a composed picture, made for it and dropped with it.
-    function pictureLayer(surface, depth) {
-      let layer = surface.layers[depth];
-      if (!layer) {
-        layer = document.createElement("canvas");
-        layer.width = surface.width;
-        layer.height = surface.height;
-        surface.layers[depth] = layer;
       }
       const c = layer.getContext("2d");
       c.setTransform(1, 0, 0, 1, 0, 0);
@@ -586,40 +465,28 @@
       return layer;
     }
 
-    function scratchCanvas(width, height) {
-      const w = Math.ceil(width / 32) * 32, h = Math.ceil(height / 32) * 32;
-      const id = w + "x" + h;
-      let scratch = scratches.get(id);
-      if (!scratch) {
-        if (scratches.size >= 8) scratches.clear();
-        scratch = document.createElement("canvas");
-        scratch.width = w;
-        scratch.height = h;
-        scratches.set(id, scratch);
-      }
-      return scratch;
-    }
-
-    function filtersOf(frame, ref) {
-      return ref >= 0 && frame.fl[ref] ? core.filterParts(frame.fl[ref]) : { blur: 0, multiply: null };
-    }
-
-    function clipTo(c, frame, clipRef, scale) {
-      if (!(clipRef >= 0) || !frame.cl[clipRef]) return;
-      c.setTransform(scale, 0, 0, scale, 0, 0);
-      for (const clip of frame.cl[clipRef]) {
-        c.beginPath();
-        core.tracePath(c, clip[0], clip[1]);
-        c.clip(clip[2] ? "evenodd" : "nonzero");
-      }
-    }
-
-    // Sets up a command's opacity, blending and clip.
-    function begin(c, frame, alpha, blend, clipRef, scale) {
+    // Sets up a command's opacity, blending, filters and clip; returns the
+    // colour any `colorMultiply` filter asks for.
+    function begin(c, frame, alpha, blend, filterRef, clipRef, scale) {
       c.save();
-      clipTo(c, frame, clipRef, scale);
+      if (clipRef >= 0 && frame.cl[clipRef]) {
+        c.setTransform(scale, 0, 0, scale, 0, 0);
+        for (const clip of frame.cl[clipRef]) {
+          c.clip(core.tracePath(new Path2D(), clip[0], clip[1]), clip[2] ? "evenodd" : "nonzero");
+        }
+      }
       c.globalAlpha = Math.max(0, Math.min(1, alpha / 1000));
       c.globalCompositeOperation = blend || "source-over";
+      let multiply = null;
+      if (filterRef >= 0 && frame.fl[filterRef]) {
+        const blurs = [];
+        for (const filter of frame.fl[filterRef]) {
+          if (filter[0] === "b") blurs.push("blur(" + (filter[1] / 10 * scale).toFixed(2) + "px)");
+          if (filter[0] === "m") multiply = filter[1];
+        }
+        if (blurs.length) c.filter = blurs.join(" ");
+      }
+      return multiply;
     }
 
     function shading(c, value, multiply) {
@@ -635,199 +502,12 @@
       return gradient;
     }
 
-    function strokeStyle(c, op) {
-      const geometry = op[6];
-      c.lineWidth = Math.max(0.01, geometry[0] / 10);
-      c.lineCap = CAPS[geometry[1]] || "butt";
-      c.lineJoin = JOINS[geometry[2]] || "miter";
-      c.miterLimit = Math.max(1, geometry[3] / 10);
-      c.setLineDash((op[7] || []).map((d) => d / 10));
-      c.lineDashOffset = (op[8] || 0) / 10;
-    }
-
-    // The picture a command draws, and its size: the rect the phone's matrix
-    // is for (the key's size), not the file's, so a sharper file is drawn in
-    // the same place. A decoded bitmap is drawn when there is one. Null while
-    // nothing can be drawn.
-    function pictureFor(key) {
-      const image = images.get(key);
-      if (image) return { image: bitmaps.get(key) || image, size: sizes.get(key), key };
-      ensure(key);
-      counters.missing += 1;
-      // A picture still being made: its undyed photo meanwhile.
-      const picture = pictures.get(key);
-      const fallback = picture && picture.fallback && images.get(picture.fallback);
-      if (!fallback) return null;
-      return { image: bitmaps.get(picture.fallback) || fallback, size: { width: picture.width, height: picture.height }, key: picture.fallback };
-    }
-
-    function pictureSize(key) {
-      const picture = pictures.get(key);
-      return sizes.get(key) || (picture ? { width: picture.width, height: picture.height } : core.pictureSize(key));
-    }
-
-    // One fill, stroke or picture, plainly (no blur): `o` may override its
-    // opacity, blending, clip and colour multiply.
-    function drawOp(c, frame, op, scale, o) {
-      const kind = op[0];
-      const alpha = o && o.alpha != null ? o.alpha : op[1];
-      const blend = o && o.blend != null ? o.blend : op[2];
-      if (kind === "f" || kind === "s") {
-        const multiply = o && o.multiply !== undefined ? o.multiply : filtersOf(frame, kind === "f" ? op[7] : op[9]).multiply;
-        begin(c, frame, alpha, blend, o && o.clipRef != null ? o.clipRef : kind === "f" ? op[8] : op[10], scale);
-        c.setTransform(scale, 0, 0, scale, 0, 0);
-        c.beginPath();
-        core.tracePath(c, op[3], op[4]);
-        if (kind === "f") {
-          c.fillStyle = shading(c, op[5], multiply);
-          c.fill(op[6] ? "evenodd" : "nonzero");
-        } else {
-          strokeStyle(c, op);
-          c.strokeStyle = shading(c, op[5], multiply);
-          c.stroke();
-        }
-        c.restore();
-        return;
-      }
-      if (kind === "i") {
-        const drawn = pictureFor(op[3]);
-        if (!drawn) return;
-        const multiply = o && o.multiply !== undefined ? o.multiply : filtersOf(frame, op[5]).multiply;
-        begin(c, frame, alpha, blend, o && o.clipRef != null ? o.clipRef : op[6], scale);
-        if (multiply) c.globalAlpha *= Math.max(0, Math.min(1, multiply[3] / 1000));
-        const m = op[4];
-        c.setTransform(scale * m[0] / 10000, scale * m[1] / 10000, scale * m[2] / 10000, scale * m[3] / 10000,
-          scale * m[4] / 10, scale * m[5] / 10);
-        c.drawImage(multiply ? tint(drawn.key, drawn.image, multiply) : drawn.image, 0, 0, drawn.size.width, drawn.size.height);
-        c.restore();
-      }
-    }
-
-    // Whether this browser casts the shadow of a shape drawn off its canvas,
-    // tried once on a canvas of its own. Where it doesn't, glows are blurred
-    // in small canvases instead (`stats.glow` says which).
-    let shadowsCast = null;
-    function castsOffstageShadows() {
-      if (shadowsCast !== null) return shadowsCast;
-      shadowsCast = false;
-      try {
-        const probe = document.createElement("canvas");
-        probe.width = 8;
-        probe.height = 8;
-        const c = probe.getContext("2d");
-        c.shadowColor = "rgba(255,0,0,1)";
-        c.shadowBlur = 1;
-        c.shadowOffsetX = OFFSTAGE;
-        c.setTransform(1, 0, 0, 1, -OFFSTAGE, 0);
-        c.fillStyle = "#000";
-        c.fillRect(-8, -8, 24, 24);
-        const pixel = c.getImageData(4, 4, 1, 1).data;
-        shadowsCast = pixel[0] > 200 && pixel[1] < 60 && pixel[3] > 200;
-      } catch (error) { shadowsCast = false; }
-      return shadowsCast;
-    }
-
-    // A plain colour shape with a blur, whatever layer it sits in: drawn as
-    // its own shadow. `o`: opacity (thousandths), blending, the clips (refs)
-    // and the blur (stage points).
-    function shadowable(frame, op, blend) {
-      if ((op[0] !== "f" && op[0] !== "s") || !Array.isArray(op[5]) || op[5][0] !== "c") return false;
-      if (UNBOUNDED.has(blend || "source-over") || (op[2] && op[2] !== "source-over")) return false;
-      return tune.blur === "shadow" && castsOffstageShadows();
-    }
-
-    function drawShadowed(c, frame, op, o, scale) {
-      c.save();
-      for (const ref of o.clipRefs) clipTo(c, frame, ref, scale);
-      c.globalAlpha = Math.max(0, Math.min(1, o.alpha / 1000));
-      c.globalCompositeOperation = o.blend || "source-over";
-      // A canvas shadow's blur is twice its standard deviation; CSS's blur
-      // radius (the filter's, SwiftUI's) is the deviation itself.
-      c.shadowColor = core.cssColor(op[5][1], o.multiply);
-      c.shadowBlur = 2 * o.blur * scale;
-      c.shadowOffsetX = OFFSTAGE;
-      c.shadowOffsetY = 0;
-      c.setTransform(scale, 0, 0, scale, -OFFSTAGE, 0);
-      c.beginPath();
-      core.tracePath(c, op[3], op[4]);
-      if (op[0] === "f") {
-        c.fillStyle = "#000";
-        c.fill(op[6] ? "evenodd" : "nonzero");
-      } else {
-        strokeStyle(c, op);
-        c.strokeStyle = "#000";
-        c.stroke();
-      }
-      c.restore();
-    }
-
-    // Blurs `rect` of `source` (a canvas the target's size) by `sigma`
-    // canvas pixels in a small canvas of its own, and draws it back into
-    // `c` as `c` is set up. Returns where it drew.
-    function blurInto(c, source, rect, sigma) {
-      const pad = Math.ceil(sigma * 3) + 2;
-      const left = Math.max(0, rect[0] - pad), top = Math.max(0, rect[1] - pad);
-      const right = Math.min(source.width, rect[2] + pad), bottom = Math.min(source.height, rect[3] + pad);
-      const w = right - left, h = bottom - top;
-      if (w <= 0 || h <= 0) return null;
-      const k = Math.min(1, Math.sqrt(SCRATCH_PIXELS / (w * h)));
-      const sw = Math.max(1, Math.ceil(w * k)), sh = Math.max(1, Math.ceil(h * k));
-      const scratch = scratchCanvas(sw, sh);
-      const s = scratch.getContext("2d");
-      s.setTransform(1, 0, 0, 1, 0, 0);
-      s.globalAlpha = 1;
-      s.globalCompositeOperation = "source-over";
-      s.clearRect(0, 0, scratch.width, scratch.height);
-      s.filter = "blur(" + Math.max(0.01, sigma * k).toFixed(2) + "px)";
-      s.drawImage(source, left, top, w, h, 0, 0, sw, sh);
-      s.filter = "none";
-      c.setTransform(1, 0, 0, 1, 0, 0);
-      c.drawImage(scratch, 0, 0, sw, sh, left, top, w, h);
-      return [left, top, right, bottom];
-    }
-
-    // Bounds in canvas pixels, grown as a layer is drawn into: null for the
-    // canvas itself (nothing to track), `full` when something could land
-    // anywhere.
-    function newBounds() { return { left: Infinity, top: Infinity, right: -Infinity, bottom: -Infinity, full: false }; }
-
-    function grow(bounds, box, scale, pad) {
-      if (!bounds) return;
-      if (!box) { bounds.full = true; return; }
-      const p = (pad || 0) + 2;
-      bounds.left = Math.min(bounds.left, box[0] * scale - p);
-      bounds.top = Math.min(bounds.top, box[1] * scale - p);
-      bounds.right = Math.max(bounds.right, box[2] * scale + p);
-      bounds.bottom = Math.max(bounds.bottom, box[3] * scale + p);
-    }
-
-    // The whole pixels `bounds` covers in a `width` x `height` canvas, or
-    // null when nothing was drawn.
-    function boundsRect(bounds, width, height) {
-      if (bounds.full || tune.layers === "full") return [0, 0, width, height];
-      const left = Math.max(0, Math.floor(bounds.left)), top = Math.max(0, Math.floor(bounds.top));
-      const right = Math.min(width, Math.ceil(bounds.right)), bottom = Math.min(height, Math.ceil(bounds.bottom));
-      return right > left && bottom > top ? [left, top, right, bottom] : null;
-    }
-
-    // A layer that changes nothing about how its content lands (opaque,
-    // plain blending, no filter or clip, and plain blending inside) is drawn
-    // straight into its parent.
-    function isFlat(frame, op, index, end) {
-      if (tune.layers === "full" || end < 0 || op[1] < 1000 || (op[2] && op[2] !== "source-over") || op[3] >= 0 || op[4] >= 0) return false;
-      for (let at = index + 1; at < end; at += 1) {
-        const inner = frame.o[at];
-        if (inner[0] === "B") return false;
-        if (inner[0] !== "l" && inner[2] && inner[2] !== "source-over") return false;
-      }
-      return true;
-    }
-
     function drawFrame(frame) {
       const started = performance.now();
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.globalAlpha = 1;
       ctx.globalCompositeOperation = "source-over";
+      ctx.filter = "none";
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.imageSmoothingQuality = smoothing;
       const cover = coverIndex(frame);
@@ -847,114 +527,81 @@
     // Draws a frame's commands from `from` on into `target`: the TV's
     // canvas (`surface.s` canvas pixels a stage point), or a composed
     // picture's own canvas (one pixel a point). `depth` is how many layers
-    // are already open below `target` (the live batter drawn inside one),
-    // and `sink` the bounds of the layer `target` is, if it is one.
-    function paint(target, frame, from, surface, depth, sink) {
+    // are already open below `target` (the live batter drawn inside one).
+    function paint(target, frame, from, surface, depth) {
       const scale = surface.s;
       const base = depth || 0;
-      const stack = [{ c: target, bounds: sink || null }];
+      const stack = [{ c: target }];
       let c = target;
-      const newLayer = (at) => surface.layers ? pictureLayer(surface, at) : layerCanvas(at);
       for (let index = from; index < frame.o.length; index += 1) {
         const op = frame.o[index];
-        const top = stack[stack.length - 1];
         switch (op[0]) {
           case "L": {
-            const end = core.layerEnd(frame.o, index);
-            const filters = filtersOf(frame, op[3]);
-            const inner = end === index + 2 ? frame.o[index + 1] : null;
-            // A glow: one plain shape in a blurred layer, drawn as its shadow.
-            if (filters.blur > 0 && tune.blur !== "filter" && inner && shadowable(frame, inner, op[2])
-                && !((inner[0] === "f" ? inner[8] : inner[10]) >= 0)) {
-              const own = filtersOf(frame, inner[0] === "f" ? inner[7] : inner[9]);
-              const blur = Math.sqrt(filters.blur * filters.blur + own.blur * own.blur);
-              drawShadowed(c, frame, inner, { alpha: op[1] * inner[1] / 1000, blend: op[2], clipRefs: [op[4]], blur, multiply: own.multiply }, scale);
-              grow(top.bounds, core.opBounds(inner, pictureSize), scale, blur * scale * 3);
-              index = end;
-              break;
-            }
-            if (isFlat(frame, op, index, end)) {
-              stack.push({ c, flat: true, bounds: top.bounds });
-              break;
-            }
             // A composed picture's layers are its own size (`surface.layers`);
             // the TV's canvas shares `layers`. Build 142 had these swapped,
             // unseen because no stadium frame drew a layer.
-            const layer = newLayer(base + stack.length);
-            stack.push({ c: layer.getContext("2d"), layer, alpha: op[1], blend: op[2], filterRef: op[3], clipRef: op[4], bounds: newBounds() });
+            const layer = surface.layers ? pictureLayer(surface, base + stack.length) : layerCanvas(base + stack.length);
+            stack.push({ c: layer.getContext("2d"), layer, alpha: op[1], blend: op[2], filterRef: op[3], clipRef: op[4] });
             c = stack[stack.length - 1].c;
             break;
           }
           case "l": {
             if (stack.length < 2) break;
-            const closed = stack.pop();
-            const parent = stack[stack.length - 1];
-            c = parent.c;
-            if (closed.flat) break;
-            const layer = closed.layer;
-            const whole = UNBOUNDED.has(closed.blend || "source-over");
-            const rect = boundsRect(closed.bounds, layer.width, layer.height);
-            if (!surface.layers) layer.dirty = rect;
-            if (!rect && !whole) break;
-            const filters = filtersOf(frame, closed.filterRef);
-            begin(c, frame, closed.alpha, closed.blend, closed.clipRef, scale);
+            const top = stack.pop();
+            c = stack[stack.length - 1].c;
+            begin(c, frame, top.alpha, top.blend, top.filterRef, top.clipRef, scale);
             c.setTransform(1, 0, 0, 1, 0, 0);
-            let drawn = rect;
-            if (filters.blur > 0 && tune.blur === "filter") {
-              c.filter = "blur(" + (filters.blur * scale).toFixed(2) + "px)";
-              c.drawImage(layer, 0, 0);
-              drawn = null;
-            } else if (filters.blur > 0) {
-              drawn = rect && blurInto(c, layer, rect, filters.blur * scale);
-            } else if (whole || !rect || tune.layers === "full") {
-              c.drawImage(layer, 0, 0);
-              drawn = null;
-            } else {
-              const w = rect[2] - rect[0], h = rect[3] - rect[1];
-              c.drawImage(layer, rect[0], rect[1], w, h, rect[0], rect[1], w, h);
-            }
+            c.drawImage(top.layer, 0, 0);
             c.restore();
-            if (parent.bounds) {
-              if (!drawn) parent.bounds.full = true;
-              else grow(parent.bounds, [drawn[0] / scale, drawn[1] / scale, drawn[2] / scale, drawn[3] / scale], scale, 0);
-            }
             break;
           }
-          case "f":
-          case "s":
+          case "f": {
+            const multiply = begin(c, frame, op[1], op[2], op[7], op[8], scale);
+            c.setTransform(scale, 0, 0, scale, 0, 0);
+            c.fillStyle = shading(c, op[5], multiply);
+            c.fill(core.tracePath(new Path2D(), op[3], op[4]), op[6] ? "evenodd" : "nonzero");
+            c.restore();
+            break;
+          }
+          case "s": {
+            const multiply = begin(c, frame, op[1], op[2], op[9], op[10], scale);
+            c.setTransform(scale, 0, 0, scale, 0, 0);
+            const geometry = op[6];
+            c.lineWidth = Math.max(0.01, geometry[0] / 10);
+            c.lineCap = CAPS[geometry[1]] || "butt";
+            c.lineJoin = JOINS[geometry[2]] || "miter";
+            c.miterLimit = Math.max(1, geometry[3] / 10);
+            c.setLineDash((op[7] || []).map((d) => d / 10));
+            c.lineDashOffset = (op[8] || 0) / 10;
+            c.strokeStyle = shading(c, op[5], multiply);
+            c.stroke(core.tracePath(new Path2D(), op[3], op[4]));
+            c.restore();
+            break;
+          }
           case "i": {
-            const filters = filtersOf(frame, op[0] === "f" ? op[7] : op[0] === "s" ? op[9] : op[5]);
-            const box = top.bounds ? core.opBounds(op, pictureSize) : null;
-            if (!(filters.blur > 0)) {
-              drawOp(c, frame, op, scale);
-              if (top.bounds) grow(top.bounds, box, scale, 0);
-              break;
+            let key = op[3];
+            let image = images.get(key);
+            // Into the rect the phone's matrix is for (the key's size), not
+            // the file's: a sharper file is drawn in the same place.
+            let size = sizes.get(key);
+            if (!image) {
+              ensure(key);
+              counters.missing += 1;
+              // A picture still being made: its undyed photo meanwhile.
+              const picture = pictures.get(key);
+              const fallback = picture && picture.fallback && images.get(picture.fallback);
+              if (!fallback) break;
+              image = fallback;
+              size = { width: picture.width, height: picture.height };
+              key = picture.fallback;
             }
-            const clipRef = op[0] === "f" ? op[8] : op[0] === "s" ? op[10] : op[6];
-            if (tune.blur === "filter") {
-              // Receiver 56: the canvas's own filter (the bench's "before").
-              c.save();
-              c.filter = "blur(" + (filters.blur * scale).toFixed(2) + "px)";
-              drawOp(c, frame, op, scale);
-              c.restore();
-            } else if (shadowable(frame, op, op[2])) {
-              drawShadowed(c, frame, op, { alpha: op[1], blend: op[2], clipRefs: [clipRef], blur: filters.blur, multiply: filters.multiply }, scale);
-            } else {
-              // A gradient or a picture: drawn plainly into a layer, then
-              // blurred in a small canvas on its way into `c`.
-              const layer = newLayer(base + stack.length);
-              drawOp(layer.getContext("2d"), frame, op, scale, { alpha: 1000, blend: "source-over", clipRef: -1, multiply: filters.multiply });
-              const area = core.opBounds(op, pictureSize);
-              const rect = area ? boundsRect({ left: area[0] * scale - 2, top: area[1] * scale - 2, right: area[2] * scale + 2, bottom: area[3] * scale + 2, full: false }, layer.width, layer.height)
-                : [0, 0, layer.width, layer.height];
-              if (!surface.layers) layer.dirty = rect;
-              if (rect) {
-                begin(c, frame, op[1], op[2], clipRef, scale);
-                blurInto(c, layer, rect, filters.blur * scale);
-                c.restore();
-              }
-            }
-            if (top.bounds) grow(top.bounds, box, scale, filters.blur * scale * 3);
+            const multiply = begin(c, frame, op[1], op[2], op[5], op[6], scale);
+            if (multiply) c.globalAlpha *= Math.max(0, Math.min(1, multiply[3] / 1000));
+            const m = op[4];
+            c.setTransform(scale * m[0] / 10000, scale * m[1] / 10000, scale * m[2] / 10000, scale * m[3] / 10000,
+              scale * m[4] / 10, scale * m[5] / 10);
+            c.drawImage(multiply ? tint(key, image, multiply) : image, 0, 0, size.width, size.height);
+            c.restore();
             break;
           }
           case "B": {
@@ -962,12 +609,12 @@
             // frame drawn ahead left room for it.
             const batter = surface.live;
             if (batter && batter.o.length) {
-              paint(c, batter, 0, Object.assign({}, surface, { live: null }), base + stack.length - 1, top.bounds);
+              paint(c, batter, 0, Object.assign({}, surface, { live: null }), base + stack.length - 1);
             }
             break;
           }
           case "t": {
-            begin(c, frame, op[1], op[2], op[10], scale);
+            begin(c, frame, op[1], op[2], -1, op[10], scale);
             c.setTransform(scale, 0, 0, scale, 0, 0);
             c.font = op[5] + " " + (op[4] / 10).toFixed(1) + "px " + (op[6] ? ROUNDED : PLAIN);
             const anchor = op[9] || [500, 500];
@@ -980,7 +627,6 @@
             const lift = (lines.length - 1) * lineHeight * (anchor[1] / 1000);
             lines.forEach((line, index) => c.fillText(line, op[8][0] / 10, op[8][1] / 10 - lift + index * lineHeight));
             c.restore();
-            if (top.bounds) grow(top.bounds, core.opBounds(op), scale, 0);
             break;
           }
           default: break;
@@ -988,23 +634,26 @@
       }
     }
 
+    // A layer inside a composed picture, made for it and dropped with it.
+    function pictureLayer(surface, depth) {
+      let layer = surface.layers[depth];
+      if (!layer) {
+        layer = document.createElement("canvas");
+        layer.width = surface.width;
+        layer.height = surface.height;
+        surface.layers[depth] = layer;
+      }
+      const c = layer.getContext("2d");
+      c.setTransform(1, 0, 0, 1, 0, 0);
+      c.clearRect(0, 0, layer.width, layer.height);
+      return layer;
+    }
+
     // MARK: HUD
 
-    // The HUD's elements, found once; and nothing written that is already
-    // so: each write made the TV lay out and paint the HUD again (receiver 57).
-    const hudNodes = new Map();
-    function el(id) {
-      let node = hudNodes.get(id);
-      if (node === undefined) { node = hud.querySelector("#" + id); hudNodes.set(id, node); }
-      return node;
-    }
-    function setText(id, value) {
-      const node = el(id);
-      const words = value == null ? "" : String(value);
-      if (node && node.textContent !== words) node.textContent = words;
-    }
-    function show(id, visible) { const node = el(id); if (node && node.hidden !== !visible) node.hidden = !visible; }
-    function setStyle(node, name, value) { if (node && node.style[name] !== value) node.style[name] = value; }
+    function el(id) { return hud.querySelector("#" + id); }
+    function setText(id, value) { const node = el(id); if (node) node.textContent = value == null ? "" : String(value); }
+    function show(id, visible) { const node = el(id); if (node) node.hidden = !visible; }
 
     const VERDICT = {
       perfect: "perfect", littleEarly: "little", littleLate: "little", early: "far", late: "far", noSwing: "none"
@@ -1024,17 +673,15 @@
       setText("hud-friend", h.friend);
       // The status card hides while the pause or lost card is up.
       const status = h.status || {};
-      setStyle(el("hud-status"), "opacity", status.hidden ? "0" : "1");
+      el("hud-status").style.opacity = status.hidden ? "0" : "1";
       setText("hud-status-title", status.title);
       show("hud-status-detail", !!status.detail);
       setText("hud-status-detail", status.detail);
       // This over, or each timing-check ball's verdict.
       show("hud-over", !h.check);
       show("hud-verdicts", !!h.check);
-      const row = h.check && el("hud-verdict-dots");
-      const verdicts = h.check ? h.check.of + ":" + (h.check.verdicts || []).join(",") : "";
-      if (h.check && row.dataset.verdicts !== verdicts) {
-        row.dataset.verdicts = verdicts;
+      if (h.check) {
+        const row = el("hud-verdict-dots");
         row.textContent = "";
         for (let index = 0; index < h.check.of; index += 1) {
           const dot = document.createElement("i");
@@ -1042,7 +689,7 @@
           dot.className = "dot " + (verdict ? "verdict-" + (VERDICT[verdict] || "none") : "to-come");
           row.appendChild(dot);
         }
-      } else if (!h.check) {
+      } else {
         const dots = el("hud-over-dots").children;
         for (let index = 0; index < dots.length; index += 1) dots[index].classList.toggle("is-bowled", index < h.over);
       }
@@ -1058,10 +705,10 @@
           void caption.offsetWidth;
           caption.classList.add("is-in");
         }
-        if (caption.hidden) caption.hidden = false;
+        caption.hidden = false;
       } else {
-        if (!caption.hidden) caption.hidden = true;
-        if (caption.dataset.line) caption.dataset.line = "";
+        caption.hidden = true;
+        caption.dataset.line = "";
       }
       // The replay's timing card and fielding cue.
       const cards = h.cards;
@@ -1070,8 +717,8 @@
         el("hud-cards").classList.toggle("is-leading", !!cards.leading);
         setText("hud-timing", cards.timing);
         const cue = el("hud-cue");
-        if (cue.hidden !== !cards.cue) cue.hidden = !cards.cue;
-        setStyle(cue, "opacity", String(cards.cueOpacity || 0));
+        cue.hidden = !cards.cue;
+        cue.style.opacity = String(cards.cueOpacity || 0);
         if (cards.cue) {
           setText("hud-cue-title", cards.cue.title);
           setText("hud-cue-direction", cards.cue.direction);
@@ -1085,7 +732,7 @@
       show("hud-interruption", !!interruption);
       if (interruption) {
         const card = el("hud-interruption");
-        if (card.dataset.kind !== interruption.kind) card.dataset.kind = interruption.kind;
+        card.dataset.kind = interruption.kind;
         setText("hud-int-title", interruption.title);
         show("hud-int-instruction", !!interruption.instruction);
         setText("hud-int-instruction", interruption.instruction);
@@ -1158,9 +805,7 @@
           behind: Math.round(core.percentile(counters.late, 0.9)),
           drawMs: Number(core.percentile(counters.drawMs, 0.5).toFixed(1)),
           drawMax: Number(Math.max(0, ...counters.drawMs).toFixed(1)),
-          missing: counters.missing, images: images.size, bitmaps: bitmaps.size, queue: timeline.length,
-          // How glows are blurred (receiver 57): as shadows, or in small canvases.
-          glow: tune.blur === "filter" ? "filter" : castsOffstageShadows() ? "shadow" : "scratch",
+          missing: counters.missing, images: images.size, queue: timeline.length,
           synced: clock.synced ? 1 : 0, w: canvas.width, canvas: plan.why,
           gap: Number(core.percentile(counters.gaps, 0.5).toFixed(1)),
           gap90: Number(core.percentile(counters.gaps, 0.9).toFixed(1)),
@@ -1294,7 +939,6 @@
           rateWatch.reset();
           resize();
           if (["low", "medium", "high"].indexOf(message.smooth) >= 0) smoothing = message.smooth;
-          setTune(message.x);
           clock.reset();
           timeline.reset();
           live.clear();
@@ -1442,8 +1086,7 @@
     });
     window.requestAnimationFrame(frameLoop);
 
-    return { NAMESPACE, handle, report, setOn, renderHUD, drawFrame, playRecording, playRecordingAt, snapshot, timeline, clock, live, images, bitmaps,
-      pictures, counters, tune, setTune };
+    return { NAMESPACE, handle, report, setOn, renderHUD, drawFrame, playRecording, playRecordingAt, snapshot, timeline, clock, live, images, pictures, counters };
   }
 
   window.RallycadeReceiverScene = { NAMESPACE, createScene };

@@ -225,15 +225,6 @@ body[data-scene="on"] #stream { visibility: hidden; }
 #scene-backdrop { display: none; }
 .scene-backdrop { position: absolute; left: 0; top: 0; transform-origin: 0 0; will-change: transform, opacity; max-width: none; }
 .scene-shade { position: absolute; inset: 0; pointer-events: none; background: linear-gradient(to bottom, rgba(0,0,0,.22) 0%, rgba(0,0,0,0) 33.333%, rgba(0,0,0,0) 66.667%, rgba(0,0,0,.24) 100%); }
-/* Receiver 57: the shading is clear across the middle third, so a
-   Chromecast composites only its top and bottom thirds, each its own layer,
-   not a full-screen gradient over the stadium every frame. */
-body[data-scene-shade="thirds"] .scene-shade { background: none; }
-body[data-scene-shade="thirds"] .scene-shade::before,
-body[data-scene-shade="thirds"] .scene-shade::after { content: ""; position: absolute; left: 0; right: 0; height: 33.334%; will-change: transform; }
-body[data-scene-shade="thirds"] .scene-shade::before { top: 0; background: linear-gradient(to bottom, rgba(0,0,0,.22), rgba(0,0,0,0)); }
-body[data-scene-shade="thirds"] .scene-shade::after { bottom: 0; background: linear-gradient(to top, rgba(0,0,0,.24), rgba(0,0,0,0)); }
-body[data-scene-shade="none"] .scene-shade { display: none; }
 .scene-hud { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; transform-origin: 0 0; pointer-events: none; }
 .scene-hud small { display: block; font-size: 17px; font-weight: 800; letter-spacing: 2.55px; }
 .scene-hud .rounded, .hud-scorebug strong, .hud-status strong, .hud-cue strong, .hud-speed, .hud-timing,
