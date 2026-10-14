@@ -262,8 +262,9 @@
         : fetch(url).then((response) => { if (!response.ok) throw new Error("fetch " + url); return response.blob(); });
       const bitmap = bytes.then((data) => {
         const options = bitmapOptions(key);
-        return options ? window.createImageBitmap(data, options) : window.createImageBitmap(data);
-      }).catch(() => null);
+        // A browser that can't resize makes it at its own size.
+        return options ? window.createImageBitmap(data, options).catch(() => window.createImageBitmap(data)) : window.createImageBitmap(data);
+      }).then((made) => (made && made.width > 0 && made.height > 0 ? made : null)).catch(() => null);
       return Promise.all([loadImage(url, false), bitmap]).then(([image, decoded]) => {
         if (!decoded) {
           // No bitmap: the image, decoded as before.
@@ -536,7 +537,8 @@
     const SCRATCH_PIXELS = 10000;
     const scratches = new Map();
     // Bench switches (`x` in hello; no phone sends it), for A/B runs on a
-    // TV: `blur` "shadow" or "filter" (receiver 56's), `layers` "bounded" or
+    // TV: `blur` "shadow", "scratch" (small canvases only) or "filter"
+    // (receiver 56's), `layers` "bounded" or
     // "full", `cover` "clip" (a stage-sized clip still covers) or "strict",
     // `bitmaps` 1 or 0.
     const TUNED = Object.freeze({ blur: "shadow", layers: "bounded", cover: "clip", bitmaps: 1, shade: "thirds", covered: 0 });
@@ -701,13 +703,37 @@
       }
     }
 
+    // Whether this browser casts the shadow of a shape drawn off its canvas,
+    // tried once on a canvas of its own. Where it doesn't, glows are blurred
+    // in small canvases instead (`stats.glow` says which).
+    let shadowsCast = null;
+    function castsOffstageShadows() {
+      if (shadowsCast !== null) return shadowsCast;
+      shadowsCast = false;
+      try {
+        const probe = document.createElement("canvas");
+        probe.width = 8;
+        probe.height = 8;
+        const c = probe.getContext("2d");
+        c.shadowColor = "rgba(255,0,0,1)";
+        c.shadowBlur = 1;
+        c.shadowOffsetX = OFFSTAGE;
+        c.setTransform(1, 0, 0, 1, -OFFSTAGE, 0);
+        c.fillStyle = "#000";
+        c.fillRect(-8, -8, 24, 24);
+        const pixel = c.getImageData(4, 4, 1, 1).data;
+        shadowsCast = pixel[0] > 200 && pixel[1] < 60 && pixel[3] > 200;
+      } catch (error) { shadowsCast = false; }
+      return shadowsCast;
+    }
+
     // A plain colour shape with a blur, whatever layer it sits in: drawn as
     // its own shadow. `o`: opacity (thousandths), blending, the clips (refs)
     // and the blur (stage points).
     function shadowable(frame, op, blend) {
       if ((op[0] !== "f" && op[0] !== "s") || !Array.isArray(op[5]) || op[5][0] !== "c") return false;
       if (UNBOUNDED.has(blend || "source-over") || (op[2] && op[2] !== "source-over")) return false;
-      return true;
+      return tune.blur === "shadow" && castsOffstageShadows();
     }
 
     function drawShadowed(c, frame, op, o, scale) {
@@ -1133,6 +1159,8 @@
           drawMs: Number(core.percentile(counters.drawMs, 0.5).toFixed(1)),
           drawMax: Number(Math.max(0, ...counters.drawMs).toFixed(1)),
           missing: counters.missing, images: images.size, bitmaps: bitmaps.size, queue: timeline.length,
+          // How glows are blurred (receiver 57): as shadows, or in small canvases.
+          glow: tune.blur === "filter" ? "filter" : castsOffstageShadows() ? "shadow" : "scratch",
           synced: clock.synced ? 1 : 0, w: canvas.width, canvas: plan.why,
           gap: Number(core.percentile(counters.gaps, 0.5).toFixed(1)),
           gap90: Number(core.percentile(counters.gaps, 0.9).toFixed(1)),
