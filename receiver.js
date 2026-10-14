@@ -279,6 +279,25 @@
     report: (where, error) => cardFailure(where, error)
   });
   let cardFailure = () => {};
+
+  // Receiver 56: the app-open welcome, while the phone plays it.
+  const welcomeQuery = new URLSearchParams(window.location.search);
+  const welcomeHeld = /^welcome/.test(welcomeQuery.get("preview") || "") && welcomeQuery.get("at") !== null;
+  const welcomeModule = window.RallycadeWelcome;
+  const welcomeRoot = element("welcome");
+  const welcomeView = welcomeModule && welcomeRoot && welcomeModule.createWelcomeView({
+    elements: {
+      root: welcomeRoot, stage: element("welcome-stage"), canvas: element("welcome-canvas"),
+      lit: [...welcomeRoot.querySelectorAll(".welcome-lit")], litAll: element("welcome-lit-all"),
+      glows: [...welcomeRoot.querySelectorAll(".welcome-glow")], scrim: element("welcome-scrim"), halo: element("welcome-halo"),
+      icon: element("welcome-icon"), wordmark: element("welcome-wordmark"), caption: element("welcome-caption"),
+      captionText: element("welcome-caption-text")
+    },
+    // ?preview=welcome&at=1.3: that moment, held (for pictures of it).
+    now: () => (welcomeHeld ? 0 : performance.now()),
+    requestFrame: (callback) => requestAnimationFrame(callback),
+    cancelFrame: (id) => cancelAnimationFrame(id)
+  });
   // A phone has said hello on the scene channel this cast.
   let stadiumPhone = false;
 
@@ -300,11 +319,18 @@
     if (state.cricketDuelResult) renderDuelResult(state.cricketDuelResult);
     if (state.timingCheck) renderTimingCheck(state.timingCheck);
     if (cardView) cardView.update(state);
+    if (welcomeView) welcomeView.update(state);
   }
 
   const query = new URLSearchParams(window.location.search);
   const preview = query.get("preview");
-  render(core.sampleState(preview || "ready"));
+  if (welcomeHeld) {
+    const state = core.sampleState(preview);
+    if (state.welcome) state.welcome.elapsed = Math.round(Number(query.get("at")) * 1000);
+    render(state);
+  } else {
+    render(core.sampleState(preview || "ready"));
+  }
   // ?preview=…&card=<picture>: that picture as the phone's scorecard.
   if (preview && query.get("card") && cardView) {
     render(Object.assign({}, core.sampleState(preview), { card: "0.0" }));

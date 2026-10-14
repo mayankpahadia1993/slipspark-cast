@@ -435,3 +435,19 @@ body[data-card="waiting"] .card-screen[data-screen="positioning"] {
 .card-hold .hold-ring { width: clamp(56px, 5vw, 96px); height: clamp(56px, 5vw, 96px); }
 .card-hold .hold-label { font-size: clamp(20px, 1.8vw, 34px); }
 body[data-card="picture"] #app, body[data-card="waiting"] #app { visibility: hidden; }
+
+/* Receiver 56: the app-open welcome over the ready screen
+   (receiver-welcome.js). A 1920 x 1080 canvas, scaled to the 16:9 stage. */
+.welcome { position: fixed; inset: 0; z-index: 8; background: #000; pointer-events: none; }
+.welcome-stage { position: absolute; left: 50%; top: 50%; width: min(100vw, 177.7778vh); height: min(56.25vw, 100vh); transform: translate(-50%, -50%); overflow: hidden; }
+.welcome-canvas { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; transform-origin: 0 0; overflow: hidden; }
+.welcome-photo { position: absolute; inset: 0; width: 1920px; height: 1080px; object-fit: cover; opacity: 0; }
+.welcome-dark { opacity: 1; filter: brightness(.075) saturate(.85); }
+.welcome-glow { position: absolute; inset: 0; opacity: 0; }
+.welcome-vignette { position: absolute; inset: 0; background: radial-gradient(ellipse 70% 70% at 50% 50%, rgba(0,0,0,0) 55%, rgba(0,0,0,.22) 100%); }
+.welcome-scrim { position: absolute; inset: 0; opacity: 0; background: radial-gradient(ellipse 50% 50% at 50% 50%, rgba(18, 43, 38, .62) 0%, rgba(18, 43, 38, 0) 100%); }
+.welcome-halo { position: absolute; left: 960px; top: 389px; width: 674px; height: 674px; transform: translate(-50%, -50%); opacity: 0; background: radial-gradient(circle, rgba(255, 194, 82, .30) 0%, rgba(255, 194, 82, 0) 70%); }
+.welcome-icon { position: absolute; left: 960px; top: 389px; width: 259px; height: 259px; border-radius: 58px; transform: translate(-50%, -50%); opacity: 0; box-shadow: 0 13px 38px rgba(0, 0, 0, .6); }
+.welcome-wordmark { position: absolute; left: 960px; top: 622px; transform: translate(-50%, -50%); opacity: 0; font-family: Inter, "Google Sans", sans-serif; font-size: 81px; font-weight: 900; letter-spacing: 16px; color: #ffc252; white-space: nowrap; }
+.welcome-caption { position: absolute; left: 50%; bottom: 30px; transform: translateX(-50%); max-width: 900px; display: flex; align-items: center; gap: 14px; padding: 14px 26px; border-radius: 999px; background: rgba(18, 43, 38, .9); color: #fcf5de; font-family: Inter, "Google Sans", sans-serif; font-size: 26px; font-weight: 700; line-height: 1.25; width: max-content; }
+.welcome-caption .hud-mic { flex: none; width: 24px; height: 24px; fill: #ffc252; color: #ffc252; }

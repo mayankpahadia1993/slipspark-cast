@@ -291,8 +291,25 @@
     const pictureScreen = resultScreen || screen === "positioning";
     normalized.card = pictureScreen && typeof value.card === "string" && /^[0-9a-z]{1,32}\.[0-9a-z]{1,32}$/.test(value.card) ? value.card : null;
     normalized.hold = resultScreen && Number(value.hold) > 0 ? Math.min(1, Number(value.hold)) : null;
+    // Receiver 56: the app-open welcome, on the ready screen only.
+    normalized.welcome = screen === "ready" ? normalizeWelcome(value.welcome) : null;
 
     return normalized;
+  }
+
+  // The app-open welcome the phone is playing (CastDisplayState.Welcome):
+  // its id, full or short, Reduce Motion, how far in it is, the
+  // commentator's lines (words, start, length in ms) and when the TV hands
+  // back to its ready screen. Anything else is no welcome.
+  function normalizeWelcome(value) {
+    if (!value || typeof value !== "object" || typeof value.id !== "string" || !/^[0-9a-z-]{1,40}$/.test(value.id)) return null;
+    if (value.kind !== "full" && value.kind !== "short") return null;
+    const ms = (x, max) => Math.max(0, Math.min(max, Math.round(number(x, 0))));
+    const lines = (Array.isArray(value.lines) ? value.lines : []).slice(0, 3)
+      .filter((line) => line && typeof line.text === "string" && line.text.trim())
+      .map((line) => ({ text: boundedString(line.text, "", 160), at: ms(line.at, 60000), duration: ms(line.duration, 20000) }));
+    return { id: value.id, kind: value.kind, reduced: value.reduced === true, elapsed: ms(value.elapsed, 60000), lines,
+      end: ms(value.end, 60000) };
   }
 
   function parseMessage(data) {
@@ -341,6 +358,14 @@
     if (kind === "cricketDuelResult") return normalizeState({ ...base, screen: "cricketDuelResult", cricketDuelResult: { headline: "PLAYER 2 WINS", margin: "BY 2 WICKETS · 1 BALL TO SPARE", winner: "second", firstRuns: 31, firstWickets: 3, secondRuns: 32, secondWickets: 1 } });
     if (kind === "timingCheck") return normalizeState({ ...base, screen: "timingCheck", timingCheck: { headline: "Mostly early", detail: "Your swings met the ball about a quarter of a second before it reached you.", verdicts: ["early", "littleEarly", "perfect", "early", "littleEarly", "noSwing"], lines: ["Balls 1 and 4 were early.", "Balls 2 and 5 were a little early.", "Ball 3 was perfect.", "Ball 6 had no swing.", "Wait for the ball to reach the crease before you swing."], note: "Raise both hands to play your innings" } });
     if (kind === "ready" || !kind) return normalizeState({ ...base, sequence: 1, screen: "ready" });
+    // ?preview=welcome: the app-open welcome as the phone sends it (an evening, a 4-day streak).
+    if (kind === "welcome" || kind === "welcomeShort") {
+      return normalizeState({ ...base, sequence: 2, screen: "ready", welcome: kind === "welcome"
+        ? { id: "preview1", kind: "full", reduced: false, elapsed: 0, end: 4950,
+            lines: [{ text: "Welcome back! The crowd's been waiting.", at: 1650, duration: 2850 },
+              { text: "Four days in a row. Keep the streak going!", at: 4800, duration: 2600 }] }
+        : { id: "preview2", kind: "short", reduced: false, elapsed: 0, end: 2050, lines: [{ text: "Back at the crease!", at: 300, duration: 1300 }] } });
+    }
     return normalizeState({ ...base, screen: "fight", fight: fightSample(kind) });
   }
 
@@ -391,6 +416,6 @@
     return null;
   }
 
-  return { clamp, formatTime, normalizeJoints, normalizeState, parseMessage, sampleState, resultHeadlineSize, estimateWidth, wrapLines,
-    hideTarget, TARGET_REVEAL_MS };
+  return { clamp, formatTime, normalizeJoints, normalizeState, normalizeWelcome, parseMessage, sampleState, resultHeadlineSize, estimateWidth,
+    wrapLines, hideTarget, TARGET_REVEAL_MS };
 });
