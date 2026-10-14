@@ -175,7 +175,7 @@
       if (!entry || entry.ready) return;
       const missing = entry.uses.filter((use) => !images.has(use));
       if (missing.length) { missing.forEach(ensure); return; }
-      // Made at the size its bitmap would be kept at (receiver 57): a dyed
+      // Made at the size its bitmap would be kept at (receiver 58): a dyed
       // kit's eleven pieces, made as the stadium comes on, cost a quarter.
       // An opaque one (the practice lane) is shown on the GPU layer, sharp.
       const factor = entry.opaque ? 1 : pictureFactor(key, entry.width, entry.height, false);
@@ -538,10 +538,10 @@
     const scratches = new Map();
     // Bench switches (`x` in hello; no phone sends it), for A/B runs on a
     // TV: `blur` "shadow", "scratch" (small canvases only) or "filter"
-    // (receiver 56's), `layers` "bounded" or
-    // "full", `cover` "clip" (a stage-sized clip still covers) or "strict",
-    // `bitmaps` 1 or 0.
-    const TUNED = Object.freeze({ blur: "shadow", layers: "bounded", cover: "clip", bitmaps: 1, shade: "thirds", covered: 0 });
+    // (receiver 56's), `layers` "bounded" or "full", `cover` "clip" (a
+    // stage-sized clip still covers) or "strict", `bitmaps` 1 or 0, `shade`
+    // "thirds", "full" or "none".
+    const TUNED = Object.freeze({ blur: "shadow", layers: "bounded", cover: "clip", bitmaps: 1, shade: "thirds" });
     const tune = Object.assign({}, TUNED);
     // Each hello starts from the defaults; the bench's `x` changes them.
     function setTune(x) {
