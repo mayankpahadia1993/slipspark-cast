@@ -427,17 +427,141 @@
     return target;
   }
 
+  // The CSS colours drawn every frame, made once each (receiver 57): a
+  // string a command a frame kept the Chromecast's collector busy.
+  const colors = new Map();
+
   function cssColor(color, multiply) {
     if (!isArray(color)) return "rgba(0,0,0,0)";
     let r = color[0], g = color[1], b = color[2], a = color[3] / 1000;
     if (multiply) {
       r = r * multiply[0] / 255; g = g * multiply[1] / 255; b = b * multiply[2] / 255; a *= multiply[3] / 1000;
     }
-    return "rgba(" + Math.round(r) + "," + Math.round(g) + "," + Math.round(b) + "," + Math.max(0, Math.min(1, a)).toFixed(3) + ")";
+    r = Math.round(r); g = Math.round(g); b = Math.round(b);
+    const alpha = Math.round(Math.max(0, Math.min(1, a)) * 1000);
+    const key = ((r * 256 + g) * 256 + b) * 1001 + alpha;
+    let css = colors.get(key);
+    if (css === undefined) {
+      css = "rgba(" + r + "," + g + "," + b + "," + (alpha / 1000).toFixed(3) + ")";
+      if (colors.size >= 4096) colors.clear();
+      colors.set(key, css);
+    }
+    return css;
+  }
+
+  // MARK: Cheap drawing on a Chromecast (receiver 57)
+
+  // A filter list's blur (stage points, several in a row add as their
+  // squares do) and colour multiply.
+  function filterParts(list) {
+    let squares = 0;
+    let multiply = null;
+    if (isArray(list)) {
+      for (const filter of list) {
+        if (!isArray(filter)) continue;
+        if (filter[0] === "b") { const radius = Number(filter[1]) / 10; if (radius > 0) squares += radius * radius; }
+        if (filter[0] === "m" && isArray(filter[1])) multiply = filter[1];
+      }
+    }
+    return { blur: Math.sqrt(squares), multiply };
+  }
+
+  // Where a command paints, in stage points [left, top, right, bottom]
+  // before any blur; null when it can't be told. `size` gives a picture's
+  // drawn size by key.
+  function opBounds(op, size) {
+    switch (op[0]) {
+      case "f":
+      case "s": {
+        const points = op[4];
+        if (!isArray(points) || points.length < 2) return null;
+        let left = Infinity, top = Infinity, right = -Infinity, bottom = -Infinity;
+        for (let index = 0; index + 1 < points.length; index += 2) {
+          const x = points[index], y = points[index + 1];
+          if (x < left) left = x;
+          if (x > right) right = x;
+          if (y < top) top = y;
+          if (y > bottom) bottom = y;
+        }
+        if (!(right >= left) || !(bottom >= top)) return null;
+        let pad = 0;
+        if (op[0] === "s") {
+          const geometry = isArray(op[6]) ? op[6] : [10, 0, 0, 100];
+          const half = Math.max(0.01, geometry[0] / 10) / 2;
+          // A mitred corner can reach out `miterLimit` half widths.
+          pad = half * (geometry[2] === 0 ? Math.max(1, geometry[3] / 10) : 1) + 1;
+        }
+        return [left / 10 - pad, top / 10 - pad, right / 10 + pad, bottom / 10 + pad];
+      }
+      case "i": {
+        const m = op[4];
+        const drawn = size && size(op[3]);
+        if (!isArray(m) || !drawn) return null;
+        const a = m[0] / 10000, b = m[1] / 10000, c = m[2] / 10000, d = m[3] / 10000, e = m[4] / 10, f = m[5] / 10;
+        const xs = [e, a * drawn.width + e, c * drawn.height + e, a * drawn.width + c * drawn.height + e];
+        const ys = [f, b * drawn.width + f, d * drawn.height + f, b * drawn.width + d * drawn.height + f];
+        return [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)];
+      }
+      case "t": {
+        // Generous: as wide as its longest line of wide letters, either way of the anchor.
+        const fontSize = Number(op[4]) / 10;
+        const lines = String(op[3]).split("\n");
+        const longest = Math.max(...lines.map((line) => line.length));
+        const at = isArray(op[8]) ? op[8] : [0, 0];
+        const width = longest * fontSize + fontSize;
+        const height = (lines.length + 1) * fontSize * 1.2;
+        return [at[0] / 10 - width, at[1] / 10 - height, at[0] / 10 + width, at[1] / 10 + height];
+      }
+      default:
+        return null;
+    }
+  }
+
+  // The "l" that closes the layer opened at `index`, or -1.
+  function layerEnd(ops, index) {
+    let depth = 0;
+    for (let at = index; at < ops.length; at += 1) {
+      const kind = ops[at][0];
+      if (kind === "L") depth += 1;
+      else if (kind === "l") { depth -= 1; if (depth === 0) return at; }
+    }
+    return -1;
+  }
+
+  // Whether a clip list leaves the whole stage drawn: every clip in it a
+  // plain rectangle around the stage. The phone clips the stadium photo
+  // to the stage (CastStadiumScene.drawBackdrop), which kept it off the
+  // GPU layer: an iPhone's stadium photo was drawn on the canvas, under a
+  // clip, thirty times a second (receiver 57).
+  function clipsWholeStage(list) {
+    if (!isArray(list) || !list.length) return false;
+    for (const clip of list) {
+      if (!isArray(clip) || typeof clip[0] !== "string" || !isArray(clip[1])) return false;
+      if (!/^ML+Z?$/.test(clip[0])) return false;
+      const points = clip[1];
+      const count = clip[0].replace("Z", "").length;
+      if (points.length !== count * 2 || count < 4) return false;
+      let left = Infinity, top = Infinity, right = -Infinity, bottom = -Infinity;
+      for (let index = 0; index < points.length; index += 2) {
+        left = Math.min(left, points[index]); right = Math.max(right, points[index]);
+        top = Math.min(top, points[index + 1]); bottom = Math.max(bottom, points[index + 1]);
+      }
+      // A rectangle walked edge by edge: each point a corner, each step
+      // along one axis.
+      for (let index = 0; index < points.length; index += 2) {
+        const x = points[index], y = points[index + 1];
+        if ((x !== left && x !== right) || (y !== top && y !== bottom)) return false;
+        const next = (index + 2) % points.length;
+        if (x !== points[next] && y !== points[next + 1]) return false;
+      }
+      if (left > 5 || top > 5 || right < STAGE.width * 10 - 5 || bottom < STAGE.height * 10 - 5) return false;
+    }
+    return true;
   }
 
   return {
     STAGE, MAX_BLEND_GAP, CANVAS, normalizeFrame, shapeKey, blendFrames, blendFramesInto, cloneFrame, createTimeline, createClock,
-    percentile, tracePath, cssColor, pictureSize, canvasPlan, canvasWidth, createRateWatch, createLiveLayer, hasLiveSlot, poseAge, poseAhead
+    percentile, tracePath, cssColor, pictureSize, canvasPlan, canvasWidth, createRateWatch, createLiveLayer, hasLiveSlot, poseAge, poseAhead,
+    filterParts, opBounds, layerEnd, clipsWholeStage
   };
 });
