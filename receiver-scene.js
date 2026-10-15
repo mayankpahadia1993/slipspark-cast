@@ -78,6 +78,7 @@
     let lastNeed = 0;
     let readyToAnswer = false;
     let pendingHello = false;
+    let helloKit = null;
     const counters = { draws: 0, blended: 0, frames: 0, late: [], drawMs: [], missing: 0, redraws: 0, gaps: [], live: 0, pose: [], ahead: [], eff: [] };
 
     // MARK: Sizing
@@ -278,29 +279,56 @@
       });
     }
 
-    // The receiver's own pictures, two at a time, as soon as a phone says
-    // hello: by the first ball every one is ready.
-    function preloadBundled() {
+    // The receiver's own pictures, and those earlier casts left in its cache
+    // (receiver 53), three at a time: by the first ball every one is ready.
+    //
+    // Receiver 60: from the moment the page is up, not from the phone's
+    // hello, and the innings' first frame's pictures first. The user's iOS
+    // 166 (Oct 15 2026) played 1.4 s after the TV answered, the stadium came
+    // on 4.8 s after it, and the receiver had loaded 49 of its 87 pictures,
+    // in the manifest's order: the stadium photo and the batter last. The
+    // first frame waited 0.5 s, the stadium was whole 1.7 s after it came
+    // on and drew 11 frames a second with 72 draws missing a picture
+    // (scripts/cast-start-bench.py reproduces it: HOME_WAIT=1 SYNC_PINGS=4).
+    // A phone's hello can name its kit (`kit`), whose cached pieces then come
+    // with the batter's.
+    let preloadQueue = [];
+    let preloading = 0;
+    let preloadKit = null;
+    function preloadRank(key) {
+      if (/^stadium-/.test(key)) return 0;
+      if (/^stroke-/.test(key)) return 1;
+      if (preloadKit && key.indexOf("kit-" + preloadKit + "-") === 0) return 1;
+      if (/^bowler-11-/.test(key)) return 2;
+      if (/^bowler-/.test(key)) return 3;
+      if (/^fielder-[A-Za-z]+-idle-/.test(key)) return 4;
+      if (/^field-outfield-/.test(key)) return 5;
+      if (/^fielder-/.test(key)) return 6;
+      if (/^kit-/.test(key) && !preloadKit) return 6;
+      return 7;
+    }
+    function preloadBundled(kit) {
+      if (typeof kit === "string" && /^[a-z0-9-]{1,40}$/.test(kit)) preloadKit = kit;
       // This TV's own copies of pictures earlier casts sent too (receiver
       // 53): build 158's innings opened with 22–59 draws a second missing a
       // photo the TV had cached but not yet loaded.
-      const keys = Array.from(bundled.keys()).concat(Array.from(cached).filter((key) => !bundled.has(key)).slice(0, MAX_CACHED_PRELOAD));
-      let next = 0;
-      const pump = () => {
-        while (next < keys.length && (images.has(keys[next]) || loading.has(keys[next]))) next += 1;
-        if (next >= keys.length) return;
-        const key = keys[next];
-        next += 1;
-        loading.add(key);
-        const source = bundled.has(key) ? Promise.resolve("scene-images/" + bundled.get(key))
-          : database ? loadCached(key) : Promise.reject(new Error("no cache"));
-        source.then((url) => loadPicture(key, url))
-          .then(() => {}, () => loading.delete(key))
-          .then(() => window.setTimeout(pump, 20));
-      };
-      pump();
-      pump();
-      pump();
+      const byRank = (a, b) => preloadRank(a) - preloadRank(b);
+      const extra = Array.from(cached).filter((key) => !bundled.has(key)).sort(byRank).slice(0, MAX_CACHED_PRELOAD);
+      preloadQueue = Array.from(bundled.keys()).concat(extra).sort(byRank);
+      while (preloading < 3 && pumpPreload()) { /* three at a time */ }
+    }
+    function pumpPreload() {
+      while (preloadQueue.length && (images.has(preloadQueue[0]) || loading.has(preloadQueue[0]))) preloadQueue.shift();
+      if (!preloadQueue.length) return false;
+      const key = preloadQueue.shift();
+      preloading += 1;
+      loading.add(key);
+      const source = bundled.has(key) ? Promise.resolve("scene-images/" + bundled.get(key))
+        : database ? loadCached(key) : Promise.reject(new Error("no cache"));
+      source.then((url) => loadPicture(key, url))
+        .then(() => {}, () => loading.delete(key))
+        .then(() => { preloading -= 1; window.setTimeout(pumpPreload, 20); });
+      return true;
     }
 
     // The first frame after the stadium comes on drawn with every picture
@@ -310,6 +338,27 @@
       if (wholeSent || !on || counters.missing !== missingBefore) return;
       wholeSent = true;
       send({ t: "whole" });
+    }
+
+    // Receiver 60: as the stadium comes on, the phone's picture (its setup,
+    // held as the innings starts) stays over it until a frame has every
+    // picture and the stadium photo is on its own layer, at most COVER_MS
+    // (the phone holds the first ball as long: CastSceneStreamer.warmLimit),
+    // rather than a stadium drawn with holes at a few frames a second. The
+    // first stadium of a cast also spent ~0.3 s making the photo's layer
+    // (a 0.7 s gap on the Living Room TV's Chromecast Ultra, however long
+    // the setup): the stadium is drawn meanwhile, all but transparent, so
+    // that work is done under the picture. With no picture up the stadium
+    // shows at once (receiver.css).
+    const COVER_MS = 3000;
+    let coverUntil = 0;
+    // The frame's stadium photo is drawn on the canvas, its layer not yet
+    // decoded; and when its layer first showed.
+    let photoPending = false;
+    let layerShownAt = 0;
+    let framePhoto = false;
+    function uncover() {
+      if (root.dataset.warming) delete root.dataset.warming;
     }
 
     // Cached pictures loaded at hello, at most.
@@ -395,15 +444,16 @@
       if (upload.count < upload.of) return;
       uploads.delete(key);
       const data = upload.parts.join("");
-      const bytes = atob(data);
-      const array = new Uint8Array(bytes.length);
-      for (let index = 0; index < bytes.length; index += 1) array[index] = bytes.charCodeAt(index);
-      const blob = new Blob([array], { type: upload.type });
-      if (upload.type === "image/jpeg") opaque.add(key);
-      const url = URL.createObjectURL(blob);
-      loadPicture(key, url, blob).then(() => {
-        cacheImage(key, blob);
-        send({ t: "got", k: key });
+      const type = upload.type === "image/jpeg" ? "image/jpeg" : "image/png";
+      if (type === "image/jpeg") opaque.add(key);
+      // Receiver 60: the base64 text into bytes by the browser itself, off
+      // the page's thread (a script loop over it held the page up).
+      fetch("data:" + type + ";base64," + data).then((response) => response.blob()).then((blob) => {
+        const url = URL.createObjectURL(blob);
+        return loadPicture(key, url, blob).then(() => {
+          cacheImage(key, blob);
+          send({ t: "got", k: key });
+        });
       }).catch((error) => report("image", error));
     }
 
@@ -834,11 +884,15 @@
       ctx.imageSmoothingQuality = smoothing;
       const cover = coverIndex(frame);
       let from = 0;
-      if (cover >= 0 && showBackdrop(frame.o[cover])) {
+      const layered = cover >= 0 && showBackdrop(frame.o[cover]);
+      if (layered) {
         from = cover + 1;
+        if (photoPending || !layerShownAt) layerShownAt = started;
       } else if (cover < 0) {
         hideBackdrops(null);
       }
+      photoPending = cover >= 0 && !layered;
+      framePhoto = cover >= 0;
       // A photo whose layer isn't decoded yet is drawn on the canvas, over
       // whichever layer was showing: never an empty frame.
       paint(ctx, frame, from, { s: scale, width: canvas.width, height: canvas.height, layers: null, live: live.current });
@@ -1105,6 +1159,10 @@
       window.requestAnimationFrame(frameLoop);
       if (!on) return;
       const local = performance.now();
+      // Shown once whole with its photo on its layer for a frame, or at
+      // COVER_MS whatever.
+      if (root.dataset.warming && (local >= coverUntil
+        || (wholeSent && (!framePhoto || (!photoPending && layerShownAt && local - layerShownAt >= 30))))) uncover();
       if (lastLoop) counters.gaps.push(local - lastLoop);
       lastLoop = local;
       const phoneNow = clock.phoneNow(local);
@@ -1209,7 +1267,13 @@
     }
 
     function setOn(value) {
-      if (!!value && !on) wholeSent = false;
+      if (!!value && !on) {
+        wholeSent = false;
+        root.dataset.warming = "1";
+        coverUntil = performance.now() + COVER_MS;
+        layerShownAt = 0;
+      }
+      if (!value) uncover();
       on = !!value;
       root.hidden = !on;
       document.body.dataset.scene = on ? "on" : "off";
@@ -1240,7 +1304,7 @@
       // drawn (`ph`) and the age that leaves (`ahead`, `eff` in stats), so the
       // phone may draw it ahead (receiver 55).
       send({ t: "ready", scene: 1, pic: 1, card: 1, live: 1, setup: 1, whole: 1, predict: 1, screen: screenPixels(), version: VERSION, ua: navigator.userAgent, have });
-      preloadBundled();
+      preloadBundled(helloKit);
     }
 
     function report(where, error) {
@@ -1304,6 +1368,8 @@
           live.clear();
           lastStamp = null;
           wholeSent = false;
+          // Receiver 60: the phone's kit, whose cached pieces load with the batter's.
+          helloKit = typeof message.kit === "string" ? message.kit : null;
           if (readyToAnswer) answerHello(); else pendingHello = true;
           break;
         case "ping":
@@ -1443,6 +1509,9 @@
     Promise.all([loadBundled(), openCache(), fontsReady]).then(() => {
       readyToAnswer = true;
       if (pendingHello) { pendingHello = false; answerHello(); }
+      // Receiver 60: the pictures start loading as soon as the page is up,
+      // before any phone says hello (a cast's launch is 1–2 s before it).
+      else if (!options.noPreload) preloadBundled();
     });
     window.requestAnimationFrame(frameLoop);
 

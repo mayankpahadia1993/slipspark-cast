@@ -69,7 +69,12 @@
 
   // FNV-1a over the base64 text, as the phone computes it.
   function checksum(text) {
-    let hash = 0x811c9dc5;
+    return fold(0x811c9dc5, text);
+  }
+
+  // The checksum carried on over more text (the parts in order).
+  function fold(start, text) {
+    let hash = start >>> 0;
     for (let index = 0; index < text.length; index += 1) {
       hash ^= text.charCodeAt(index) & 0xff;
       hash = Math.imul(hash, 0x01000193) >>> 0;
@@ -114,15 +119,25 @@
       }
       if (!entry) {
         while (pending.size >= MAX_PENDING) pending.delete(pending.keys().next().value);
-        entry = { of, len, sum, width: Number(m.w) || 0, height: Number(m.h) || 0, ring: validRing(m.ring), parts: new Array(of), count: 0 };
+        entry = { of, len, sum, width: Number(m.w) || 0, height: Number(m.h) || 0, ring: validRing(m.ring), parts: new Array(of), count: 0,
+          hash: 0x811c9dc5, hashed: 0 };
         pending.set(id, entry);
       }
-      if (entry.parts[n] == null) entry.count += 1;
-      entry.parts[n] = m.d;
+      if (entry.parts[n] == null) {
+        entry.count += 1;
+        entry.parts[n] = m.d;
+        // Receiver 60: the checksum as the parts come, in order, not all at
+        // once at the end. A Chromecast Ultra spent 40-135 ms on a sharp
+        // 1920 x 1080 picture's in one go, before the picture could show.
+        while (entry.hashed < of && entry.parts[entry.hashed] != null) {
+          entry.hash = fold(entry.hash, entry.parts[entry.hashed]);
+          entry.hashed += 1;
+        }
+      }
       if (entry.count < of) return { status: "partial", id };
       pending.delete(id);
       const data = entry.parts.join("");
-      if (data.length !== len || checksum(data) !== sum) return { status: "invalid", id };
+      if (data.length !== len || entry.hash !== sum) return { status: "invalid", id };
       return { status: "complete", id, picture: { id, width: entry.width, height: entry.height, ring: entry.ring, data } };
     }
 
@@ -265,16 +280,22 @@
       }
       if (result.status !== "complete") return Promise.resolve(result);
       let url;
-      try { url = o.toUrl(result.picture.data); } catch (error) {
+      let made;
+      try { made = o.toUrl(result.picture.data); } catch (error) {
         if (o.report) o.report("card", error);
         return Promise.resolve({ status: "invalid", id: result.id });
       }
-      // Decoded before it is shown: no half-drawn picture on the TV.
-      return Promise.resolve(o.decode ? o.decode(url) : null).then(() => {
+      // The picture's address may come later (receiver 60 turns the text
+      // into bytes off the page's thread). Decoded before it is shown: no
+      // half-drawn picture on the TV.
+      return Promise.resolve(made).then((address) => {
+        url = address;
+        return o.decode ? o.decode(url) : null;
+      }).then(() => {
         keep(result.id, url, result.picture);
         return result;
       }, (error) => {
-        o.revoke(url);
+        if (url) o.revoke(url);
         if (o.report) o.report("card", error);
         return { status: "invalid", id: result.id };
       });
@@ -283,5 +304,5 @@
     return { receive, update, apply, keep, get decision() { return last; }, get urls() { return urls; } };
   }
 
-  return { TIMEOUT_MS, SETUP_TIMEOUT_MS, MAX_PARTS, CARD_SCREENS, checksum, family, validId, cardId, validRing, ringPlacement, createAssembler, createDisplay, prune, createCardView };
+  return { TIMEOUT_MS, SETUP_TIMEOUT_MS, MAX_PARTS, CARD_SCREENS, checksum, fold, family, validId, cardId, validRing, ringPlacement, createAssembler, createDisplay, prune, createCardView };
 });

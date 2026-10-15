@@ -220,6 +220,11 @@ body[data-video="on"] #app { visibility: hidden; }
 }
 body[data-scene="on"] #app,
 body[data-scene="on"] #stream { visibility: hidden; }
+/* Receiver 60: the phone's picture stays up over a stadium still loading
+   its pictures, until a frame has them all and its photo is on its layer
+   (receiver-scene.js, `warming`). Drawn all but transparent, not hidden, so
+   the browser does the stadium's first work under the picture. */
+body[data-card="picture"] .scene[data-warming="1"] { opacity: .01; }
 .scene-stage { position: absolute; left: 50%; top: 50%; width: min(100vw, 177.7778vh); height: min(56.25vw, 100vh); transform: translate(-50%, -50%); overflow: hidden; }
 #scene-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 #scene-backdrop { display: none; }

@@ -262,11 +262,12 @@
     ring: element("card-ring"), renderRing, view: () => ({ width: window.innerWidth, height: window.innerHeight }),
     renderHold, now: () => performance.now(),
     setTimer: (callback, ms) => setTimeout(callback, ms), clearTimer: (id) => clearTimeout(id),
+    // Receiver 60: the picture's own base64 text as its address; the browser
+    // turns it into bytes as it loads it. A script loop did that before, and
+    // a Chromecast Ultra spent 40-140 ms on it a picture (a sharp 1920 x 1080
+    // one, the first few of a cast) before the picture could show.
     toUrl(data) {
-      const binary = atob(data);
-      const bytes = new Uint8Array(binary.length);
-      for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
-      return URL.createObjectURL(new Blob([bytes], { type: "image/jpeg" }));
+      return "data:image/jpeg;base64," + data;
     },
     revoke(url) { if (url && url.indexOf("blob:") === 0) URL.revokeObjectURL(url); },
     // A phone that draws the stadium: as its innings starts, its setup
