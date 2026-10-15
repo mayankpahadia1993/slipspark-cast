@@ -326,7 +326,12 @@
       const source = bundled.has(key) ? Promise.resolve("scene-images/" + bundled.get(key))
         : database ? loadCached(key) : Promise.reject(new Error("no cache"));
       source.then((url) => loadPicture(key, url))
-        .then(() => {}, () => loading.delete(key))
+        .then(() => {
+          // The stadium's photos get their GPU layer now, decoded while the
+          // setup shows: made at the first frame, it took the first stadium
+          // of a cast 0.7-1 s on a Chromecast Ultra.
+          if (/^stadium-(ground|backdrop)-/.test(key) && opaque.has(key)) backdropLayer(key);
+        }, () => loading.delete(key))
         .then(() => { preloading -= 1; window.setTimeout(pumpPreload, 20); });
       return true;
     }
