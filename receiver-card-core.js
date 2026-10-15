@@ -169,7 +169,7 @@
       return { mode: "html", wait: 0 };
     }
 
-    return { expect, arrived, forget, decide, get expected() { return expected; } };
+    return { expect, arrived, forget, decide, get expected() { return expected; }, get since() { return since; } };
   }
 
   // Ids to let go so at most `keep` pictures stay decoded, oldest first,
@@ -192,6 +192,9 @@
     let state = null;
     let timer = null;
     let last = { mode: "html" };
+    // The picture last reported on screen (receiver 60: `onShown`, so the
+    // phone's log says when each picture reached the TV).
+    let reported = null;
 
     function apply() {
       if (timer != null) { o.clearTimer(timer); timer = null; }
@@ -204,6 +207,13 @@
         const url = urls.get(decision.id);
         if (o.image.src !== url) o.image.src = url;
         o.image.hidden = false;
+        // A picture the state asked for, newly on screen (a draft, then its
+        // sharp picture): how long after it was asked for.
+        if (o.onShown && decision.id === display.expected && reported !== url) {
+          reported = url;
+          const picture = meta.get(decision.id);
+          o.onShown({ id: decision.id, width: picture ? picture.width : 0, waited: Math.max(0, Math.round(o.now() - display.since)) });
+        }
       } else {
         o.image.hidden = true;
       }

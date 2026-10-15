@@ -255,6 +255,8 @@
     const value = Math.max(0, Math.min(1, Number(progress) || 0));
     ring.querySelector(".card-ring-fill").style.strokeDashoffset = String(SETUP_RING * (1 - value));
   }
+  // Messages to the phone on the scene channel, once one has said hello.
+  let sendScene = () => {};
   const cardView = cardCore && cardCore.createCardView({
     root: element("card"), image: element("card-image"), hold: element("card-hold"), body: document.body,
     ring: element("card-ring"), renderRing, view: () => ({ width: window.innerWidth, height: window.innerHeight }),
@@ -276,7 +278,9 @@
       probe.src = url;
       return probe.decode ? probe.decode() : new Promise((ok, fail) => { probe.onload = ok; probe.onerror = fail; });
     },
-    report: (where, error) => cardFailure(where, error)
+    report: (where, error) => cardFailure(where, error),
+    // Receiver 60: the phone's log says when each picture reached the TV.
+    onShown: (shown) => sendScene({ t: "shown", id: shown.id, w: shown.width, ms: shown.waited })
   });
   let cardFailure = () => {};
 
@@ -361,7 +365,6 @@
   // The stadium the TV draws itself, from the phone's drawing commands.
   const sceneModule = window.RallycadeReceiverScene;
   let sceneSender = null;
-  let sendScene = () => {};
   const scene = sceneModule && sceneModule.createScene({
     root: document.getElementById("scene"),
     canvas: document.getElementById("scene-canvas"),
