@@ -355,7 +355,12 @@
   // Google TV 4K and HD, TVs with Cast built in) start at 1920 and drop to
   // 1280 for good if they can't keep `minFps`; the Linux Cast dongles
   // (Chromecast 1st–3rd generation, Ultra) stay at 1280 and never try.
-  const CANVAS = { wide: 1920, narrow: 1280, minFps: 25 };
+  // `minFps` 45 since receiver 61 (Oct 17 2026, the user: "Lag with the new
+  // chromecast"): an onn 4K Streaming Device (Android 14, Chrome 92) drew
+  // the 1920 canvas at 27–58 frames a second, about 40 most of the time,
+  // with 90th-percentile gaps up to 60 ms, in 3–7 ms of script a frame: its
+  // compositor, not the drawing, was the limit, and 25 never narrowed it.
+  const CANVAS = { wide: 1920, narrow: 1280, minFps: 45 };
 
   // `device`: `ua` (navigator.userAgent), `pinned` (a width the phone or the
   // bench asked for in `hello`), `wide` (the phone's hello allows 1920: build
