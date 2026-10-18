@@ -13,6 +13,27 @@ This static receiver shows RallyCade on Chromecast and Google TV. The phone (iPh
 - **Picture** (`urn:x-cast:com.slipspark.video`, `receiver-video.js`): builds 89–120 streamed the phone's own screen (ReplayKit, H.264, fragmented MP4 over Cast messages, Media Source Extensions). Kept so those builds still work; nothing newer sends it.
 - **Scoreboard** (`urn:x-cast:com.slipspark.game`, `receiver.js`): positioning, boxing, cricket, 1v1, results and cricket-duel state as normalized pose coordinates and game state. It shows whenever the stadium isn't drawn: setup, results, the innings break, boxing, and on phones older than build 121 before their picture starts.
 
+## Background music
+
+`urn:x-cast:com.slipspark.music` is an optional channel. A version-1 hello
+acknowledges support before either phone pauses its local theme. Only then does
+the receiver play its bundled `music/music-theme.m4a`, byte-identical to the apps’
+original theme. Older receivers leave music on the phone. The same screen,
+volume, mute, other-music and commentary/ring duck rules still decide its level.
+Gameplay remains free of background music. Commentary and effects keep their
+existing output; this channel carries only the background bed.
+
+Commands contain an ephemeral session, increasing sequence, position, volume,
+fade and a three-second expiry on the receiver’s measured clock. A healthy phone
+renews the lease; shutdown, sender departure, decoding failure or an expired
+lease stops audio. Reordered/expired commands and other senders cannot restart
+it. Phone fallback waits for a stopped acknowledgement or the last lease plus
+its clock/round-trip margin, so the two outputs do not play together.
+
+Receiver files share cache revision 61. Deployment of this receiver and updated
+iOS/Android apps is required for TV playback; this source change deploys nothing.
+See [the feedback validation record](../docs/cast-music-feedback.md).
+
 Production URL: `https://www.mysticoai.com/slipspark-cast/`
 
 The MysticoAI site keeps the public receiver URL on the product domain and

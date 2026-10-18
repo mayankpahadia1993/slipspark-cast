@@ -468,6 +468,18 @@
     options.customNamespaces[NAMESPACE] = window.cast.framework.system.MessageType.JSON;
     if (videoModule) options.customNamespaces[videoModule.NAMESPACE] = window.cast.framework.system.MessageType.JSON;
     if (scene) options.customNamespaces[sceneModule.NAMESPACE] = window.cast.framework.system.MessageType.JSON;
+    const musicModule = window.RallycadeMusic;
+    if (musicModule) {
+      const audio = new Audio("music/music-theme.m4a");
+      const music = musicModule.createPlayer({ audio,
+        send: (sender, message) => context.sendCustomMessage(musicModule.NAMESPACE, sender, message) });
+      options.customNamespaces[musicModule.NAMESPACE] = window.cast.framework.system.MessageType.JSON;
+      context.addCustomMessageListener(musicModule.NAMESPACE, event => music.handle(event.senderId, event.data));
+      context.addEventListener(window.cast.framework.system.EventType.SENDER_DISCONNECTED, event => music.disconnected(event.senderId));
+      context.addEventListener(window.cast.framework.system.EventType.SHUTDOWN, () => music.stop());
+      window.addEventListener("pagehide", () => music.stop());
+      window.addEventListener("unload", () => music.stop());
+    }
     options.disableIdleTimeout = true;
     options.skipPlayersLoad = true;
     options.statusText = "RallyCade is ready";
