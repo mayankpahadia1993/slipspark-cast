@@ -945,10 +945,10 @@
       }
       photoPending = cover >= 0 && !layered;
       framePhoto = cover >= 0;
-      from = drawStatic(frame, from);
+      const rest = drawStatic(frame, from);
       // A photo whose layer isn't decoded yet is drawn on the canvas, over
       // whichever layer was showing: never an empty frame.
-      paint(ctx, frame, from, { s: scale, width: canvas.width, height: canvas.height, layers: null, live: live.current });
+      paint(ctx, rest.frame, rest.from, { s: scale, width: canvas.width, height: canvas.height, layers: null, live: live.current });
       counters.drawMs.push(performance.now() - started);
       counters.draws += 1;
     }
@@ -958,14 +958,11 @@
     // "Could we reduce the number of pictures and shapes to draw?" Of a
     // frame's ~31 commands about half are the same as the frame before
     // (fielders standing, their shadows, the pitch's marks), and a live
-    // batter redraws the same frame again ~30 times a second. The frame's
-    // longest run of plain commands (source-over, no filter, no layer) from
-    // the start that was also in the frame before is drawn once into a
-    // canvas of the stadium's size and then blitted: one drawImage instead
-    // of each command. The run is cut where the frames differ, so what is
-    // drawn above it keeps its order and the picture is the same. The cache
-    // is rebuilt only when that run changes (a camera move, a fielder
-    // moving, a picture arriving).
+    // batter redraws the same frame again ~30 times a second. Those (see
+    // splitStatic) are drawn once into a canvas of the stadium's size and
+    // then blitted: one drawImage instead of each command, the picture the
+    // same. The layer is rebuilt only when its commands change (a camera
+    // move, a fielder moving, a picture arriving).
     const staticLayer = { canvas: null, key: null, built: 0, hits: 0, ops: 0, draws: 0 };
     let lastStaticKeys = null;
     const opKeys = new WeakMap();
@@ -982,16 +979,41 @@
       if (kind === "i") return !(op[5] >= 0) && !!images.get(op[3]);
       return false;
     }
+    // Which of a frame's commands the layer draws: each plain top-level
+    // command that was also in the frame before (a fielder standing, a
+    // shadow, the pitch's marks), unless a command before it that changed
+    // overlaps it (then it must stay above that one). The rest is drawn
+    // over the layer in its own order. Anything without bounds (the live
+    // batter's slot, a layer) ends the search, so nothing after it moves.
+    const overlaps = (a, b) => a[0] < b[2] && b[0] < a[2] && a[1] < b[3] && b[1] < a[3];
+    function splitStatic(frame, from, previous) {
+      const statics = [];
+      const changed = [];
+      let open = true;
+      for (let index = from; index < frame.o.length; index += 1) {
+        const op = frame.o[index];
+        if (!open) break;
+        if (op[0] === "L" || op[0] === "B" || op[0] === "l") { open = false; break; }
+        const box = core.opBounds(op, pictureSize);
+        if (!box) { open = false; break; }
+        const padded = [box[0] - 2, box[1] - 2, box[2] + 2, box[3] + 2];
+        if (staticable(op) && previous && previous.has(opKey(op)) && !changed.some((other) => overlaps(other, padded))) statics.push(index);
+        else changed.push(padded);
+      }
+      return statics;
+    }
     function drawStatic(frame, from) {
-      if (!tune.cache) { lastStaticKeys = null; return from; }
+      if (!tune.cache) { lastStaticKeys = null; return { frame, from }; }
       staticLayer.draws += 1;
-      const keys = [];
-      for (let index = from; index < frame.o.length && staticable(frame.o[index]); index += 1) keys.push(opKey(frame.o[index]));
-      let run = 0;
-      if (lastStaticKeys) while (run < keys.length && run < lastStaticKeys.length && keys[run] === lastStaticKeys[run]) run += 1;
-      lastStaticKeys = keys;
-      if (run < 2) return from;
-      const key = canvas.width + "x" + canvas.height + "|" + keys.slice(0, run).join("|");
+      const keysNow = new Set();
+      for (let index = from; index < frame.o.length; index += 1) {
+        const op = frame.o[index];
+        if (op[0] === "f" || op[0] === "s" || op[0] === "i") keysNow.add(opKey(op));
+      }
+      const statics = splitStatic(frame, from, lastStaticKeys);
+      lastStaticKeys = keysNow;
+      if (statics.length < 2) return { frame, from };
+      const key = canvas.width + "x" + canvas.height + "|" + statics.map((index) => opKey(frame.o[index])).join("|");
       if (staticLayer.key !== key) {
         if (!staticLayer.canvas) staticLayer.canvas = document.createElement("canvas");
         const layer = staticLayer.canvas;
@@ -1002,7 +1024,7 @@
         c.globalCompositeOperation = "source-over";
         c.clearRect(0, 0, layer.width, layer.height);
         c.imageSmoothingQuality = smoothing;
-        paint(c, { s: frame.s, o: frame.o.slice(from, from + run), fl: frame.fl, cl: frame.cl }, 0,
+        paint(c, { s: frame.s, o: statics.map((index) => frame.o[index]), fl: frame.fl, cl: frame.cl }, 0,
           { s: scale, width: layer.width, height: layer.height, layers: null, live: null });
         staticLayer.key = key;
         staticLayer.built += 1;
@@ -1013,8 +1035,10 @@
       ctx.globalAlpha = 1;
       ctx.globalCompositeOperation = "source-over";
       ctx.drawImage(staticLayer.canvas, 0, 0);
-      staticLayer.ops += run;
-      return from + run;
+      staticLayer.ops += statics.length;
+      const skip = new Set(statics);
+      const rest = Object.assign({}, frame, { o: frame.o.filter((op, index) => index >= from && !skip.has(index)) });
+      return { frame: rest, from: 0 };
     }
     function dropStaticLayer() {
       staticLayer.key = null;
