@@ -24,7 +24,11 @@
     const send = options.send;
     // The 16:9 box the stadium fills, in CSS pixels.
     const stageBox = options.stage || root;
-    const boxWidth = () => stageBox.clientWidth || window.innerWidth;
+    // Measured once per resize, not per frame: reading clientWidth in every
+    // frame's backdrop placement forced a layout each frame (4% of a slowed
+    // Chromecast page's thread, the bench's cpu=3 profile).
+    let measuredBox = 0;
+    const boxWidth = () => measuredBox || (measuredBox = stageBox.clientWidth || 0) || window.innerWidth;
     const ctx = canvas.getContext("2d");
     // The opaque photo a frame starts from (the stadium, or the replay's
     // outfield) sits behind the canvas as an image the TV's GPU composites:
@@ -107,6 +111,7 @@
     }
 
     function resize() {
+      measuredBox = 0;
       const width = core.canvasWidth(boxWidth(), window.devicePixelRatio, maxCanvasWidth);
       const height = Math.round(width * STAGE.height / STAGE.width);
       if (canvas.width !== width || canvas.height !== height) {

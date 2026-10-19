@@ -87,8 +87,13 @@
       ? { status: "RECONNECTING", title: "Reconnecting to<br>your phone", detail: "The innings carries on on your phone.", score }
       : { status: "STADIUM LOADING", title: "Your stadium<br>is on its way", detail: "Keep playing on your phone.", score };
   }
+  let holdingShown = "";
   function renderHolding(state, reconnecting) {
     const words = holdingWords(state, reconnecting, stadiumPhone);
+    // Game states come 10–30 a second: the page is written only when its words change.
+    const key = JSON.stringify(words);
+    if (key === holdingShown) return;
+    holdingShown = key;
     text("holding-status", words.status);
     element("holding-title").innerHTML = words.title;
     text("holding-detail", words.detail);
