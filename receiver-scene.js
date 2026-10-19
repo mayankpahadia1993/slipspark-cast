@@ -331,9 +331,39 @@
           // setup shows: made at the first frame, it took the first stadium
           // of a cast 0.7-1 s on a Chromecast Ultra.
           if (/^stadium-(ground|backdrop)-/.test(key) && opaque.has(key)) backdropLayer(key);
+          warmDecode(key);
         }, () => loading.delete(key))
         .then(() => { preloading -= 1; window.setTimeout(pumpPreload, 20); });
       return true;
+    }
+
+    // Warm-up v2 (after build 198): each preloaded picture is drawn once,
+    // while the stadium is off, into a 1×1 canvas, so its decode and drawing
+    // path run behind the home and setup screens and not in the first innings
+    // frame. Build 198 drew them into a canvas the stadium's size (1280×720
+    // on a Chromecast Ultra) and the TV then drew the stadium at 7–9 fps,
+    // drawMs 10–27 (iOS 199, Oct 18 2026). A 1×1 canvas is below the size a
+    // browser puts on the GPU, so it holds no full-size texture, and it is
+    // let go as the stadium comes on. Photos with their own GPU layer are
+    // skipped: the layer decodes them.
+    const WARM_MODE = "tiny";
+    const warmed = new Set();
+    let warmCanvas = null;
+    function warmDecode(key) {
+      if (WARM_MODE === "off" || on || warmed.has(key) || released) return;
+      if (backdropLayers.has(key)) return;
+      const image = images.get(key);
+      if (!image) return;
+      try {
+        if (!warmCanvas) { warmCanvas = document.createElement("canvas"); warmCanvas.width = 1; warmCanvas.height = 1; }
+        warmCanvas.getContext("2d").drawImage(bitmaps.get(key) || image, 0, 0, 1, 1);
+        warmed.add(key);
+      } catch (error) { /* decoded at the first frame instead */ }
+    }
+    function dropWarmCanvas() {
+      if (!warmCanvas) return;
+      try { warmCanvas.width = 0; warmCanvas.height = 0; } catch (error) { /* gone */ }
+      warmCanvas = null;
     }
 
     // The first frame after the stadium comes on drawn with every picture
@@ -1223,7 +1253,7 @@
           behind: Math.round(core.percentile(counters.late, 0.9)),
           drawMs: Number(core.percentile(counters.drawMs, 0.5).toFixed(1)),
           drawMax: Number(Math.max(0, ...counters.drawMs).toFixed(1)),
-          missing: counters.missing, images: images.size, bitmaps: bitmaps.size, queue: timeline.length,
+          missing: counters.missing, images: images.size, warmed: warmed.size, bitmaps: bitmaps.size, queue: timeline.length,
           // How glows are blurred (receiver 57): as shadows, or in small canvases.
           glow: tune.blur === "filter" ? "filter" : castsOffstageShadows() ? "shadow" : "scratch",
           synced: clock.synced ? 1 : 0, w: canvas.width, canvas: plan.why,
@@ -1273,6 +1303,7 @@
 
     function setOn(value) {
       if (!!value && !on) {
+        dropWarmCanvas();
         wholeSent = false;
         root.dataset.warming = "1";
         coverUntil = performance.now() + COVER_MS;
@@ -1542,10 +1573,11 @@
       images.clear();
       backdropLayers.forEach((entry) => { try { entry.element.removeAttribute("src"); } catch (error) { /* gone */ } });
       empty(canvas);
+      dropWarmCanvas();
     }
 
     return { NAMESPACE, handle, report, setOn, renderHUD, drawFrame, playRecording, playRecordingAt, snapshot, timeline, clock, live, images, bitmaps, release,
-      pictures, counters, tune, setTune };
+      pictures, counters, tune, setTune, warmed };
   }
 
   window.RallycadeReceiverScene = { NAMESPACE, createScene };
