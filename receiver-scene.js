@@ -331,9 +331,38 @@
           // setup shows: made at the first frame, it took the first stadium
           // of a cast 0.7-1 s on a Chromecast Ultra.
           if (/^stadium-(ground|backdrop)-/.test(key) && opaque.has(key)) backdropLayer(key);
+          warmDraw(key);
         }, () => loading.delete(key))
         .then(() => { preloading -= 1; window.setTimeout(pumpPreload, 20); });
       return true;
+    }
+
+    // Build 198: each preloaded picture is drawn once, while the stadium is
+    // off (behind the home and setup screens), into a canvas the stadium's
+    // size, so the first innings frame finds every picture decoded and the
+    // drawing path warm. Android 19501 on a Chromecast Ultra opened its
+    // innings at fps 1, then 14, 269 ms behind, and reached ~28 fps only
+    // after 4-6 s. The canvas is let go as the stadium comes on.
+    const warmed = new Set();
+    let warmCanvas = null;
+    function warmDraw(key) {
+      if (on || warmed.has(key) || released) return;
+      const image = images.get(key);
+      const size = sizes.get(key);
+      if (!image || !size) return;
+      try {
+        if (!warmCanvas) { warmCanvas = document.createElement("canvas"); warmCanvas.width = canvas.width; warmCanvas.height = canvas.height; }
+        const c = warmCanvas.getContext("2d");
+        c.setTransform(1, 0, 0, 1, 0, 0);
+        c.clearRect(0, 0, warmCanvas.width, warmCanvas.height);
+        c.drawImage(bitmaps.get(key) || image, 0, 0, Math.min(warmCanvas.width, size.width * scale), Math.min(warmCanvas.height, size.height * scale));
+        warmed.add(key);
+      } catch (error) { /* drawn at the first frame instead */ }
+    }
+    function dropWarmCanvas() {
+      if (!warmCanvas) return;
+      try { warmCanvas.width = 0; warmCanvas.height = 0; } catch (error) { /* gone */ }
+      warmCanvas = null;
     }
 
     // The first frame after the stadium comes on drawn with every picture
@@ -1223,7 +1252,7 @@
           behind: Math.round(core.percentile(counters.late, 0.9)),
           drawMs: Number(core.percentile(counters.drawMs, 0.5).toFixed(1)),
           drawMax: Number(Math.max(0, ...counters.drawMs).toFixed(1)),
-          missing: counters.missing, images: images.size, bitmaps: bitmaps.size, queue: timeline.length,
+          missing: counters.missing, images: images.size, warmed: warmed.size, bitmaps: bitmaps.size, queue: timeline.length,
           // How glows are blurred (receiver 57): as shadows, or in small canvases.
           glow: tune.blur === "filter" ? "filter" : castsOffstageShadows() ? "shadow" : "scratch",
           synced: clock.synced ? 1 : 0, w: canvas.width, canvas: plan.why,
@@ -1273,6 +1302,7 @@
 
     function setOn(value) {
       if (!!value && !on) {
+        dropWarmCanvas();
         wholeSent = false;
         root.dataset.warming = "1";
         coverUntil = performance.now() + COVER_MS;
@@ -1308,7 +1338,7 @@
       // `predict`: it reports how far ahead of its pose the live batter was
       // drawn (`ph`) and the age that leaves (`ahead`, `eff` in stats), so the
       // phone may draw it ahead (receiver 55).
-      send({ t: "ready", scene: 1, pic: 1, card: 1, live: 1, setup: 1, whole: 1, predict: 1, screen: screenPixels(), version: VERSION, ua: navigator.userAgent, have });
+      send({ t: "ready", scene: 1, pic: 1, card: 1, live: 1, setup: 1, whole: 1, predict: 1, warm: 1, screen: screenPixels(), version: VERSION, ua: navigator.userAgent, have });
       preloadBundled(helloKit);
     }
 
@@ -1542,10 +1572,11 @@
       images.clear();
       backdropLayers.forEach((entry) => { try { entry.element.removeAttribute("src"); } catch (error) { /* gone */ } });
       empty(canvas);
+      dropWarmCanvas();
     }
 
     return { NAMESPACE, handle, report, setOn, renderHUD, drawFrame, playRecording, playRecordingAt, snapshot, timeline, clock, live, images, bitmaps, release,
-      pictures, counters, tune, setTune };
+      pictures, counters, tune, setTune, warmed };
   }
 
   window.RallycadeReceiverScene = { NAMESPACE, createScene };
