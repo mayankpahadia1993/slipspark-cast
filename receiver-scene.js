@@ -142,7 +142,7 @@
 
     function addImage(key, source) {
       images.set(key, source);
-      if (staticLayer) staticLayer.key = null;
+      if (staticLayer) { staticLayer.key = null; staticLayer.keys = null; }
       sizes.set(key, core.pictureSize(key)
         || { width: source.naturalWidth || source.width, height: source.naturalHeight || source.height });
       needsRedraw = true;
@@ -963,10 +963,26 @@
     // then blitted: one drawImage instead of each command, the picture the
     // same. The layer is rebuilt only when its commands change (a camera
     // move, a fielder moving, a picture arriving).
-    const staticLayer = { canvas: null, key: null, built: 0, hits: 0, ops: 0, draws: 0 };
+    //
+    // Oct 19 2026 (iOS 201 on the owner's Ultra: ~5–25 rebuilds every 2 s,
+    // drawMs 8–11 for the stadium's first ~15 s): the layer was keyed by
+    // exactly which commands were unchanged since the draw before, and that
+    // set flips every draw. A new frame leaves out what moved; the live
+    // batter's redraw of that same frame has everything unchanged; so the
+    // layer was rebuilt twice a frame, each rebuild dearer than no layer.
+    // Now a layer is kept while it still fits the frame (`layerFits`: each of
+    // its commands still there, in order, under nothing that changed), and
+    // rebuilt only for a set of commands that held for two draws, or when it
+    // no longer fits. And a blended frame (the timeline's scratch, its
+    // commands' arrays rewritten each draw) is never keyed from the cache:
+    // a stale key made a moving fielder look unchanged and blitted it where
+    // it was a draw before.
+    const staticLayer = { canvas: null, key: null, keys: null, built: 0, hits: 0, ops: 0, draws: 0 };
     let lastStaticKeys = null;
+    let lastCandidateKey = null;
     const opKeys = new WeakMap();
-    function opKey(op) {
+    function opKey(op, fresh) {
+      if (fresh) return JSON.stringify(op);
       let key = opKeys.get(op);
       if (key === undefined) { key = JSON.stringify(op); opKeys.set(op, key); }
       return key;
@@ -986,63 +1002,103 @@
     // over the layer in its own order. Anything without bounds (the live
     // batter's slot, a layer) ends the search, so nothing after it moves.
     const overlaps = (a, b) => a[0] < b[2] && b[0] < a[2] && a[1] < b[3] && b[1] < a[3];
-    function splitStatic(frame, from, previous) {
+    function splitStatic(frame, from, previous, keys) {
       const statics = [];
       const changed = [];
-      let open = true;
       for (let index = from; index < frame.o.length; index += 1) {
         const op = frame.o[index];
-        if (!open) break;
-        if (op[0] === "L" || op[0] === "B" || op[0] === "l") { open = false; break; }
+        if (op[0] === "L" || op[0] === "B" || op[0] === "l") break;
         const box = core.opBounds(op, pictureSize);
-        if (!box) { open = false; break; }
+        if (!box) break;
         const padded = [box[0] - 2, box[1] - 2, box[2] + 2, box[3] + 2];
-        if (staticable(op) && previous && previous.has(opKey(op)) && !changed.some((other) => overlaps(other, padded))) statics.push(index);
+        if (staticable(op) && previous && previous.has(keys[index]) && !changed.some((other) => overlaps(other, padded))) statics.push(index);
         else changed.push(padded);
       }
       return statics;
     }
+    // Where the layer's commands are in this frame, or null when it doesn't
+    // fit: each must be there in the layer's order, before anything without
+    // bounds, with no other command before it overlapping it (that one
+    // would be drawn above it now).
+    function layerFits(frame, from, keys) {
+      const want = staticLayer.keys;
+      if (!want || !want.length) return null;
+      const at = [];
+      const others = [];
+      let next = 0;
+      for (let index = from; index < frame.o.length && next < want.length; index += 1) {
+        const op = frame.o[index];
+        if (op[0] === "L" || op[0] === "B" || op[0] === "l") return null;
+        const box = core.opBounds(op, pictureSize);
+        if (!box) return null;
+        const padded = [box[0] - 2, box[1] - 2, box[2] + 2, box[3] + 2];
+        if (keys[index] === want[next]) {
+          if (others.some((other) => overlaps(other, padded))) return null;
+          at.push(index);
+          next += 1;
+        } else {
+          others.push(padded);
+        }
+      }
+      return next === want.length ? at : null;
+    }
+    function buildLayer(frame, statics, keys) {
+      if (!staticLayer.canvas) staticLayer.canvas = document.createElement("canvas");
+      const layer = staticLayer.canvas;
+      if (layer.width !== canvas.width || layer.height !== canvas.height) { layer.width = canvas.width; layer.height = canvas.height; }
+      const c = layer.getContext("2d");
+      c.setTransform(1, 0, 0, 1, 0, 0);
+      c.globalAlpha = 1;
+      c.globalCompositeOperation = "source-over";
+      c.clearRect(0, 0, layer.width, layer.height);
+      c.imageSmoothingQuality = smoothing;
+      paint(c, { s: frame.s, o: statics.map((index) => frame.o[index]), fl: frame.fl, cl: frame.cl }, 0,
+        { s: scale, width: layer.width, height: layer.height, layers: null, live: null });
+      staticLayer.keys = statics.map((index) => keys[index]);
+      staticLayer.key = canvas.width + "x" + canvas.height + "|" + staticLayer.keys.join("|");
+      staticLayer.built += 1;
+    }
     function drawStatic(frame, from) {
-      if (!tune.cache) { lastStaticKeys = null; return { frame, from }; }
+      if (!tune.cache) { lastStaticKeys = null; lastCandidateKey = null; return { frame, from }; }
       staticLayer.draws += 1;
+      const fresh = !!frame.scratch;
+      const keys = new Array(frame.o.length);
       const keysNow = new Set();
       for (let index = from; index < frame.o.length; index += 1) {
         const op = frame.o[index];
-        if (op[0] === "f" || op[0] === "s" || op[0] === "i") keysNow.add(opKey(op));
+        if (op[0] === "f" || op[0] === "s" || op[0] === "i") { keys[index] = opKey(op, fresh); keysNow.add(keys[index]); }
       }
-      const statics = splitStatic(frame, from, lastStaticKeys);
+      const statics = splitStatic(frame, from, lastStaticKeys, keys);
       lastStaticKeys = keysNow;
-      if (statics.length < 2) return { frame, from };
-      const key = canvas.width + "x" + canvas.height + "|" + statics.map((index) => opKey(frame.o[index])).join("|");
-      if (staticLayer.key !== key) {
-        if (!staticLayer.canvas) staticLayer.canvas = document.createElement("canvas");
-        const layer = staticLayer.canvas;
-        if (layer.width !== canvas.width || layer.height !== canvas.height) { layer.width = canvas.width; layer.height = canvas.height; }
-        const c = layer.getContext("2d");
-        c.setTransform(1, 0, 0, 1, 0, 0);
-        c.globalAlpha = 1;
-        c.globalCompositeOperation = "source-over";
-        c.clearRect(0, 0, layer.width, layer.height);
-        c.imageSmoothingQuality = smoothing;
-        paint(c, { s: frame.s, o: statics.map((index) => frame.o[index]), fl: frame.fl, cl: frame.cl }, 0,
-          { s: scale, width: layer.width, height: layer.height, layers: null, live: null });
-        staticLayer.key = key;
-        staticLayer.built += 1;
-      } else {
+      const candidateKey = statics.length >= 2 ? statics.map((index) => keys[index]).join("|") : null;
+      const steady = candidateKey !== null && candidateKey === lastCandidateKey;
+      lastCandidateKey = candidateKey;
+      const sized = staticLayer.canvas && staticLayer.canvas.width === canvas.width && staticLayer.canvas.height === canvas.height;
+      let used = sized ? layerFits(frame, from, keys) : null;
+      // A bigger set of unchanged commands that held for two draws: worth a
+      // rebuild. A layer that no longer fits: the set now, if there is one.
+      if (used && steady && statics.length >= used.length + 3) used = null;
+      if (used) {
         staticLayer.hits += 1;
+      } else {
+        if (statics.length < 2) return { frame, from };
+        buildLayer(frame, statics, keys);
+        used = statics;
       }
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.globalAlpha = 1;
       ctx.globalCompositeOperation = "source-over";
       ctx.drawImage(staticLayer.canvas, 0, 0);
-      staticLayer.ops += statics.length;
-      const skip = new Set(statics);
+      staticLayer.ops += used.length;
+      const skip = new Set(used);
       const rest = Object.assign({}, frame, { o: frame.o.filter((op, index) => index >= from && !skip.has(index)) });
       return { frame: rest, from: 0 };
     }
     function dropStaticLayer() {
       staticLayer.key = null;
+      staticLayer.keys = null;
       lastStaticKeys = null;
+      lastCandidateKey = null;
       if (staticLayer.canvas) { try { staticLayer.canvas.width = 0; staticLayer.canvas.height = 0; } catch (error) { /* gone */ } staticLayer.canvas = null; }
     }
 

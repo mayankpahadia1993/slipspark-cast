@@ -244,7 +244,7 @@
         if (b && b.s - a.s <= MAX_BLEND_GAP && shapeKey(a) === shapeKey(b)) {
           const u = Math.min(1, Math.max(0, (now - a.s) / (b.s - a.s)));
           if (u <= 0) return { frame: a, stamp: a.s, blended: false };
-          if (scratchShape !== shapeKey(a)) { scratch = cloneFrame(a); scratchShape = shapeKey(a); }
+          if (scratchShape !== shapeKey(a)) { scratch = cloneFrame(a); scratch.scratch = true; scratchShape = shapeKey(a); }
           return { frame: blendFramesInto(scratch, a, b, u), stamp: a.s, blended: true };
         }
         return { frame: a, stamp: a.s, blended: false };
