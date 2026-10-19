@@ -355,7 +355,20 @@
   // Google TV 4K and HD, TVs with Cast built in) start at 1920 and drop to
   // 1280 for good if they can't keep `minFps`; the Linux Cast dongles
   // (Chromecast 1st–3rd generation, Ultra) stay at 1280 and never try.
-  const CANVAS = { wide: 1920, narrow: 1280, minFps: 25 };
+  const CANVAS = { wide: 1920, narrow: 1280, weak: 854, minFps: 25 };
+
+  // The 32-bit Cast dongles (Chromecast 2nd and 3rd generation: "Linux
+  // armv7l", CrKey) draw a quarter as fast as an Ultra ("Linux aarch64").
+  // iOS 184–199 at a house party (Oct 18 2026) drew 7–10 fps on one, the
+  // page's loop every ~105 ms with frames arriving on time; the same stream
+  // drew 29 on the Ultra, and the Ultra with its page slowed threefold (the
+  // bench's cpu=3) drew 8. The weak plan: an 854 canvas, no blended redraws,
+  // glows unblurred (`WEAK_TUNED` in receiver-scene.js), and `weak: 1` in
+  // `ready` so the phone sends at the TV's pace.
+  function isWeakDongle(ua) {
+    const text = String(ua || "");
+    return /CrKey/.test(text) && /armv7l/.test(text) && !/Android|GoogleTV|Google TV|Fuchsia/i.test(text);
+  }
 
   // `device`: `ua` (navigator.userAgent), `pinned` (a width the phone or the
   // bench asked for in `hello`), `wide` (the phone's hello allows 1920: build
@@ -366,7 +379,9 @@
   function canvasPlan(device) {
     const ua = String((device && device.ua) || "");
     const pinned = Number(device && device.pinned);
-    if (pinned >= 320) return { width: Math.min(CANVAS.wide, Math.round(pinned)), adaptive: false, why: "asked" };
+    const weak = !!(device && device.weak) || isWeakDongle(ua);
+    if (pinned >= 320) return Object.assign({ width: Math.min(CANVAS.wide, Math.round(pinned)), adaptive: false, why: "asked" }, weak ? { weak: true } : {});
+    if (weak) return { width: CANVAS.weak, adaptive: false, why: "weak", weak: true };
     if (!(device && device.wide)) return { width: CANVAS.narrow, adaptive: false, why: "phone" };
     const remembered = device && device.remembered;
     if (remembered && remembered.ua === ua && Number(remembered.width) <= CANVAS.narrow) {
@@ -560,7 +575,7 @@
   }
 
   return {
-    STAGE, MAX_BLEND_GAP, CANVAS, normalizeFrame, shapeKey, blendFrames, blendFramesInto, cloneFrame, createTimeline, createClock,
+    isWeakDongle, STAGE, MAX_BLEND_GAP, CANVAS, normalizeFrame, shapeKey, blendFrames, blendFramesInto, cloneFrame, createTimeline, createClock,
     percentile, tracePath, cssColor, pictureSize, canvasPlan, canvasWidth, createRateWatch, createLiveLayer, hasLiveSlot, poseAge, poseAhead,
     filterParts, opBounds, layerEnd, clipsWholeStage
   };

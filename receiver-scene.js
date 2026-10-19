@@ -99,7 +99,7 @@
     // frame on screen is drawn again in the same animation frame, so the TV
     // never shows the cleared canvas.
     function narrowCanvas() {
-      plan = { width: core.CANVAS.narrow, adaptive: false, why: "slow" };
+      plan = { width: core.CANVAS.narrow, adaptive: false, why: "slow", weak: false };
       maxCanvasWidth = plan.width;
       rememberCanvas(plan.width);
       resize();
@@ -337,16 +337,17 @@
       return true;
     }
 
-    // Warm-up v2 (after build 198): each preloaded picture is drawn once,
-    // while the stadium is off, into a 1×1 canvas, so its decode and drawing
-    // path run behind the home and setup screens and not in the first innings
-    // frame. Build 198 drew them into a canvas the stadium's size (1280×720
-    // on a Chromecast Ultra) and the TV then drew the stadium at 7–9 fps,
-    // drawMs 10–27 (iOS 199, Oct 18 2026). A 1×1 canvas is below the size a
-    // browser puts on the GPU, so it holds no full-size texture, and it is
-    // let go as the stadium comes on. Photos with their own GPU layer are
-    // skipped: the layer decodes them.
-    const WARM_MODE = "tiny";
+    // Warm-up v2: each preloaded picture is drawn once, while the stadium is
+    // off (home and setup screens), into a 256×256 canvas: big enough to be
+    // on the GPU, so the picture is decoded and its texture uploaded before
+    // the innings. A Chromecast Ultra with its page slowed threefold (the
+    // bench's cpu=3, like a 32-bit Chromecast) opened the stadium at 2 fps
+    // with a 1×1 target (decode only) and at 8–10 with this one. Build 198's
+    // canvas the stadium's size cost nothing measurable either (Oct 18 2026:
+    // its 7–9 fps were a 32-bit Chromecast at a party, not the warm-up). The
+    // canvas is let go as the stadium comes on. Photos with their own GPU
+    // layer are skipped: the layer uploads them. "tiny" (1×1) and "off" for A/B.
+    const WARM_MODE = "gpu";
     const warmed = new Set();
     let warmCanvas = null;
     function warmDecode(key) {
@@ -355,8 +356,10 @@
       const image = images.get(key);
       if (!image) return;
       try {
-        if (!warmCanvas) { warmCanvas = document.createElement("canvas"); warmCanvas.width = 1; warmCanvas.height = 1; }
-        warmCanvas.getContext("2d").drawImage(bitmaps.get(key) || image, 0, 0, 1, 1);
+        // "gpu": a 256×256 canvas, big enough to be on the GPU, so each picture's texture is uploaded now.
+        const side = WARM_MODE === "gpu" ? 256 : 1;
+        if (!warmCanvas) { warmCanvas = document.createElement("canvas"); warmCanvas.width = side; warmCanvas.height = side; }
+        warmCanvas.getContext("2d").drawImage(bitmaps.get(key) || image, 0, 0, side, side);
         warmed.add(key);
       } catch (error) { /* decoded at the first frame instead */ }
     }
@@ -628,12 +631,18 @@
     // "thirds", "full" or "none".
     // Bitmaps are off by default (receiver 59b): with them the Living Room
     // TV refused to start RallyCade again for minutes after a stop.
-    const TUNED = Object.freeze({ blur: "shadow", layers: "bounded", cover: "clip", bitmaps: 0, shade: "thirds" });
+    const TUNED = Object.freeze({ blur: "shadow", layers: "bounded", cover: "clip", bitmaps: 0, shade: "thirds", blend: 1 });
+    // A weak dongle (core.isWeakDongle): no redraw only to blend between
+    // frames (each draw costs it ~30 ms of its page's thread) and glows
+    // drawn plain, never blurred.
+    const WEAK_TUNED = Object.freeze(Object.assign({}, TUNED, { blur: "off", blend: 0 }));
     const tune = Object.assign({}, TUNED);
-    // Each hello starts from the defaults; the bench's `x` changes them.
+    // Each hello starts from the defaults (the weak ones on a weak dongle);
+    // the bench's `x` changes them.
     function setTune(x) {
-      Object.assign(tune, TUNED);
-      if (x && typeof x === "object") Object.keys(TUNED).forEach((name) => { if (x[name] !== undefined) tune[name] = x[name]; });
+      const base = plan && plan.weak ? WEAK_TUNED : TUNED;
+      Object.assign(tune, base);
+      if (x && typeof x === "object") Object.keys(base).forEach((name) => { if (x[name] !== undefined) tune[name] = x[name]; });
       document.body.dataset.sceneShade = tune.shade;
     }
     setTune(null);
@@ -688,7 +697,9 @@
     }
 
     function filtersOf(frame, ref) {
-      return ref >= 0 && frame.fl[ref] ? core.filterParts(frame.fl[ref]) : { blur: 0, multiply: null };
+      if (!(ref >= 0 && frame.fl[ref])) return { blur: 0, multiply: null };
+      const parts = core.filterParts(frame.fl[ref]);
+      return tune.blur === "off" ? { blur: 0, multiply: parts.multiply } : parts;
     }
 
     function clipTo(c, frame, clipRef, scale) {
@@ -1205,7 +1216,7 @@
       const result = timeline.at(phoneNow);
       // A frame already on screen is drawn again only while blending.
       let drew = false;
-      if (result && (result.blended || result.stamp !== lastStamp || needsRedraw)) {
+      if (result && ((result.blended && tune.blend) || result.stamp !== lastStamp || needsRedraw)) {
         const missingBefore = counters.missing;
         drawFrame(result.frame);
         noteWhole(missingBefore);
@@ -1255,8 +1266,8 @@
           drawMax: Number(Math.max(0, ...counters.drawMs).toFixed(1)),
           missing: counters.missing, images: images.size, warmed: warmed.size, bitmaps: bitmaps.size, queue: timeline.length,
           // How glows are blurred (receiver 57): as shadows, or in small canvases.
-          glow: tune.blur === "filter" ? "filter" : castsOffstageShadows() ? "shadow" : "scratch",
-          synced: clock.synced ? 1 : 0, w: canvas.width, canvas: plan.why,
+          glow: tune.blur === "filter" ? "filter" : tune.blur === "off" ? "off" : castsOffstageShadows() ? "shadow" : "scratch",
+          synced: clock.synced ? 1 : 0, w: canvas.width, canvas: plan.why, weak: plan.weak ? 1 : 0,
           gap: Number(core.percentile(counters.gaps, 0.5).toFixed(1)),
           gap90: Number(core.percentile(counters.gaps, 0.9).toFixed(1)),
           // Live batters received; and how old the pose of the batter on
@@ -1339,7 +1350,10 @@
       // `predict`: it reports how far ahead of its pose the live batter was
       // drawn (`ph`) and the age that leaves (`ahead`, `eff` in stats), so the
       // phone may draw it ahead (receiver 55).
-      send({ t: "ready", scene: 1, pic: 1, card: 1, live: 1, setup: 1, whole: 1, predict: 1, screen: screenPixels(), version: VERSION, ua: navigator.userAgent, have });
+      const ready = { t: "ready", scene: 1, pic: 1, card: 1, live: 1, setup: 1, whole: 1, predict: 1, screen: screenPixels(), version: VERSION, ua: navigator.userAgent, have };
+      // A weak dongle: the phone sends frames and live batters at its pace.
+      if (plan.weak) ready.weak = 1;
+      send(ready);
       preloadBundled(helloKit);
     }
 
@@ -1390,8 +1404,9 @@
           debug = message.debug === 1;
           // A width the phone or the bench asks for is kept as asked; else
           // the device's own plan, and a wide canvas is measured afresh.
+          // `x.weak` (the bench) draws as a weak dongle does on any TV.
           plan = core.canvasPlan({ ua: navigator.userAgent, pinned: message.canvas || options.canvasWidth,
-            wide: message.wide === 1, remembered: rememberedCanvas() });
+            wide: message.wide === 1, remembered: rememberedCanvas(), weak: !!(message.x && message.x.weak === 1) });
           maxCanvasWidth = plan.width;
           rateWatch.reset();
           resize();
