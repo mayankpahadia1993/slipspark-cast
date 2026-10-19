@@ -9,10 +9,13 @@
   const screens = {
     ready: document.getElementById("ready-screen"),
     positioning: document.getElementById("positioning-screen"),
-    fight: document.getElementById("fight-screen"),
-    cricket: document.getElementById("cricket-screen"),
-    versusSetup: document.getElementById("versus-setup-screen"),
-    versus: document.getElementById("versus-screen"),
+    // Play has no HTML board (Oct 18 2026): cricket is the stadium, and
+    // until its first frame (or on a phone that can't draw it) the holding
+    // screen. Boxing (flagged off) gets the holding screen too.
+    fight: document.getElementById("holding-screen"),
+    cricket: document.getElementById("holding-screen"),
+    versusSetup: document.getElementById("holding-screen"),
+    versus: document.getElementById("holding-screen"),
     result: document.getElementById("result-screen"),
     versusResult: document.getElementById("versus-result-screen"),
     cricketDuelHandoff: document.getElementById("duel-handoff-screen"),
@@ -63,80 +66,36 @@
     if (positioning.canHold) renderHold(hold, positioning.progress, positioning.holdLabel || "Raise both hands to play");
   }
 
-  function renderFight(fight) {
-    text("score", fight.score.toLocaleString("en-US"));
-    text("combo", fight.combo > 1.01 ? `×${fight.combo.toFixed(2)}` : "");
-    text("timer", core.formatTime(fight.timeRemaining));
-    text("round", fight.currentRound > 1 || fight.timeRemaining > 60 ? `ROUND ${fight.currentRound}` : "");
-    text("opponent-name", fight.opponentName.toUpperCase());
-    element("player-health").style.width = `${fight.playerHealth}%`;
-    element("opponent-health").style.width = `${fight.opponentHealth}%`;
-    element("player-figure").className = `fighter player-figure pose-${fight.playerAction}`;
-    element("opponent-figure").className = `fighter opponent-figure style-${fight.opponentStyle}${fight.opponentHit ? " is-hit" : ""}`;
-
-    const glove = element("incoming-glove");
-    glove.className = `incoming-glove attack-${fight.currentAttack}${fight.attackCommitted ? " is-impact" : ""}`;
-    glove.style.setProperty("--telegraph-duration", `${fight.telegraphDuration}s`);
-    glove.hidden = !(fight.phase === "telegraph" || fight.phase === "defend");
-
-    const target = element("punch-target");
-    target.hidden = !(fight.phase === "counter" || fight.phase === "opening");
-    target.classList.toggle("target-left", fight.phase === "opening" && /LEFT|JAB/.test(fight.phaseValue || ""));
-    target.classList.toggle("target-right", fight.phase === "opening" && /RIGHT|CROSS/.test(fight.phaseValue || ""));
-
-    const callout = element("action-callout");
-    setVisible(callout, true);
-    callout.className = `action-callout phase-${fight.phase}`;
-    let title = fight.phaseValue || "";
-    let detail = fight.phaseDetail || "";
-    if (fight.phase === "telegraph" || fight.phase === "defend") {
-      title = (fight.phaseDetail || "MOVE").toUpperCase();
-      detail = fight.phase === "defend" ? "NOW!" : "GET READY";
+  // The holding screen: play is on but the stadium isn't up (its first
+  // frame not yet drawn, the phone reconnecting, or a phone too old to send
+  // one). The score as it stands, never a call to watch a ball it can't show.
+  const PLAY_SCREENS = new Set(["cricket", "fight", "versus", "versusSetup"]);
+  function holdingWords(state, reconnecting, drawsStadium) {
+    if (state.screen !== "cricket") {
+      return { status: "ON YOUR PHONE", title: "Boxing is on<br>your phone", detail: "The TV shows the stadium for cricket.", score: "" };
     }
-    if (fight.phase === "feedback") title = title.toUpperCase();
-    const comboProgress = fight.comboStep && fight.comboTotal ? ` · ${fight.comboStep}/${fight.comboTotal}` : "";
-    text("action-title", title);
-    text("action-detail", `${detail}${comboProgress}`);
-  }
-
-  function renderCricket(cricket) {
-    text("cricket-runs", cricket.runs.toLocaleString("en-US"));
-    text("cricket-wickets", `${cricket.wicketsLost}/${cricket.wicketLimit}`);
-    text("cricket-ball", `BALL ${Math.min(cricket.ballsFaced + 1, cricket.totalBalls)}/${cricket.totalBalls}`);
-    text("cricket-chase", cricket.runsNeeded == null ? "" : `NEED ${cricket.runsNeeded} OFF ${cricket.ballsRemaining}`);
-    text("cricket-title", (cricket.phaseValue || "").toUpperCase());
-    text("cricket-detail", (cricket.phaseDetail || "").toUpperCase());
-  }
-
-  function renderVersusSetup(setup) {
-    text("versus-setup-title", setup.instruction.toUpperCase());
-    element("red-corner-guide").classList.toggle("is-ready", setup.isLeftReady);
-    element("blue-corner-guide").classList.toggle("is-ready", setup.isRightReady);
-    element("red-corner-guide").querySelector("span").textContent = setup.isLeftReady ? "READY" : "STEP IN";
-    element("blue-corner-guide").querySelector("span").textContent = setup.isRightReady ? "READY" : "STEP IN";
-    text("versus-setup-status", setup.isReady ? "✓ STARTING FIGHT…" : "ONE FIGHTER IN EACH FRAME");
-  }
-
-  function renderVersus(versus) {
-    text("versus-left-score", versus.left.score.toLocaleString("en-US"));
-    text("versus-right-score", versus.right.score.toLocaleString("en-US"));
-    text("versus-timer", core.formatTime(versus.timeRemaining));
-    element("versus-left-health").style.width = `${versus.left.health}%`;
-    element("versus-right-health").style.width = `${versus.right.health}%`;
-    element("versus-left-figure").className = `versus-figure red pose-${versus.left.action}`;
-    element("versus-right-figure").className = `versus-figure blue pose-${versus.right.action}`;
-    let title = versus.phaseValue || "";
-    let detail = versus.phaseDetail || "";
-    if (versus.phase === "telegraph" || versus.phase === "defend") {
-      title = (versus.phaseDetail || "MOVE").toUpperCase();
-      detail = versus.phase === "defend" ? "NOW — BOTH PLAYERS" : "GET READY";
+    const cricket = state.cricket || {};
+    const balls = Number(cricket.totalBalls) || 0;
+    const ball = balls ? "BALL " + Math.min((Number(cricket.ballsFaced) || 0) + 1, balls) + " OF " + balls : "";
+    const score = [cricket.runs != null ? cricket.runs + "/" + (cricket.wicketsLost || 0) : "", ball].filter(Boolean).join(" · ");
+    // A phone that never said hello on the stadium's channel (older than
+    // build 121, 2026's App Store builds all draw it): play stays on it.
+    if (!drawsStadium && !reconnecting) {
+      return { status: "ON YOUR PHONE", title: "Your innings is<br>on your phone", detail: "Update RallyCade to see the stadium on your TV.", score };
     }
-    const comboProgress = versus.comboStep && versus.comboTotal ? ` · ${versus.comboStep}/${versus.comboTotal}` : "";
-    text("versus-title", title.toUpperCase());
-    text("versus-detail", `${detail}${comboProgress}`.toUpperCase());
-    text("versus-left-feedback", versus.left.feedback || "");
-    text("versus-right-feedback", versus.right.feedback || "");
+    return reconnecting
+      ? { status: "RECONNECTING", title: "Reconnecting to<br>your phone", detail: "The innings carries on on your phone.", score }
+      : { status: "STADIUM LOADING", title: "Your stadium<br>is on its way", detail: "Keep playing on your phone.", score };
   }
+  function renderHolding(state, reconnecting) {
+    const words = holdingWords(state, reconnecting, stadiumPhone);
+    text("holding-status", words.status);
+    element("holding-title").innerHTML = words.title;
+    text("holding-detail", words.detail);
+    text("holding-score", words.score);
+    element("holding-score").hidden = !words.score;
+  }
+  window.RallycadeHoldingWords = holdingWords;
 
   function renderResult(result) {
     text("result-mode", result.mode);
@@ -305,6 +264,20 @@
   });
   // A phone has said hello on the scene channel this cast.
   let stadiumPhone = false;
+  // The stadium came on during this stretch of play, and the scene's phone left.
+  let stadiumThisPlay = false;
+  let sceneLost = false;
+  let lastState = null;
+  // During play with the stadium off after it has been up: its last frame
+  // stays with a chip (receiver-scene.js holdLast), never an HTML board.
+  function updateHold() {
+    const scene = window.__rallycadeScene;
+    if (!lastState) return;
+    const play = PLAY_SCREENS.has(lastState.screen);
+    const held = !!scene && play && stadiumThisPlay && scene.holdLast(sceneLost ? "Reconnecting…" : "Loading the stadium…");
+    if (!held && scene && scene.holding) scene.holdLast(null);
+    if (play) renderHolding(lastState, sceneLost);
+  }
 
   function render(rawState) {
     const state = core.normalizeState(rawState);
@@ -312,12 +285,13 @@
     app.dataset.screen = state.screen;
     app.dataset.sequence = String(state.sequence);
     app.dataset.phase = state.fight?.phase || state.cricket?.phase || state.versus?.phase || state.screen;
-    Object.entries(screens).forEach(([name, screen]) => setVisible(screen, name === state.screen));
+    const shown = screens[state.screen];
+    new Set(Object.values(screens)).forEach((screen) => setVisible(screen, screen === shown));
     if (state.positioning) renderPositioning(state.positioning);
-    if (state.fight) renderFight(state.fight);
-    if (state.cricket) renderCricket(state.cricket);
-    if (state.versusSetup) renderVersusSetup(state.versusSetup);
-    if (state.versus) renderVersus(state.versus);
+    lastState = state;
+    if (!PLAY_SCREENS.has(state.screen)) stadiumThisPlay = false;
+    if (PLAY_SCREENS.has(state.screen)) renderHolding(state, sceneLost);
+    updateHold();
     if (state.result) renderResult(state.result);
     if (state.versusResult) renderVersusResult(state.versusResult);
     if (state.cricketDuelHandoff) renderDuelHandoff(state.cricketDuelHandoff);
@@ -442,6 +416,11 @@
           window.clearTimeout(sceneGone);
         }
         try { scene.handle(event.data); } catch (error) { scene.report("handle", error); }
+        if (event.data && event.data.t === "scene") {
+          if (event.data.on === 1) { sceneLost = false; if (lastState && PLAY_SCREENS.has(lastState.screen)) stadiumThisPlay = true; }
+          updateHold();
+        }
+        if (event.data && event.data.t === "hello") { sceneLost = false; updateHold(); }
       });
       window.addEventListener("error", (event) => scene.report("script", event.message + " @" + event.lineno));
       cardFailure = (where, error) => scene.report(where, error);
@@ -453,7 +432,7 @@
         if (event.senderId !== sceneSender) return;
         sceneSender = null;
         window.clearTimeout(sceneGone);
-        sceneGone = window.setTimeout(() => { if (!sceneSender) { scene.setOn(false); stadiumPhone = false; } }, SCENE_GRACE_MS);
+        sceneGone = window.setTimeout(() => { if (!sceneSender) { scene.setOn(false); stadiumPhone = false; sceneLost = true; updateHold(); } }, SCENE_GRACE_MS);
       });
     }
     // Receiver 59: the stadium's bitmaps and canvases are let go as the

@@ -46,72 +46,18 @@
       </div>
     </section>
 
-    <section id="fight-screen" class="screen fight-screen" hidden>
-      <header class="hud">
-        <div class="score-card">
-          <strong id="score">0</strong>
-          <span id="combo"></span>
-        </div>
-        <div class="health-card">
-          <div class="health-row"><span>YOU</span><div class="health-track"><i id="player-health"></i></div></div>
-          <div class="health-row opponent-health"><span id="opponent-name">AGGRESSOR</span><div class="health-track"><i id="opponent-health"></i></div></div>
-        </div>
-        <div class="timer-card">
-          <strong id="timer">1:00</strong>
-          <span id="round"></span>
-        </div>
-      </header>
-
-      <div class="fighters" aria-hidden="true">
-        <div id="player-figure" class="fighter player-figure pose-neutral">
-          <i class="head"></i><i class="torso"></i><i class="arm arm-left"></i><i class="arm arm-right"></i>
-        </div>
-        <div id="opponent-figure" class="fighter opponent-figure style-aggressor">
-          <i class="head"></i><i class="torso"></i><i class="arm arm-left"></i><i class="arm arm-right"></i>
-        </div>
-        <div id="incoming-glove" class="incoming-glove"><span></span></div>
-        <div id="punch-target" class="punch-target"><span>●</span></div>
+    <!-- Play before the stadium's first frame (and phones that can't draw
+         it): the branded holding screen. Oct 18 2026: no HTML game boards
+         during play (a house party's TV showed a ball call over one). -->
+    <section id="holding-screen" class="screen ready-screen holding-screen" hidden>
+      <div class="brand-mark" aria-label="RallyCade">
+        <img class="brand-icon" src="rallycade-icon.png" alt="">
+        <span>RALLYCADE</span>
       </div>
-
-      <div id="action-callout" class="action-callout" hidden>
-        <strong id="action-title"></strong>
-        <span id="action-detail"></span>
-      </div>
-
-      <footer class="tracking-footer">TRACKED BY THE IPHONE CAMERA</footer>
-    </section>
-
-    <section id="cricket-screen" class="screen game-board cricket-screen" hidden>
-      <header class="board-hud">
-        <div class="board-score"><strong id="cricket-runs">0</strong><span>RUNS</span></div>
-        <div class="board-center"><strong id="cricket-chase"></strong><span id="cricket-ball">BALL 1/12</span></div>
-        <div class="board-score"><strong id="cricket-wickets">0/3</strong><span>WICKETS</span></div>
-      </header>
-      <div class="pitch-art" aria-hidden="true"><i></i><span>●</span></div>
-      <div class="board-callout"><strong id="cricket-title"></strong><span id="cricket-detail"></span></div>
-      <footer class="tracking-footer">TRACKED BY THE IPHONE CAMERA</footer>
-    </section>
-
-    <section id="versus-setup-screen" class="screen setup-board" hidden>
-      <span class="eyebrow">CAMERA STAYS ON IPHONE</span>
-      <h1 id="versus-setup-title">STAND SIDE BY SIDE</h1>
-      <div class="corner-guides">
-        <div id="red-corner-guide" class="corner-guide red"><strong>RED CORNER</strong><span>STEP IN</span></div>
-        <div id="blue-corner-guide" class="corner-guide blue"><strong>BLUE CORNER</strong><span>STEP IN</span></div>
-      </div>
-      <div id="versus-setup-status" class="bottom-chip">ONE FIGHTER IN EACH FRAME</div>
-    </section>
-
-    <section id="versus-screen" class="screen game-board versus-screen" hidden>
-      <header class="duel-hud">
-        <div class="corner-score red"><span>RED</span><strong id="versus-left-score">0</strong><div class="health-track"><i id="versus-left-health"></i></div></div>
-        <div class="duel-timer" id="versus-timer">1:00</div>
-        <div class="corner-score blue"><span>BLUE</span><strong id="versus-right-score">0</strong><div class="health-track"><i id="versus-right-health"></i></div></div>
-      </header>
-      <div class="versus-figures" aria-hidden="true"><i id="versus-left-figure" class="versus-figure red pose-neutral"></i><i id="versus-right-figure" class="versus-figure blue pose-neutral"></i></div>
-      <div class="board-callout"><strong id="versus-title"></strong><span id="versus-detail"></span></div>
-      <div class="corner-feedback"><span id="versus-left-feedback"></span><span id="versus-right-feedback"></span></div>
-      <footer class="tracking-footer">TWO PLAYERS · ONE IPHONE CAMERA</footer>
+      <div class="ready-status"><span class="status-dot"></span> <span id="holding-status">STADIUM LOADING</span></div>
+      <h1 id="holding-title">Your stadium<br>is on its way</h1>
+      <p id="holding-detail">Keep playing on your phone.</p>
+      <p id="holding-score" class="holding-score" hidden></p>
     </section>
 
     <section id="result-screen" class="screen scorecard-screen" hidden>

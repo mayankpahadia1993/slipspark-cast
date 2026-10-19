@@ -1312,7 +1312,36 @@
       counters.frames += 1;
     }
 
+    // Oct 18 2026 (a house party's Chromecast showed the old HTML scoreboard
+    // mid-innings, "WATCH THE BALL" over a board with no ball): during play
+    // the TV never shows an HTML board. With the stadium off for a moment
+    // (the phone reconnecting, its stadium held) the last frame stays up with
+    // a small chip; before any frame, receiver.js shows its holding screen.
+    let holdChip = null;
+    let holding = false;
+    function holdLast(text) {
+      const want = !!text && !on && !!shownFrame;
+      if (want) {
+        if (!holdChip) {
+          holdChip = document.createElement("div");
+          holdChip.className = "scene-chip";
+          if (root.appendChild) root.appendChild(holdChip);
+        }
+        holdChip.textContent = text;
+        holdChip.hidden = false;
+        root.hidden = false;
+        document.body.dataset.scene = "hold";
+      } else {
+        if (holdChip) holdChip.hidden = true;
+        if (holding && !on) { root.hidden = true; document.body.dataset.scene = "off"; }
+      }
+      holding = want;
+      return want;
+    }
+
     function setOn(value) {
+      if (value && holdChip) holdChip.hidden = true;
+      holding = false;
       if (!!value && !on) {
         dropWarmCanvas();
         wholeSent = false;
@@ -1592,7 +1621,7 @@
     }
 
     return { NAMESPACE, handle, report, setOn, renderHUD, drawFrame, playRecording, playRecordingAt, snapshot, timeline, clock, live, images, bitmaps, release,
-      pictures, counters, tune, setTune, warmed };
+      pictures, counters, tune, setTune, warmed, holdLast, get holding() { return holding; }, get hasFrame() { return !!shownFrame; } };
   }
 
   window.RallycadeReceiverScene = { NAMESPACE, createScene };
