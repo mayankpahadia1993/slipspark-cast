@@ -1586,7 +1586,11 @@
         .catch(() => null)
       : Promise.resolve();
 
-    Promise.all([loadBundled(), openCache(), fontsReady]).then(() => {
+    // The phone waits 8 s for `ready` (iOS) and then plays without the
+    // stadium. A slow TV on a crowded Wi-Fi must not spend that on its fonts
+    // or its cache: each gets at most a couple of seconds before the answer.
+    const atMost = (promise, ms) => Promise.race([promise, new Promise((ok) => window.setTimeout(ok, ms))]);
+    Promise.all([atMost(loadBundled(), 4000), atMost(openCache(), 2000), atMost(fontsReady, 1500)]).then(() => {
       readyToAnswer = true;
       if (pendingHello) { pendingHello = false; answerHello(); }
       // Receiver 60: the pictures start loading as soon as the page is up,
