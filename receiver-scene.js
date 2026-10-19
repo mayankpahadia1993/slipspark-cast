@@ -142,6 +142,7 @@
 
     function addImage(key, source) {
       images.set(key, source);
+      if (staticLayer) staticLayer.key = null;
       sizes.set(key, core.pictureSize(key)
         || { width: source.naturalWidth || source.width, height: source.naturalHeight || source.height });
       needsRedraw = true;
@@ -636,7 +637,7 @@
     // "thirds", "full" or "none".
     // Bitmaps are off by default (receiver 59b): with them the Living Room
     // TV refused to start RallyCade again for minutes after a stop.
-    const TUNED = Object.freeze({ blur: "shadow", layers: "bounded", cover: "clip", bitmaps: 0, shade: "thirds", blend: 1 });
+    const TUNED = Object.freeze({ blur: "shadow", layers: "bounded", cover: "clip", bitmaps: 0, shade: "thirds", blend: 1, cache: 1 });
     // A weak dongle (core.isWeakDongle): no redraw only to blend between
     // frames (each draw costs it ~30 ms of its page's thread) and glows
     // drawn plain, never blurred.
@@ -944,11 +945,81 @@
       }
       photoPending = cover >= 0 && !layered;
       framePhoto = cover >= 0;
+      from = drawStatic(frame, from);
       // A photo whose layer isn't decoded yet is drawn on the canvas, over
       // whichever layer was showing: never an empty frame.
       paint(ctx, frame, from, { s: scale, width: canvas.width, height: canvas.height, layers: null, live: live.current });
       counters.drawMs.push(performance.now() - started);
       counters.draws += 1;
+    }
+
+    // MARK: Static layer (Oct 19 2026)
+    //
+    // "Could we reduce the number of pictures and shapes to draw?" Of a
+    // frame's ~31 commands about half are the same as the frame before
+    // (fielders standing, their shadows, the pitch's marks), and a live
+    // batter redraws the same frame again ~30 times a second. The frame's
+    // longest run of plain commands (source-over, no filter, no layer) from
+    // the start that was also in the frame before is drawn once into a
+    // canvas of the stadium's size and then blitted: one drawImage instead
+    // of each command. The run is cut where the frames differ, so what is
+    // drawn above it keeps its order and the picture is the same. The cache
+    // is rebuilt only when that run changes (a camera move, a fielder
+    // moving, a picture arriving).
+    const staticLayer = { canvas: null, key: null, built: 0, hits: 0, ops: 0, draws: 0 };
+    let lastStaticKeys = null;
+    const opKeys = new WeakMap();
+    function opKey(op) {
+      let key = opKeys.get(op);
+      if (key === undefined) { key = JSON.stringify(op); opKeys.set(op, key); }
+      return key;
+    }
+    function staticable(op) {
+      const kind = op[0];
+      if (op[2] && op[2] !== "source-over") return false;
+      if (kind === "f") return !(op[7] >= 0);
+      if (kind === "s") return !(op[9] >= 0);
+      if (kind === "i") return !(op[5] >= 0) && !!images.get(op[3]);
+      return false;
+    }
+    function drawStatic(frame, from) {
+      if (!tune.cache) { lastStaticKeys = null; return from; }
+      staticLayer.draws += 1;
+      const keys = [];
+      for (let index = from; index < frame.o.length && staticable(frame.o[index]); index += 1) keys.push(opKey(frame.o[index]));
+      let run = 0;
+      if (lastStaticKeys) while (run < keys.length && run < lastStaticKeys.length && keys[run] === lastStaticKeys[run]) run += 1;
+      lastStaticKeys = keys;
+      if (run < 2) return from;
+      const key = canvas.width + "x" + canvas.height + "|" + keys.slice(0, run).join("|");
+      if (staticLayer.key !== key) {
+        if (!staticLayer.canvas) staticLayer.canvas = document.createElement("canvas");
+        const layer = staticLayer.canvas;
+        if (layer.width !== canvas.width || layer.height !== canvas.height) { layer.width = canvas.width; layer.height = canvas.height; }
+        const c = layer.getContext("2d");
+        c.setTransform(1, 0, 0, 1, 0, 0);
+        c.globalAlpha = 1;
+        c.globalCompositeOperation = "source-over";
+        c.clearRect(0, 0, layer.width, layer.height);
+        c.imageSmoothingQuality = smoothing;
+        paint(c, { s: frame.s, o: frame.o.slice(from, from + run), fl: frame.fl, cl: frame.cl }, 0,
+          { s: scale, width: layer.width, height: layer.height, layers: null, live: null });
+        staticLayer.key = key;
+        staticLayer.built += 1;
+      } else {
+        staticLayer.hits += 1;
+      }
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.globalAlpha = 1;
+      ctx.globalCompositeOperation = "source-over";
+      ctx.drawImage(staticLayer.canvas, 0, 0);
+      staticLayer.ops += run;
+      return from + run;
+    }
+    function dropStaticLayer() {
+      staticLayer.key = null;
+      lastStaticKeys = null;
+      if (staticLayer.canvas) { try { staticLayer.canvas.width = 0; staticLayer.canvas.height = 0; } catch (error) { /* gone */ } staticLayer.canvas = null; }
     }
 
     // Draws a frame's commands from `from` on into `target`: the TV's
@@ -1269,7 +1340,7 @@
           behind: Math.round(core.percentile(counters.late, 0.9)),
           drawMs: Number(core.percentile(counters.drawMs, 0.5).toFixed(1)),
           drawMax: Number(Math.max(0, ...counters.drawMs).toFixed(1)),
-          missing: counters.missing, images: images.size, warmed: warmed.size, bitmaps: bitmaps.size, queue: timeline.length,
+          missing: counters.missing, images: images.size, warmed: warmed.size, cached: staticLayer.hits, rebuilt: staticLayer.built, bitmaps: bitmaps.size, queue: timeline.length,
           // How glows are blurred (receiver 57): as shadows, or in small canvases.
           glow: tune.blur === "filter" ? "filter" : tune.blur === "off" ? "off" : castsOffstageShadows() ? "shadow" : "scratch",
           synced: clock.synced ? 1 : 0, w: canvas.width, canvas: plan.why, weak: plan.weak ? 1 : 0,
@@ -1627,10 +1698,11 @@
       backdropLayers.forEach((entry) => { try { entry.element.removeAttribute("src"); } catch (error) { /* gone */ } });
       empty(canvas);
       dropWarmCanvas();
+      dropStaticLayer();
     }
 
     return { NAMESPACE, handle, report, setOn, renderHUD, drawFrame, playRecording, playRecordingAt, snapshot, timeline, clock, live, images, bitmaps, release,
-      pictures, counters, tune, setTune, warmed, holdLast, get holding() { return holding; }, get hasFrame() { return !!shownFrame; } };
+      pictures, counters, tune, setTune, warmed, staticLayer, holdLast, get holding() { return holding; }, get hasFrame() { return !!shownFrame; } };
   }
 
   window.RallycadeReceiverScene = { NAMESPACE, createScene };
