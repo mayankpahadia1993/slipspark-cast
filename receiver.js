@@ -386,8 +386,6 @@
   }
 
   if (!preview && !query.get("scene") && window.cast && window.cast.framework) {
-    // The stadium came on: the music lets its element go (build 198).
-    let onStadium = () => {};
     const context = window.cast.framework.CastReceiverContext.getInstance();
     let reportFailure = () => {};
     context.addCustomMessageListener(NAMESPACE, (event) => {
@@ -444,7 +442,6 @@
           window.clearTimeout(sceneGone);
         }
         try { scene.handle(event.data); } catch (error) { scene.report("handle", error); }
-        if (event.data && event.data.t === "scene" && event.data.on === 1) onStadium();
       });
       window.addEventListener("error", (event) => scene.report("script", event.message + " @" + event.lineno));
       cardFailure = (where, error) => scene.report(where, error);
@@ -473,11 +470,9 @@
     if (scene) options.customNamespaces[sceneModule.NAMESPACE] = window.cast.framework.system.MessageType.JSON;
     const musicModule = window.RallycadeMusic;
     if (musicModule) {
-      // Build 198: the Audio element only on the first play command, and
-      // released as the stadium comes on (`onStadium`).
-      const music = musicModule.createPlayer({ createAudio: () => new Audio("music/music-theme.m4a"),
+      const audio = new Audio("music/music-theme.m4a");
+      const music = musicModule.createPlayer({ audio,
         send: (sender, message) => context.sendCustomMessage(musicModule.NAMESPACE, sender, message) });
-      onStadium = () => music.release();
       options.customNamespaces[musicModule.NAMESPACE] = window.cast.framework.system.MessageType.JSON;
       context.addCustomMessageListener(musicModule.NAMESPACE, event => music.handle(event.senderId, event.data));
       context.addEventListener(window.cast.framework.system.EventType.SENDER_DISCONNECTED, event => music.disconnected(event.senderId));
