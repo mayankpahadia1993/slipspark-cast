@@ -1,0 +1,367 @@
+:root {
+  color-scheme: dark;
+  --void: #070909;
+  --ink: #101312;
+  --paper: #f6f5ec;
+  --muted: rgba(246, 245, 236, .64);
+  --signal: #d6ff38;
+  --amber: #ffb829;
+  --danger: #ff5c52;
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: var(--void); }
+body { font-family: Inter, "Google Sans", system-ui, sans-serif; color: var(--paper); }
+
+#app {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  min-width: 960px;
+  min-height: 540px;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 14% 55%, rgba(214,255,56,.10), transparent 30%),
+    radial-gradient(circle at 82% 30%, rgba(255,184,41,.08), transparent 34%),
+    linear-gradient(135deg, #111614 0%, #070909 56%, #020303 100%);
+}
+
+.ambient { position: absolute; width: 42vw; height: 42vw; border-radius: 50%; filter: blur(80px); opacity: .16; }
+.ambient-one { left: -18vw; top: 20vh; background: var(--signal); }
+.ambient-two { right: -20vw; top: -18vh; background: var(--amber); }
+.arena-lines { position: absolute; inset: auto 0 9vh; height: 30vh; perspective: 600px; opacity: .22; }
+.arena-lines i { display: block; height: 2px; margin-top: 8vh; background: linear-gradient(90deg, transparent, rgba(255,255,255,.55), transparent); transform: rotateX(60deg); }
+
+.screen { position: absolute; inset: 0; }
+
+.ready-screen { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 7vh 8vw; }
+.brand-mark { display: flex; align-items: center; gap: 1.1vw; font-size: clamp(24px, 2.7vw, 52px); font-weight: 950; letter-spacing: .08em; }
+.brand-icon { width: 1.6em; height: 1.6em; border-radius: 22.37%; object-fit: cover; }
+.ready-status { margin-top: 6vh; padding: 1.2vh 1.5vw; border: 1px solid rgba(214,255,56,.35); border-radius: 999px; background: rgba(0,0,0,.42); color: var(--signal); font-size: clamp(16px, 1.4vw, 28px); font-weight: 900; letter-spacing: .14em; }
+.status-dot { display: inline-block; width: .62em; height: .62em; margin-right: .65em; border-radius: 50%; background: var(--signal); box-shadow: 0 0 1.2em var(--signal); }
+.ready-screen h1 { margin: 3vh 0 1.5vh; font-size: clamp(52px, 6.5vw, 124px); line-height: .93; letter-spacing: -.045em; }
+.ready-screen p { max-width: 60vw; margin: 0; color: var(--muted); font-size: clamp(20px, 1.8vw, 36px); font-weight: 650; }
+
+.eyebrow { color: var(--signal); font-size: clamp(14px, 1.2vw, 24px); font-weight: 900; letter-spacing: .16em; }
+
+.result-corner.red > span { color: var(--danger); }
+.result-corner.blue > span { color: #45d8e8; }
+
+.scorecard-screen { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 5vh 7vw; text-align: center; }
+.scorecard-screen h1 { margin: 1.6vh 0 0; font-size: clamp(52px, 7vw, 132px); line-height: .9; }
+.hero-score { margin-top: 2vh; color: var(--signal); font-size: clamp(120px, 17vw, 320px); line-height: .86; letter-spacing: -.05em; font-variant-numeric: tabular-nums; }
+.score-caption { margin-top: 1.5vh; color: var(--signal); font-size: clamp(18px, 2vw, 38px); font-weight: 950; letter-spacing: .14em; }
+.scorecard-screen p { margin: 3vh 0 0; color: var(--muted); font-size: clamp(16px, 1.5vw, 28px); font-weight: 750; }
+.result-stats, .versus-result-grid { display: flex; gap: 1.5vw; margin-top: 3vh; }
+.result-stat, .result-corner { min-width: 15vw; padding: 2vh 2vw; border: 1px solid rgba(255,255,255,.12); border-radius: 1.4vw; background: rgba(0,0,0,.5); }
+.result-stat strong { display: block; font-size: clamp(24px, 2.8vw, 52px); }
+.result-stat span, .result-corner span, .result-corner small { display: block; margin-top: .7vh; color: var(--muted); font-size: clamp(12px, 1vw, 20px); font-weight: 900; letter-spacing: .1em; }
+.result-corner { min-width: 28vw; }
+.result-corner strong { display: block; margin-top: .5vh; font-size: clamp(64px, 8vw, 150px); line-height: 1; }
+.result-corner.is-winner { border-width: 3px; border-color: var(--signal); box-shadow: 0 0 3vw rgba(214,255,56,.12); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; }
+}
+
+/* The phone's streamed picture covers the scoreboard while it is live. */
+#stream {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  object-fit: contain;
+  background: #000;
+  display: none;
+  z-index: 10;
+}
+body[data-video="on"] #stream { display: block; }
+body[data-video="on"] #app { visibility: hidden; }
+
+/* TestFlight builds: the stream's counters, small, over everything. */
+#stream-status {
+  position: fixed;
+  left: 24px;
+  bottom: 18px;
+  z-index: 20;
+  max-width: 70vw;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.62);
+  color: #f5f1e3;
+  font: 600 14px/1.3 system-ui, sans-serif;
+}
+
+/* The stadium the TV draws itself (receiver-scene.js). The canvas fills the
+   screen; the HUD is laid out on a 1920 x 1080 stage, as on an AirPlay TV,
+   and scaled to fit. Colours and sizes follow StadiumMatchPresentation at
+   its TV scale (1.7). */
+.scene {
+  --cream: #fcf5de;
+  --ink: 18, 43, 38;
+  --gold: #ffc252;
+  --good: #61d67a;
+  --off: #f56b54;
+  position: fixed;
+  inset: 0;
+  z-index: 12;
+  overflow: hidden;
+  background: #0c1a17;
+  color: var(--cream);
+  font-family: Inter, "Google Sans", system-ui, sans-serif;
+}
+body[data-scene="on"] #app,
+body[data-scene="on"] #stream,
+body[data-scene="hold"] #app,
+body[data-scene="hold"] #stream { visibility: hidden; }
+/* The stadium's last frame held (the phone reconnecting): a small chip, never an HTML board. */
+.scene-chip { position: absolute; right: 2.2vw; top: 2.2vw; z-index: 4; padding: 10px 18px; border-radius: 999px; background: rgba(9, 22, 18, .82); color: #f5f1e3; font: 800 clamp(14px, 1.2vw, 22px)/1.2 Nunito, "Varela Round", sans-serif; letter-spacing: .04em; }
+.scene-chip[hidden] { display: none; }
+/* Play before the stadium's first frame: the branded holding screen. */
+.holding-score { margin-top: 2vh; color: var(--signal); font-size: clamp(18px, 1.8vw, 34px); font-weight: 900; letter-spacing: .08em; }
+/* Receiver 60: the phone's picture stays up over a stadium still loading
+   its pictures, until a frame has them all and its photo is on its layer
+   (receiver-scene.js, `warming`). Drawn all but transparent, not hidden, so
+   the browser does the stadium's first work under the picture. */
+body[data-card="picture"] .scene[data-warming="1"] { opacity: .01; }
+.scene-stage { position: absolute; left: 50%; top: 50%; width: min(100vw, 177.7778vh); height: min(56.25vw, 100vh); transform: translate(-50%, -50%); overflow: hidden; }
+#scene-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+#scene-backdrop { display: none; }
+.scene-backdrop { position: absolute; left: 0; top: 0; transform-origin: 0 0; will-change: transform, opacity; max-width: none; }
+.scene-shade { position: absolute; inset: 0; pointer-events: none; background: linear-gradient(to bottom, rgba(0,0,0,.22) 0%, rgba(0,0,0,0) 33.333%, rgba(0,0,0,0) 66.667%, rgba(0,0,0,.24) 100%); }
+/* Receiver 57: the shading is clear across the middle third, so a
+   Chromecast composites only its top and bottom thirds, each its own layer,
+   not a full-screen gradient over the stadium every frame. */
+body[data-scene-shade="thirds"] .scene-shade { background: none; }
+body[data-scene-shade="thirds"] .scene-shade::before,
+body[data-scene-shade="thirds"] .scene-shade::after { content: ""; position: absolute; left: 0; right: 0; height: 33.334%; will-change: transform; }
+body[data-scene-shade="thirds"] .scene-shade::before { top: 0; background: linear-gradient(to bottom, rgba(0,0,0,.22), rgba(0,0,0,0)); }
+body[data-scene-shade="thirds"] .scene-shade::after { bottom: 0; background: linear-gradient(to top, rgba(0,0,0,.24), rgba(0,0,0,0)); }
+body[data-scene-shade="none"] .scene-shade { display: none; }
+.scene-hud { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; transform-origin: 0 0; pointer-events: none; }
+.scene-hud small { display: block; font-size: 17px; font-weight: 800; letter-spacing: 2.55px; }
+.scene-hud .rounded, .hud-scorebug strong, .hud-status strong, .hud-cue strong, .hud-speed, .hud-timing,
+.hud-int-title, .hud-int-instruction { font-family: Nunito, "Varela Round", "Google Sans", sans-serif; }
+
+.hud-top { position: absolute; left: 37px; right: 37px; top: 24px; display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
+.hud-left { position: relative; }
+.hud-scorebug { display: flex; align-items: baseline; gap: 17px; padding: 15px 31px; border-radius: 31px; background: var(--cream); color: rgb(var(--ink)); font-variant-numeric: tabular-nums; }
+.hud-scorebug > strong { font-size: 65px; font-weight: 900; line-height: 1; }
+.hud-overs b { display: block; margin-top: 3px; font-size: 22px; font-weight: 700; }
+.hud-check { display: block; }
+.hud-check strong { display: block; margin-top: 3px; font-size: 41px; font-weight: 900; line-height: 1.05; }
+.hud-friend { position: absolute; left: 0; top: 112px; padding: 10px 20px; border-radius: 999px; background: var(--gold); color: rgb(var(--ink)); white-space: nowrap; font-size: 19px; font-weight: 800; letter-spacing: 2px; font-variant-numeric: tabular-nums; }
+/* Boundary over sends no scorebug: its line takes the scorebug's place. */
+#hud-score[hidden] + #hud-check[hidden] + .hud-friend { position: static; }
+.hud-status { max-width: 730px; display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 20px 31px; border-radius: 27px; background: rgba(var(--ink), .9); text-align: center; transition: opacity .2s ease; }
+.hud-status strong { font-size: 31px; font-weight: 900; line-height: 1.15; }
+.hud-status span { font-size: 20px; font-weight: 600; white-space: pre-line; }
+.hud-right { display: flex; flex-direction: column; align-items: flex-end; gap: 10px; }
+.hud-over-card { padding: 25px; border-radius: 27px; background: rgba(var(--ink), .85); text-align: right; }
+.hud-dots { display: flex; justify-content: flex-end; gap: 8.5px; margin-top: 13px; }
+.hud-dots i { width: 10px; height: 10px; border-radius: 50%; background: rgba(252, 245, 222, .4); }
+.hud-dots i.is-bowled { background: var(--gold); }
+.hud-verdict-dots { gap: 10px; }
+.hud-verdict-dots i { width: 19px; height: 19px; }
+.hud-verdict-dots i.to-come { background: rgba(252, 245, 222, .28); }
+.hud-verdict-dots i.verdict-perfect { background: var(--good); }
+.hud-verdict-dots i.verdict-little { background: var(--gold); }
+.hud-verdict-dots i.verdict-far { background: var(--off); }
+.hud-verdict-dots i.verdict-none { background: transparent; box-shadow: inset 0 0 0 2.5px rgba(252, 245, 222, .7); }
+.hud-speed { padding: 8.5px 17px; border-radius: 999px; background: rgba(var(--ink), .75); font-size: 20px; font-weight: 800; animation: hud-fade .3s ease both; }
+
+.hud-cards { position: absolute; left: 37px; right: 37px; top: 179px; }
+.hud-timing { position: absolute; right: 0; top: 0; width: 349px; padding: 20px; border-radius: 24px; background: rgba(var(--ink), .9); text-align: center; font-size: 24px; font-weight: 800; }
+.hud-cards.is-leading .hud-timing { right: auto; left: 0; }
+.hud-cue { position: absolute; left: 50%; top: 0; width: 357px; margin-left: -178px; transform: translateX(375px); display: flex; flex-direction: column; align-items: center; gap: 7px; padding: 17px 22px; border-radius: 24px; background: rgba(var(--ink), .9); text-align: center; }
+.hud-cards.is-leading .hud-cue { transform: translateX(-375px); }
+.hud-cue strong { font-size: 29px; font-weight: 900; }
+.hud-cue b { font-size: 19px; font-weight: 700; }
+.hud-cue span { font-size: 17px; font-weight: 500; color: rgba(252, 245, 222, .78); }
+
+.hud-moves { position: absolute; left: 50%; top: 130px; transform: translateX(-50%); max-width: 1500px; padding: 10px 18px; border-radius: 999px; background: rgba(var(--ink), .88); font-size: 22px; font-weight: 700; white-space: nowrap; }
+
+.hud-caption { position: absolute; left: 50%; bottom: 30px; transform: translateX(-50%); max-width: 900px; display: flex; align-items: center; gap: 14px; padding: 14px 26px; border-radius: 999px; background: rgba(var(--ink), .9); font-size: 26px; font-weight: 700; line-height: 1.25; width: max-content; }
+.hud-caption.is-in { animation: hud-caption-in .35s cubic-bezier(.2, .9, .3, 1.05) both; }
+.hud-mic { flex: none; width: 24px; height: 24px; fill: var(--gold); color: var(--gold); }
+
+.hud-interruption { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); max-width: 1876px; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 51px; border-radius: 24px; background: rgba(var(--ink), .95); text-align: center; animation: hud-fade .25s ease both; }
+/* The phone's cards at the AirPlay TV's scale (1.7 on a 1080p TV),
+   StadiumMatchPresentation's: paused, a 12-point stack of the pause symbol
+   (.title), the title (30), the words (14) and the 40-point ring, in 30 of
+   padding; lost, 26 of padding round a 10-point stack of the title (17),
+   the instruction (34) and the words (14), as wide as the screen less 44.
+   Both have 24-point corners, unscaled. */
+.hud-pause { width: 34px; height: 34px; fill: var(--cream); }
+.hud-int-title { font-size: 51px; font-weight: 900; }
+.hud-int-instruction { font-size: 58px; font-weight: 900; color: var(--gold); }
+.hud-int-detail { font-size: 24px; font-weight: 500; white-space: pre-line; }
+.hud-interruption[data-kind="lost"] { width: 1876px; gap: 17px; padding: 44px; }
+.hud-interruption[data-kind="lost"] .hud-pause { display: none; }
+.hud-interruption[data-kind="lost"] .hud-int-title { font-size: 29px; font-weight: 700; color: rgba(252, 245, 222, .8); }
+
+@keyframes hud-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes hud-caption-in { from { opacity: 0; transform: translate(-50%, 40px); } to { opacity: 1; transform: translate(-50%, 0); } }
+
+/* TestFlight builds: the scene's counters, small, over everything. */
+#scene-status { position: absolute; left: 24px; bottom: 18px; z-index: 3; padding: 6px 10px; border-radius: 8px; background: rgba(0, 0, 0, .62); color: #f5f1e3; font: 600 14px/1.3 system-ui, sans-serif; }
+
+/* Build 121: the screens the TV doesn't draw as the stadium (setup, results,
+   the innings break, the timing check) take the stadium's look: the same
+   photograph, colours and rounded type as the phone. Boxing keeps its own. */
+:root {
+  --signal: #ffc252;
+  --amber: #ffc252;
+  --paper: #fcf5de;
+  --muted: rgba(252, 245, 222, .74);
+  --stadium-ink: rgba(18, 43, 38, .9);
+}
+#app {
+  background:
+    linear-gradient(180deg, rgba(6, 14, 12, .55) 0%, rgba(6, 14, 12, .72) 55%, rgba(6, 14, 12, .86) 100%),
+    url("scene-images/stadium-ground-1672x941.jpg") center / cover no-repeat,
+    #0c1a17;
+}
+#app[data-screen="fight"], #app[data-screen="versus"], #app[data-screen="versusSetup"], #app[data-screen="versusResult"] {
+  background:
+    radial-gradient(circle at 14% 55%, rgba(214,255,56,.10), transparent 30%),
+    linear-gradient(135deg, #111614 0%, #070909 56%, #020303 100%);
+}
+#app:not([data-screen="fight"]):not([data-screen="versus"]):not([data-screen="versusSetup"]):not([data-screen="versusResult"]) .ambient,
+#app:not([data-screen="fight"]):not([data-screen="versus"]):not([data-screen="versusSetup"]):not([data-screen="versusResult"]) .arena-lines { display: none; }
+#app h1, .hero-score, .brand-mark, .result-stat strong, .result-corner strong {
+  font-family: Nunito, "Varela Round", "Google Sans", sans-serif;
+  font-weight: 900;
+}
+.status-dot { box-shadow: none; }
+.ready-status { border: 0; background: var(--stadium-ink); }
+.ready-screen h1, .scorecard-screen h1, .stadium-card h1 { text-shadow: 0 .4vw 2vw rgba(0, 0, 0, .45); }
+.result-stat, .result-corner { border: 0; background: var(--stadium-ink); }
+.hero-score { color: var(--paper); text-shadow: 0 .6vw 2.4vw rgba(0, 0, 0, .4); }
+.result-corner.is-winner { border: 3px solid var(--signal); box-shadow: 0 0 3vw rgba(255, 194, 82, .2); }
+
+.timing-check-screen { display: flex; align-items: center; justify-content: center; padding: 6vh 8vw; }
+.stadium-card { width: min(76vw, 1400px); display: flex; flex-direction: column; gap: 1.6vh; }
+.stadium-card h1 { margin: 0; font-size: clamp(48px, 5.6vw, 108px); line-height: 1; letter-spacing: -.02em; }
+.card-detail { margin: 0; color: var(--paper); font-size: clamp(18px, 1.7vw, 32px); font-weight: 600; }
+.timing-balls { display: flex; flex-wrap: wrap; gap: .6vw; margin-top: 1vh; }
+.timing-chip { display: inline-flex; align-items: center; gap: .6vw; padding: .8vh 1.2vw; border-radius: 999px; background: var(--stadium-ink); color: var(--paper); font-size: clamp(14px, 1.3vw, 24px); font-weight: 800; }
+.timing-chip b { display: inline-flex; align-items: center; justify-content: center; width: 1.6em; height: 1.6em; border-radius: 50%; color: #122b26; font-size: .85em; }
+.timing-chip.verdict-perfect b { background: #61d67a; }
+.timing-chip.verdict-little b { background: #ffc252; }
+.timing-chip.verdict-far b { background: #f56b54; }
+.timing-chip.verdict-none b { background: transparent; color: var(--paper); box-shadow: inset 0 0 0 2px rgba(252, 245, 222, .7); }
+.timing-lines { margin: 1vh 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: .8vh; }
+.timing-lines li { color: var(--paper); font-size: clamp(16px, 1.45vw, 28px); font-weight: 600; }
+.timing-lines li:last-child { margin-top: .6vh; color: var(--signal); font-weight: 800; }
+.card-note { margin: 1.4vh 0 0; color: var(--muted); font-size: clamp(14px, 1.2vw, 22px); font-weight: 700; }
+
+/* Build 122: setup on a Chromecast is the phone's setup card and its hold
+   ring; the TV never draws the batter's skeleton. The same ring fills on the
+   paused card. */
+.positioning-screen { display: flex; align-items: center; justify-content: flex-start; padding: 6vh 8vw; }
+.positioning-screen .stadium-card { width: min(62vw, 1200px); }
+#positioning-detail { white-space: pre-line; }
+.hold { display: flex; align-items: center; gap: 1.2vw; margin-top: 2vh; }
+.hold[hidden] { display: none; }
+.hold-ring { flex: none; width: clamp(64px, 6.4vw, 124px); height: clamp(64px, 6.4vw, 124px); transform: rotate(-90deg); }
+.hold-ring circle { fill: none; stroke-width: 8; }
+.hold-track { stroke: rgba(252, 245, 222, .2); }
+.hold-fill { stroke: #ffc252; stroke-linecap: round; stroke-dasharray: 276.5; stroke-dashoffset: 276.5; transition: stroke-dashoffset .15s linear; }
+.hold-label { color: var(--paper); font-size: clamp(20px, 1.9vw, 36px); font-weight: 800; }
+/* The ring shows once both hands are up (it keeps its place, so nothing moves). */
+.hold:not(.is-holding) .hold-ring { visibility: hidden; }
+.hud-interruption .hold { margin-top: 0; gap: 18px; }
+/* The phone's 68-pixel ring: a 34 radius and a 6.8 stroke (r 44 of 100,
+   stroke 8.8), laid out in 68 pixels as the phone lays it out. */
+.hud-interruption .hold-ring { width: 77.27px; height: 77.27px; margin: -4.64px; }
+.hud-interruption .hold-ring circle { stroke-width: 8.8; }
+.hud-interruption .hold-label { font-size: 26px; }
+.positioning-screen .hold { margin-top: 3vh; gap: 1.8vw; }
+.positioning-screen .hold-ring { width: clamp(96px, 10vw, 200px); height: clamp(96px, 10vw, 200px); }
+.positioning-screen .hold-label { font-size: clamp(26px, 2.8vw, 56px); font-weight: 900; }
+
+/* Build 145: what the innings earned, as large as the stats. */
+.result-reward { margin-top: 3vh; padding: 2vh 2.4vw; border-radius: 1.4vw; background: var(--stadium-ink, rgba(0,0,0,.6)); text-align: left; }
+.result-reward[hidden] { display: none; }
+.result-reward .eyebrow { color: var(--gold, #f5c14b); }
+.result-reward-amounts { display: flex; gap: 2.4vw; margin-top: .8vh; font-size: clamp(28px, 3.4vw, 64px); font-weight: 900; }
+.result-reward-amounts .gold { color: var(--gold, #f5c14b); }
+.result-reward-level { display: block; margin-top: .8vh; color: var(--gold, #f5c14b); font-size: clamp(22px, 2.4vw, 46px); font-weight: 900; letter-spacing: .04em; }
+.result-reward-level[hidden] { display: none; }
+.result-reward-milestones { margin: .6vh 0 0; padding: 0; list-style: none; }
+.result-reward-milestones li { margin-top: .4vh; font-size: clamp(18px, 1.9vw, 36px); font-weight: 800; }
+.result-reward small { display: block; margin-top: .8vh; color: var(--muted); font-size: clamp(14px, 1.4vw, 28px); font-weight: 700; }
+
+/* Build 153, a Chromecast's result: "the text is way too large". The
+   headline is sized in receiver.js by its length (at most 5.6vw, two lines at
+   most); the score, stats and reward share what is left of a 16:9 screen,
+   with margins, still big enough to read from the sofa. */
+#result-screen { padding: 4.5vh 7vw; justify-content: center; }
+#result-screen .eyebrow { font-size: clamp(14px, 1.3vw, 26px); }
+#result-screen h1 { max-width: 86vw; margin: 1.2vh 0 0; font-size: clamp(36px, 5.6vw, 120px); line-height: 1.02; letter-spacing: -.01em; }
+#result-screen .hero-score { margin-top: 1.4vh; font-size: clamp(84px, min(11.5vw, 20vh), 230px); }
+#result-screen .score-caption { margin-top: .8vh; font-size: clamp(16px, 1.6vw, 32px); }
+#result-screen .result-stats { margin-top: 2vh; gap: 1.2vw; }
+#result-screen .result-stat { min-width: 12vw; padding: 1.3vh 1.6vw; }
+#result-screen .result-stat strong { font-size: clamp(22px, 2.4vw, 46px); }
+#result-screen .result-reward { margin-top: 2vh; padding: 1.5vh 2vw; max-width: 72vw; }
+#result-screen .result-reward-amounts { font-size: clamp(24px, 2.6vw, 52px); }
+#result-screen .result-reward-level { font-size: clamp(18px, 1.8vw, 36px); }
+#result-screen .result-reward-milestones li { font-size: clamp(16px, 1.5vw, 30px); }
+#result-screen .result-reward small { font-size: clamp(14px, 1.3vw, 26px); }
+#result-screen p { margin-top: 2vh; font-size: clamp(14px, 1.3vw, 26px); }
+
+/* Build 154: a result is the phone's own TV scorecard picture, whole on the
+   screen (letterboxed on any other shape), over this page's result, which
+   stays for older phones and as the fallback. While it is on its way (up
+   to 4 s, receiver 51) the TV shows the stadium's dark ground, not the
+   HTML; for an innings or a timing check, the phone's own backdrop (the
+   stadium photograph under its ink shade, `StadiumBackdrop(shade: true)`),
+   so the picture lands on the same ground. */
+.card-screen { position: fixed; inset: 0; z-index: 11; background: #0c1a17; }
+body[data-card="waiting"] .card-screen[data-screen="result"],
+body[data-card="waiting"] .card-screen[data-screen="timingCheck"] {
+  background:
+    linear-gradient(90deg, rgba(18, 43, 38, .94) 0%, rgba(18, 43, 38, .7) 50%, rgba(18, 43, 38, 0) 100%),
+    url("scene-images/stadium-ground-1672x941.jpg") center / cover no-repeat,
+    #0c1a17;
+}
+/* The setup's picture is on its way: the setup's own ground, the stadium
+   under a 60% ink shade. */
+body[data-card="waiting"] .card-screen[data-screen="positioning"] {
+  background:
+    linear-gradient(rgba(18, 43, 38, .6), rgba(18, 43, 38, .6)),
+    url("scene-images/stadium-ground-1672x941.jpg") center / cover no-repeat,
+    #0c1a17;
+}
+/* The setup's hold ring over its picture, placed by receiver-card-core.js:
+   StadiumHoldRing's cream track at 20% and gold fill, a tenth as thick as
+   the ring is wide, filling clockwise from the top. */
+.card-ring { position: absolute; transform: rotate(-90deg); overflow: visible; pointer-events: none; }
+.card-ring[hidden] { display: none; }
+.card-ring circle { fill: none; stroke-width: 10; }
+.card-ring-track { stroke: rgba(252, 245, 222, .2); }
+.card-ring-fill { stroke: #ffc252; stroke-linecap: round; stroke-dasharray: 314.16; stroke-dashoffset: 314.16; transition: stroke-dashoffset .12s linear; }
+.card-image { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+.card-hold { position: absolute; left: 50%; bottom: 4vh; margin: 0; padding: 1vh 1.6vw; transform: translateX(-50%); border-radius: 999px; background: rgba(9, 22, 19, .82); }
+.card-hold .hold-ring { width: clamp(56px, 5vw, 96px); height: clamp(56px, 5vw, 96px); }
+.card-hold .hold-label { font-size: clamp(20px, 1.8vw, 34px); }
+body[data-card="picture"] #app, body[data-card="waiting"] #app { visibility: hidden; }
+
+/* Receiver 56: the app-open welcome over the ready screen
+   (receiver-welcome.js). A 1920 x 1080 canvas, scaled to the 16:9 stage. */
+.welcome { position: fixed; inset: 0; z-index: 8; background: #000; pointer-events: none; }
+.welcome-stage { position: absolute; left: 50%; top: 50%; width: min(100vw, 177.7778vh); height: min(56.25vw, 100vh); transform: translate(-50%, -50%); overflow: hidden; }
+.welcome-canvas { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; transform-origin: 0 0; overflow: hidden; }
+.welcome-photo { position: absolute; inset: 0; width: 1920px; height: 1080px; object-fit: cover; opacity: 0; }
+.welcome-dark { opacity: 1; filter: brightness(.075) saturate(.85); }
+.welcome-glow { position: absolute; inset: 0; opacity: 0; }
+.welcome-vignette { position: absolute; inset: 0; background: radial-gradient(ellipse 70% 70% at 50% 50%, rgba(0,0,0,0) 55%, rgba(0,0,0,.22) 100%); }
+.welcome-scrim { position: absolute; inset: 0; opacity: 0; background: radial-gradient(ellipse 50% 50% at 50% 50%, rgba(18, 43, 38, .62) 0%, rgba(18, 43, 38, 0) 100%); }
+.welcome-halo { position: absolute; left: 960px; top: 389px; width: 674px; height: 674px; transform: translate(-50%, -50%); opacity: 0; background: radial-gradient(circle, rgba(255, 194, 82, .30) 0%, rgba(255, 194, 82, 0) 70%); }
+.welcome-icon { position: absolute; left: 960px; top: 389px; width: 259px; height: 259px; border-radius: 58px; transform: translate(-50%, -50%); opacity: 0; box-shadow: 0 13px 38px rgba(0, 0, 0, .6); }
+.welcome-wordmark { position: absolute; left: 960px; top: 622px; transform: translate(-50%, -50%); opacity: 0; font-family: Inter, "Google Sans", sans-serif; font-size: 81px; font-weight: 900; letter-spacing: 16px; color: #ffc252; white-space: nowrap; }
+.welcome-caption { position: absolute; left: 50%; bottom: 30px; transform: translateX(-50%); max-width: 900px; display: flex; align-items: center; gap: 14px; padding: 14px 26px; border-radius: 999px; background: rgba(18, 43, 38, .9); color: #fcf5de; font-family: Inter, "Google Sans", sans-serif; font-size: 26px; font-weight: 700; line-height: 1.25; width: max-content; }
+.welcome-caption .hud-mic { flex: none; width: 24px; height: 24px; fill: #ffc252; color: #ffc252; }

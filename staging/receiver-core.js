@@ -1,0 +1,421 @@
+(function (root, factory) {
+  const api = factory();
+  if (typeof module === "object" && module.exports) module.exports = api;
+  root.SlipSparkReceiverCore = api;
+})(typeof globalThis !== "undefined" ? globalThis : this, function () {
+  "use strict";
+
+  const validScreens = new Set([
+    "ready", "positioning", "fight", "cricket", "versusSetup", "versus",
+    "result", "versusResult", "cricketDuelHandoff", "cricketDuelResult", "timingCheck"
+  ]);
+  const verdicts = new Set(["early", "littleEarly", "perfect", "littleLate", "late", "noSwing"]);
+  const fightPhases = new Set([
+    "ready", "countdown", "telegraph", "defend", "counter", "opening",
+    "feedback", "trackingPaused", "roundBreak", "finished"
+  ]);
+  const cricketPhases = new Set([
+    "ready", "countdown", "runUp", "delivery", "feedback", "trackingPaused", "finished"
+  ]);
+  const versusPhases = new Set([
+    "ready", "countdown", "telegraph", "defend", "counter", "opening",
+    "feedback", "knockout", "trackingPaused", "finished"
+  ]);
+  const validActions = new Set([
+    "neutral", "slipLeft", "slipRight", "duck", "highBlock", "bodyBlock",
+    "counterLeft", "counterRight"
+  ]);
+  const validStyles = new Set(["aggressor", "bodyHunter", "trickster"]);
+  const validAttacks = new Set([
+    "straight", "leftHook", "rightHook", "body", "doubleStraight", "highLow",
+    "lowHigh", "delayed", "feint"
+  ]);
+  const jointNames = [
+    "nose", "neck", "leftShoulder", "rightShoulder", "leftElbow", "rightElbow",
+    "leftWrist", "rightWrist", "root", "leftHip", "rightHip"
+  ];
+
+  function number(value, fallback) {
+    return Number.isFinite(Number(value)) ? Number(value) : fallback;
+  }
+
+  function clamp(value, minimum, maximum) {
+    return Math.min(maximum, Math.max(minimum, number(value, minimum)));
+  }
+
+  function boundedString(value, fallback, maximumLength) {
+    return String(value == null ? fallback : value).slice(0, maximumLength);
+  }
+
+  function optionalString(value, maximumLength) {
+    return value == null ? null : boundedString(value, "", maximumLength);
+  }
+
+  function allowedString(value, allowed, fallback) {
+    const candidate = boundedString(value, fallback, 40);
+    return allowed.has(candidate) ? candidate : fallback;
+  }
+
+  function normalizeJoints(value) {
+    const input = value && typeof value === "object" ? value : {};
+    return jointNames.reduce((result, name) => {
+      const joint = input[name];
+      if (!joint || typeof joint !== "object") return result;
+      result[name] = {
+        x: clamp(joint.x, 0, 1),
+        y: clamp(joint.y, 0, 1),
+        confidence: clamp(joint.confidence, 0, 1)
+      };
+      return result;
+    }, {});
+  }
+
+  function normalizePlayer(value) {
+    const player = value && typeof value === "object" ? value : {};
+    return {
+      score: Math.floor(clamp(player.score, 0, 999999999)),
+      health: clamp(player.health, 0, 100),
+      combo: clamp(player.combo, 1, 99),
+      action: allowedString(player.action, validActions, "neutral"),
+      feedback: optionalString(player.feedback, 48)
+    };
+  }
+
+  function normalizeStats(value) {
+    if (!Array.isArray(value)) return [];
+    return value.slice(0, 4).map((stat) => ({
+      label: boundedString(stat && stat.label, "STAT", 32),
+      value: boundedString(stat && stat.value, "0", 32)
+    }));
+  }
+
+  function formatTime(seconds) {
+    const safe = Math.max(0, Math.floor(number(seconds, 0)));
+    return `${Math.floor(safe / 60)}:${String(safe % 60).padStart(2, "0")}`;
+  }
+
+  function normalizeState(input) {
+    const value = input && typeof input === "object" ? input : {};
+    const screen = validScreens.has(value.screen) ? value.screen : "ready";
+    const normalized = {
+      schemaVersion: number(value.schemaVersion, 2),
+      sequence: Math.max(0, Math.floor(number(value.sequence, 0))),
+      screen,
+      positioning: null,
+      fight: null,
+      cricket: null,
+      versusSetup: null,
+      versus: null,
+      result: null,
+      versusResult: null,
+      cricketDuelHandoff: null,
+      cricketDuelResult: null,
+      timingCheck: null
+    };
+
+    if (screen === "positioning") {
+      const positioning = value.positioning && typeof value.positioning === "object" ? value.positioning : {};
+      normalized.positioning = {
+        isReady: positioning.isReady === true,
+        instruction: boundedString(positioning.instruction, "Fit your upper body in the frame", 160),
+        eyebrow: positioning.eyebrow == null ? null : boundedString(positioning.eyebrow, "", 80),
+        title: positioning.title == null ? null : boundedString(positioning.title, "", 120),
+        detail: positioning.detail == null ? null : boundedString(positioning.detail, "", 240),
+        hand: positioning.hand == null ? null : boundedString(positioning.hand, "", 60),
+        canHold: positioning.canHold === true,
+        progress: Math.max(0, Math.min(1, Number(positioning.progress) || 0)),
+        // Build 134 phones name the gesture; older ones need both hands.
+        holdLabel: boundedString(positioning.holdLabel, "Raise both hands to play", 60)
+      };
+    }
+
+    if (screen === "fight") {
+      const fight = value.fight && typeof value.fight === "object" ? value.fight : {};
+      normalized.fight = {
+        phase: allowedString(fight.phase, fightPhases, "ready"),
+        phaseValue: optionalString(fight.phaseValue, 80),
+        phaseDetail: optionalString(fight.phaseDetail, 160),
+        score: Math.floor(clamp(fight.score, 0, 999999999)),
+        combo: clamp(fight.combo, 1, 99),
+        timeRemaining: Math.floor(clamp(fight.timeRemaining, 0, 3600)),
+        playerHealth: clamp(fight.playerHealth, 0, 100),
+        opponentHealth: clamp(fight.opponentHealth, 0, 100),
+        playerAction: allowedString(fight.playerAction, validActions, "neutral"),
+        opponentStyle: allowedString(fight.opponentStyle, validStyles, "aggressor"),
+        opponentName: boundedString(fight.opponentName, "Opponent", 48),
+        currentAttack: allowedString(fight.currentAttack, validAttacks, "straight"),
+        calledDefense: boundedString(fight.calledDefense, "Slip left", 80),
+        currentRound: Math.floor(clamp(fight.currentRound, 1, 5)),
+        attackCommitted: fight.attackCommitted === true,
+        opponentHit: fight.opponentHit === true,
+        comboStep: fight.comboStep == null ? null : Math.floor(clamp(fight.comboStep, 1, 99)),
+        comboTotal: fight.comboTotal == null ? null : Math.floor(clamp(fight.comboTotal, 1, 99)),
+        telegraphDuration: clamp(fight.telegraphDuration, 0.1, 10)
+      };
+    }
+
+    if (screen === "cricket") {
+      const cricket = value.cricket && typeof value.cricket === "object" ? value.cricket : {};
+      normalized.cricket = {
+        phase: allowedString(cricket.phase, cricketPhases, "ready"),
+        phaseValue: optionalString(cricket.phaseValue, 80),
+        phaseDetail: optionalString(cricket.phaseDetail, 160),
+        runs: Math.floor(clamp(cricket.runs, 0, 99999)),
+        wicketsLost: Math.floor(clamp(cricket.wicketsLost, 0, 20)),
+        wicketLimit: Math.floor(clamp(cricket.wicketLimit, 1, 20)),
+        ballsFaced: Math.floor(clamp(cricket.ballsFaced, 0, 999)),
+        totalBalls: Math.floor(clamp(cricket.totalBalls, 1, 999)),
+        runsNeeded: cricket.runsNeeded == null ? null : Math.floor(clamp(cricket.runsNeeded, 0, 99999)),
+        ballsRemaining: Math.floor(clamp(cricket.ballsRemaining, 0, 999)),
+        playerAction: allowedString(cricket.playerAction, validActions, "neutral")
+      };
+    }
+
+    if (screen === "versusSetup") {
+      const setup = value.versusSetup && typeof value.versusSetup === "object" ? value.versusSetup : {};
+      normalized.versusSetup = {
+        isLeftReady: setup.isLeftReady === true,
+        isRightReady: setup.isRightReady === true,
+        isReady: setup.isReady === true,
+        instruction: boundedString(setup.instruction, "Stand side by side", 160)
+      };
+    }
+
+    if (screen === "versus") {
+      const versus = value.versus && typeof value.versus === "object" ? value.versus : {};
+      normalized.versus = {
+        phase: allowedString(versus.phase, versusPhases, "ready"),
+        phaseValue: optionalString(versus.phaseValue, 80),
+        phaseDetail: optionalString(versus.phaseDetail, 160),
+        timeRemaining: Math.floor(clamp(versus.timeRemaining, 0, 3600)),
+        currentAttack: allowedString(versus.currentAttack, validAttacks, "straight"),
+        calledDefense: boundedString(versus.calledDefense, "Slip left", 80),
+        comboStep: versus.comboStep == null ? null : Math.floor(clamp(versus.comboStep, 1, 99)),
+        comboTotal: versus.comboTotal == null ? null : Math.floor(clamp(versus.comboTotal, 1, 99)),
+        telegraphDuration: clamp(versus.telegraphDuration, 0.1, 10),
+        left: normalizePlayer(versus.left),
+        right: normalizePlayer(versus.right)
+      };
+    }
+
+    if (screen === "result") {
+      const result = value.result && typeof value.result === "object" ? value.result : {};
+      normalized.result = {
+        mode: boundedString(result.mode, "FIGHT", 48),
+        headline: boundedString(result.headline, "Fight complete", 80),
+        score: Math.floor(clamp(result.score, 0, 999999999)),
+        caption: boundedString(result.caption, "FINAL SCORE", 48),
+        isPersonalBest: result.isPersonalBest === true,
+        stats: normalizeStats(result.stats),
+        scoreText: result.scoreText == null ? null : boundedString(result.scoreText, "", 24),
+        hint: result.hint == null ? null : boundedString(result.hint, "", 120),
+        // Build 145 phones send what the innings earned.
+        reward: result.reward && typeof result.reward === "object" ? {
+          title: boundedString(result.reward.title, "YOU EARNED", 40),
+          xp: Math.floor(clamp(result.reward.xp, 0, 1000000)),
+          coins: Math.floor(clamp(result.reward.coins, 0, 1000000)),
+          detail: boundedString(result.reward.detail, "", 120),
+          // Career-9 phones add a level-up line and the milestones reached.
+          levelUp: result.reward.levelUp == null ? null : boundedString(result.reward.levelUp, "", 60),
+          milestones: Array.isArray(result.reward.milestones)
+            ? result.reward.milestones.filter((line) => typeof line === "string" && line).slice(0, 4).map((line) => boundedString(line, "", 80))
+            : []
+        } : null
+      };
+    }
+
+    if (screen === "versusResult") {
+      const result = value.versusResult && typeof value.versusResult === "object" ? value.versusResult : {};
+      const winner = result.winner === "left" || result.winner === "right" ? result.winner : null;
+      normalized.versusResult = {
+        headline: boundedString(result.headline, "DRAW", 80),
+        detail: boundedString(result.detail, "RUN IT BACK", 120),
+        winner,
+        leftScore: Math.floor(clamp(result.leftScore, 0, 999999999)),
+        rightScore: Math.floor(clamp(result.rightScore, 0, 999999999)),
+        leftDefense: Math.floor(clamp(result.leftDefense, 0, 100)),
+        rightDefense: Math.floor(clamp(result.rightDefense, 0, 100)),
+        leftCounters: Math.floor(clamp(result.leftCounters, 0, 9999)),
+        rightCounters: Math.floor(clamp(result.rightCounters, 0, 9999))
+      };
+    }
+
+    if (screen === "cricketDuelHandoff") {
+      const handoff = value.cricketDuelHandoff && typeof value.cricketDuelHandoff === "object" ? value.cricketDuelHandoff : {};
+      normalized.cricketDuelHandoff = {
+        target: Math.floor(clamp(handoff.target, 1, 99999)),
+        balls: Math.floor(clamp(handoff.balls, 1, 999)),
+        wickets: Math.floor(clamp(handoff.wickets, 1, 20)),
+        rules: optionalString(handoff.rules, 120),
+        title: optionalString(handoff.title, 80),
+        note: optionalString(handoff.note, 120)
+      };
+    }
+
+    if (screen === "cricketDuelResult") {
+      const result = value.cricketDuelResult && typeof value.cricketDuelResult === "object" ? value.cricketDuelResult : {};
+      const winner = ["first", "second", "tie"].includes(result.winner) ? result.winner : "tie";
+      normalized.cricketDuelResult = {
+        headline: boundedString(result.headline, "TIED", 80),
+        margin: boundedString(result.margin, "SCORES LEVEL", 160),
+        winner,
+        firstRuns: Math.floor(clamp(result.firstRuns, 0, 99999)),
+        firstWickets: Math.floor(clamp(result.firstWickets, 0, 20)),
+        secondRuns: Math.floor(clamp(result.secondRuns, 0, 99999)),
+        secondWickets: Math.floor(clamp(result.secondWickets, 0, 20)),
+        firstName: optionalString(result.firstName, 40),
+        secondName: optionalString(result.secondName, 40),
+        eyebrow: optionalString(result.eyebrow, 40),
+        note: optionalString(result.note, 120)
+      };
+    }
+
+    if (screen === "timingCheck") {
+      const check = value.timingCheck && typeof value.timingCheck === "object" ? value.timingCheck : {};
+      normalized.timingCheck = {
+        headline: boundedString(check.headline, "Timing check", 80),
+        detail: optionalString(check.detail, 200),
+        verdicts: (Array.isArray(check.verdicts) ? check.verdicts : []).slice(0, 12)
+          .map((verdict) => verdicts.has(verdict) ? verdict : "noSwing"),
+        lines: (Array.isArray(check.lines) ? check.lines : []).slice(0, 6)
+          .map((line) => optionalString(line, 200)).filter(Boolean),
+        note: boundedString(check.note, "Raise both hands to play your innings", 120)
+      };
+    }
+
+    // Build 154: a result screen's picture from the phone (receiver-card-
+    // core.js) and the raise-hand ring drawn live over it. Build 158
+    // (receiver 52): the stadium setup's picture too, its hold ring drawn
+    // live from `positioning.progress`.
+    const resultScreen = ["result", "versusResult", "cricketDuelResult", "timingCheck"].includes(screen);
+    const pictureScreen = resultScreen || screen === "positioning";
+    normalized.card = pictureScreen && typeof value.card === "string" && /^[0-9a-z]{1,32}\.[0-9a-z]{1,32}$/.test(value.card) ? value.card : null;
+    normalized.hold = resultScreen && Number(value.hold) > 0 ? Math.min(1, Number(value.hold)) : null;
+    // Receiver 56: the app-open welcome, on the ready screen only.
+    normalized.welcome = screen === "ready" ? normalizeWelcome(value.welcome) : null;
+
+    return normalized;
+  }
+
+  // The app-open welcome the phone is playing (CastDisplayState.Welcome):
+  // its id, full or short, Reduce Motion, how far in it is, the
+  // commentator's lines (words, start, length in ms) and when the TV hands
+  // back to its ready screen. Anything else is no welcome.
+  function normalizeWelcome(value) {
+    if (!value || typeof value !== "object" || typeof value.id !== "string" || !/^[0-9a-z-]{1,40}$/.test(value.id)) return null;
+    if (value.kind !== "full" && value.kind !== "short") return null;
+    const ms = (x, max) => Math.max(0, Math.min(max, Math.round(number(x, 0))));
+    const lines = (Array.isArray(value.lines) ? value.lines : []).slice(0, 3)
+      .filter((line) => line && typeof line.text === "string" && line.text.trim())
+      .map((line) => ({ text: boundedString(line.text, "", 160), at: ms(line.at, 60000), duration: ms(line.duration, 20000) }));
+    return { id: value.id, kind: value.kind, reduced: value.reduced === true, elapsed: ms(value.elapsed, 60000), lines,
+      end: ms(value.end, 60000) };
+  }
+
+  function parseMessage(data) {
+    if (typeof data === "string") {
+      try { return normalizeState(JSON.parse(data)); } catch (_) { return normalizeState(null); }
+    }
+    return normalizeState(data);
+  }
+
+  function fightSample(kind) {
+    const phaseMap = {
+      fight: ["telegraph", "leftHook", "DUCK"],
+      tracking: ["trackingPaused", "TRACKING PAUSED", "Keep your head and shoulders in the frame"],
+      opening: ["opening", "LEFT HOOK!", "LEFT HAND"],
+      feedback: ["feedback", "perfect", "RIGHT ON THE CUE"]
+    };
+    const phase = phaseMap[kind] || phaseMap.fight;
+    return {
+      phase: phase[0], phaseValue: phase[1], phaseDetail: phase[2],
+      score: 2840, combo: 1.75, timeRemaining: 42,
+      playerHealth: 82, opponentHealth: 54, playerAction: "slipLeft",
+      opponentStyle: "aggressor", opponentName: "Aggressor",
+      currentAttack: "leftHook", calledDefense: "Duck", currentRound: 1,
+      attackCommitted: kind === "fight", opponentHit: kind === "feedback",
+      comboStep: kind === "opening" ? 2 : null, comboTotal: kind === "opening" ? 3 : null,
+      telegraphDuration: 1.3
+    };
+  }
+
+  function sampleState(kind) {
+    const base = { schemaVersion: 2, sequence: 10 };
+    if (kind === "positioning") return normalizeState({ ...base, screen: "positioning", positioning: { isReady: true, instruction: "You’re ready.", eyebrow: "FIND YOUR CREASE", title: "You’re ready.", detail: "Return to your stance.\nRaise both hands and hold to start.", hand: "Right-handed batter", canHold: true, progress: 0.45 } });
+    if (kind === "cricket") return normalizeState({ ...base, screen: "cricket", cricket: { phase: "delivery", phaseValue: "FULL!", phaseDetail: "DRIVE", runs: 18, wicketsLost: 1, wicketLimit: 3, ballsFaced: 7, totalBalls: 12, ballsRemaining: 5, playerAction: "counterRight" } });
+    if (kind === "versusSetup") return normalizeState({ ...base, screen: "versusSetup", versusSetup: { isLeftReady: true, isRightReady: false, instruction: "RED CORNER SET — ONE MORE" } });
+    if (kind === "versus") return normalizeState({ ...base, screen: "versus", versus: { phase: "defend", phaseValue: "leftHook", phaseDetail: "DUCK", timeRemaining: 41, currentAttack: "leftHook", calledDefense: "Duck", telegraphDuration: 1.3, left: { score: 1700, health: 82, combo: 1.5, action: "duck" }, right: { score: 1450, health: 70, combo: 1.25, action: "duck" } } });
+    if (kind === "result") return normalizeState({ ...base, screen: "result", result: { mode: "QUICK FIGHT", headline: "You win", score: 4820, caption: "NEW PERSONAL BEST", isPersonalBest: true, stats: [{ label: "DEFENSE", value: "86%" }, { label: "REACTION", value: "312 MS" }, { label: "BEST COMBO", value: "×2.50" }] } });
+    // The build 152 Chromecast photo's screen, with a level-up and milestones
+    // too: the fullest result screen there is.
+    if (kind === "cricketResultLong") return normalizeState({ ...base, screen: "result", result: { mode: "RALLYCADE WORLD CUP · INDIA · GROUP 3/3 vs IRELAND", headline: "Fell short. Lost by 17 runs.", score: 18, scoreText: "18/3", caption: "RUNS", isPersonalBest: false, stats: [{ label: "TARGET", value: "36" }, { label: "OVERS", value: "2.1" }, { label: "RUN RATE", value: "8.3" }, { label: "GROUP", value: "3RD · 2 PTS" }], hint: "Raise a hand for the next match", reward: { title: "YOU EARNED", xp: 92, coins: 23, detail: "Out of the RallyCade World Cup. Pick a country and try again.", levelUp: "LEVEL UP · Level 13 · +65 coins", milestones: ["Milestone: 25 innings · +40 XP · +20 coins"] } } });
+    // The two results of the build 153 photos (a chase won, Nets), for
+    // before/after pictures of the phone's scorecard.
+    if (kind === "chaseWon") return normalizeState({ ...base, screen: "result", result: { mode: "STADIUM INNINGS", headline: "Chased it down! Won with 12 balls to spare.", score: 37, scoreText: "37/1", caption: "NEW PERSONAL BEST", isPersonalBest: true, stats: [{ label: "TARGET", value: "35" }, { label: "OVERS", value: "2.0" }, { label: "RUN RATE", value: "18.5" }], hint: "Raise a hand for another chase", reward: { title: "CHASE WON", xp: 160, coins: 39, detail: "Target beaten. Bonus included." } } });
+    if (kind === "nets") return normalizeState({ ...base, screen: "result", result: { mode: "STADIUM INNINGS", headline: "Nets complete", score: 42, scoreText: "42", caption: "RUNS", isPersonalBest: false, stats: [{ label: "BALLS", value: "12" }, { label: "SCORING SHOTS", value: "10" }], hint: "Raise a hand for more Nets" } });
+    if (kind === "versusResult") return normalizeState({ ...base, screen: "versusResult", versusResult: { headline: "RED CORNER WINS", detail: "ON POINTS", winner: "left", leftScore: 4200, rightScore: 3700, leftDefense: 88, rightDefense: 76, leftCounters: 5, rightCounters: 3 } });
+    if (kind === "cricketDuelHandoff") return normalizeState({ ...base, screen: "cricketDuelHandoff", cricketDuelHandoff: { target: 32, balls: 12, wickets: 3 } });
+    if (kind === "cricketDuelResult") return normalizeState({ ...base, screen: "cricketDuelResult", cricketDuelResult: { headline: "PLAYER 2 WINS", margin: "BY 2 WICKETS · 1 BALL TO SPARE", winner: "second", firstRuns: 31, firstWickets: 3, secondRuns: 32, secondWickets: 1 } });
+    if (kind === "timingCheck") return normalizeState({ ...base, screen: "timingCheck", timingCheck: { headline: "Mostly early", detail: "Your swings met the ball about a quarter of a second before it reached you.", verdicts: ["early", "littleEarly", "perfect", "early", "littleEarly", "noSwing"], lines: ["Balls 1 and 4 were early.", "Balls 2 and 5 were a little early.", "Ball 3 was perfect.", "Ball 6 had no swing.", "Wait for the ball to reach the crease before you swing."], note: "Raise both hands to play your innings" } });
+    if (kind === "ready" || !kind) return normalizeState({ ...base, sequence: 1, screen: "ready" });
+    // ?preview=welcome: the app-open welcome as the phone sends it (an evening, a 4-day streak).
+    if (kind === "welcome" || kind === "welcomeShort") {
+      return normalizeState({ ...base, sequence: 2, screen: "ready", welcome: kind === "welcome"
+        ? { id: "preview1", kind: "full", reduced: false, elapsed: 0, end: 4950,
+            lines: [{ text: "Welcome back! The crowd's been waiting.", at: 1650, duration: 2850 },
+              { text: "Four days in a row. Keep the streak going!", at: 4800, duration: 2600 }] }
+        : { id: "preview2", kind: "short", reduced: false, elapsed: 0, end: 2050, lines: [{ text: "Back at the crease!", at: 300, duration: 1300 }] } });
+    }
+    return normalizeState({ ...base, screen: "fight", fight: fightSample(kind) });
+  }
+
+  // Build 153, a Chromecast: "the text is way too large" — "FELL SHORT. LOST
+  // BY 17 RUNS." filled two lines at 7vw over the score. The result headline
+  // is sized by its length: as large as one line allows (at most 5.6vw),
+  // two lines only for a long one, never more. Widths are estimated from the
+  // rounded heavy type (uppercase averages ~0.66em, a space ~0.3em).
+  const HEADLINE = { maxVw: 5.6, oneLineMinVw: 3.8, minVw: 2.8, widthVw: 84 };
+  function estimateWidth(text, fontPx) {
+    let ems = 0;
+    for (const ch of String(text)) ems += ch === " " ? 0.3 : /[.,·:'!]/.test(ch) ? 0.34 : /[0-9]/.test(ch) ? 0.62 : 0.68;
+    return ems * fontPx;
+  }
+  function wrapLines(text, fontPx, maxWidth) {
+    const words = String(text).split(/\s+/).filter(Boolean);
+    const lines = [];
+    let line = "";
+    for (const word of words) {
+      const next = line ? line + " " + word : word;
+      if (line && estimateWidth(next, fontPx) > maxWidth) { lines.push(line); line = word; } else { line = next; }
+    }
+    if (line) lines.push(line);
+    return lines;
+  }
+  function resultHeadlineSize(text, viewportWidth) {
+    const vw = viewportWidth / 100;
+    const maxWidth = HEADLINE.widthVw * vw;
+    const max = Math.min(HEADLINE.maxVw * vw, 120);
+    for (let px = max; px >= HEADLINE.oneLineMinVw * vw; px -= 1) {
+      if (wrapLines(text, px, maxWidth).length <= 1) return { fontPx: Math.floor(px), lines: 1 };
+    }
+    for (let px = HEADLINE.oneLineMinVw * vw; px >= HEADLINE.minVw * vw; px -= 1) {
+      const lines = wrapLines(text, px, maxWidth).length;
+      if (lines <= 2) return { fontPx: Math.floor(px), lines };
+    }
+    const px = Math.floor(HEADLINE.minVw * vw);
+    return { fontPx: px, lines: wrapLines(text, px, maxWidth).length };
+  }
+
+  // The setup eyebrow with its target hidden for its reveal, or null.
+  const TARGET_REVEAL_MS = 700;
+  function hideTarget(line) {
+    const value = String(line || "");
+    for (const pattern of [/\d+(?= TO WIN)/, /(?<=CHASING )\d+/]) {
+      if (pattern.test(value)) return value.replace(pattern, "?");
+    }
+    return null;
+  }
+
+  return { clamp, formatTime, normalizeJoints, normalizeState, normalizeWelcome, parseMessage, sampleState, resultHeadlineSize, estimateWidth,
+    wrapLines, hideTarget, TARGET_REVEAL_MS };
+});

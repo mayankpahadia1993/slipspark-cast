@@ -1,0 +1,8 @@
+{
+  "environment": "staging",
+  "commit": "b6c7369449eff2adc1f4bb4db228a2593e003ebc",
+  "subject": "Chromecast staging receiver: deploy to staging/, promote, Debug builds on 9AFC369F",
+  "receiverTree": "0780185028b648ae6d48862b8f2259a2e75de187",
+  "revision": 62,
+  "deployedAt": "2026-10-20T07:12:14Z"
+}

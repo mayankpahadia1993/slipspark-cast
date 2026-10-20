@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RallyCade TV</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800;900&family=Nunito:wght@600;700;800;900&display=swap">
+  <link rel="stylesheet" href="receiver.css?v=62">
+  <script src="https://www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>
+</head>
+<body>
+  <main id="app" data-screen="ready" data-phase="ready" aria-live="polite">
+    <div class="ambient ambient-one"></div>
+    <div class="ambient ambient-two"></div>
+    <div class="arena-lines" aria-hidden="true">
+      <i></i><i></i><i></i>
+    </div>
+
+    <section id="ready-screen" class="screen ready-screen">
+      <div class="brand-mark" aria-label="RallyCade">
+        <img class="brand-icon" src="rallycade-icon.png" alt="">
+        <span>RALLYCADE</span>
+      </div>
+      <div class="ready-status"><span class="status-dot"></span> TV READY</div>
+      <h1>Your stadium<br>is ready</h1>
+      <p>Tap Play innings on your phone. Keep it below the TV, facing you.</p>
+    </section>
+
+    <section id="positioning-screen" class="screen positioning-screen" hidden>
+      <div class="stadium-card">
+        <span id="positioning-eyebrow" class="eyebrow">FIND YOUR CREASE</span>
+        <h1 id="positioning-title">Step into view.</h1>
+        <p id="positioning-detail" class="card-detail"></p>
+        <span id="positioning-hand" class="card-note" hidden></span>
+        <!-- As on the phone: the words, and once both hands are up a ring
+             that fills while they stay up. -->
+        <div id="positioning-hold" class="hold" hidden>
+          <span id="positioning-hold-label" class="hold-label">Raise both hands to play</span>
+          <svg class="hold-ring" viewBox="0 0 100 100" aria-hidden="true">
+            <circle class="hold-track" cx="50" cy="50" r="44"></circle>
+            <circle class="hold-fill" cx="50" cy="50" r="44"></circle>
+          </svg>
+        </div>
+      </div>
+    </section>
+
+    <!-- Play before the stadium's first frame (and phones that can't draw
+         it): the branded holding screen. Oct 18 2026: no HTML game boards
+         during play (a house party's TV showed a ball call over one). -->
+    <section id="holding-screen" class="screen ready-screen holding-screen" hidden>
+      <div class="brand-mark" aria-label="RallyCade">
+        <img class="brand-icon" src="rallycade-icon.png" alt="">
+        <span>RALLYCADE</span>
+      </div>
+      <div class="ready-status"><span class="status-dot"></span> <span id="holding-status">STADIUM LOADING</span></div>
+      <h1 id="holding-title">Your stadium<br>is on its way</h1>
+      <p id="holding-detail">Keep playing on your phone.</p>
+      <p id="holding-score" class="holding-score" hidden></p>
+    </section>
+
+    <section id="result-screen" class="screen scorecard-screen" hidden>
+      <span id="result-mode" class="eyebrow">FIGHT</span>
+      <h1 id="result-headline">YOU WIN</h1>
+      <strong id="result-score" class="hero-score">0</strong>
+      <span id="result-caption" class="score-caption">FINAL SCORE</span>
+      <div id="result-stats" class="result-stats"></div>
+      <div id="result-reward" class="result-reward" hidden>
+        <span id="result-reward-title" class="eyebrow">YOU EARNED</span>
+        <div class="result-reward-amounts"><strong id="result-reward-xp">+0 XP</strong><strong id="result-reward-coins" class="gold">+0 coins</strong></div>
+        <strong id="result-reward-level" class="result-reward-level" hidden></strong>
+        <ul id="result-reward-milestones" class="result-reward-milestones"></ul>
+        <small id="result-reward-detail"></small>
+      </div>
+      <p id="result-hint">Raise both hands to go again · Results saved on your phone</p>
+    </section>
+
+    <section id="versus-result-screen" class="screen scorecard-screen" hidden>
+      <span class="eyebrow">1V1 FIGHT</span>
+      <h1 id="versus-result-headline">DRAW</h1>
+      <span id="versus-result-detail" class="score-caption">RUN IT BACK</span>
+      <div class="versus-result-grid">
+        <div id="versus-result-left" class="result-corner red"><span>RED CORNER</span><strong id="versus-result-left-score">0</strong><small id="versus-result-left-stats"></small></div>
+        <div id="versus-result-right" class="result-corner blue"><span>BLUE CORNER</span><strong id="versus-result-right-score">0</strong><small id="versus-result-right-stats"></small></div>
+      </div>
+      <p>Raise both hands for a rematch</p>
+    </section>
+
+    <section id="duel-handoff-screen" class="screen scorecard-screen" hidden>
+      <span class="eyebrow">INNINGS BREAK</span>
+      <h1 id="duel-handoff-title">PLAYER 2 — YOUR CHASE</h1>
+      <strong id="duel-target" class="hero-score">1</strong>
+      <span id="duel-rules" class="score-caption"></span>
+      <p id="duel-handoff-note">Raise both hands at the crease to begin</p>
+    </section>
+
+    <section id="duel-result-screen" class="screen scorecard-screen" hidden>
+      <span id="duel-result-eyebrow" class="eyebrow">CHASE DUEL</span>
+      <h1 id="duel-result-headline">TIED</h1>
+      <span id="duel-result-margin" class="score-caption">SCORES LEVEL</span>
+      <div class="versus-result-grid">
+        <div id="duel-result-first" class="result-corner"><span id="duel-result-first-name">PLAYER 1</span><strong id="duel-result-first-score">0</strong><small id="duel-result-first-wickets"></small></div>
+        <div id="duel-result-second" class="result-corner"><span id="duel-result-second-name">PLAYER 2</span><strong id="duel-result-second-score">0</strong><small id="duel-result-second-wickets"></small></div>
+      </div>
+      <p id="duel-result-note">Raise both hands for another duel</p>
+    </section>
+    <section id="timing-check-screen" class="screen timing-check-screen" hidden>
+      <div class="stadium-card">
+        <span class="eyebrow">TIMING CHECK</span>
+        <h1 id="timing-headline">Right on time</h1>
+        <p id="timing-detail" class="card-detail"></p>
+        <div id="timing-balls" class="timing-balls"></div>
+        <ul id="timing-lines" class="timing-lines"></ul>
+        <p id="timing-note" class="card-note"></p>
+      </div>
+    </section>
+  </main>
+
+  <!-- Build 154: a result as the phone's own TV scorecard, drawn on the
+       phone (receiver-card-core.js), with the raise-hand ring live over it. -->
+  <section id="card" class="card-screen" hidden aria-label="RallyCade scorecard">
+    <img id="card-image" class="card-image" alt="" hidden>
+    <div id="card-hold" class="hold card-hold" hidden>
+      <svg class="hold-ring" viewBox="0 0 100 100" aria-hidden="true">
+        <circle class="hold-track" cx="50" cy="50" r="44"></circle>
+        <circle class="hold-fill" cx="50" cy="50" r="44"></circle>
+      </svg>
+      <span class="hold-label" hidden></span>
+    </div>
+    <!-- Build 158: the setup's hold ring, where the phone's picture has it,
+         filling live (receiver-card-core.js ringPlacement). -->
+    <svg id="card-ring" class="card-ring" viewBox="-5 -5 110 110" aria-hidden="true" hidden>
+      <circle class="card-ring-track" cx="50" cy="50" r="50"></circle>
+      <circle class="card-ring-fill" cx="50" cy="50" r="50"></circle>
+    </svg>
+  </section>
+
+  <!-- Receiver 56: the app-open welcome, played here while the phone plays
+       it (receiver-welcome.js): the stadium's floodlights coming on, the
+       logo landing and the commentator's lines. Over the ready screen. -->
+  <section id="welcome" class="welcome" hidden aria-hidden="true">
+    <div id="welcome-stage" class="welcome-stage">
+      <div id="welcome-canvas" class="welcome-canvas">
+        <img class="welcome-photo welcome-dark" src="welcome-stadium.jpg" alt="">
+        <img class="welcome-photo welcome-lit" src="welcome-stadium.jpg" alt="">
+        <img class="welcome-photo welcome-lit" src="welcome-stadium.jpg" alt="">
+        <img class="welcome-photo welcome-lit" src="welcome-stadium.jpg" alt="">
+        <img class="welcome-photo welcome-lit" src="welcome-stadium.jpg" alt="">
+        <img id="welcome-lit-all" class="welcome-photo" src="welcome-stadium.jpg" alt="">
+        <div class="welcome-glow"></div><div class="welcome-glow"></div><div class="welcome-glow"></div><div class="welcome-glow"></div>
+        <div class="welcome-vignette"></div>
+        <div id="welcome-scrim" class="welcome-scrim"></div>
+        <div id="welcome-halo" class="welcome-halo"></div>
+        <img id="welcome-icon" class="welcome-icon" src="rallycade-icon.png" alt="">
+        <div id="welcome-wordmark" class="welcome-wordmark">RALLYCADE</div>
+      </div>
+    </div>
+    <div id="welcome-caption" class="welcome-caption" hidden>
+      <svg class="hud-mic" viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="2" width="8" height="13" rx="4"/><path d="M5 11a7 7 0 0 0 14 0" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/><rect x="10.8" y="18" width="2.4" height="4" rx="1"/></svg>
+      <span id="welcome-caption-text"></span>
+    </div>
+  </section>
+
+  <video id="stream" muted autoplay playsinline disablepictureinpicture aria-label="RallyCade on your phone"></video>
+
+  <!-- The stadium the TV draws from the phone's drawing commands, and its HUD. -->
+  <section id="scene" class="scene" hidden aria-label="RallyCade stadium">
+    <!-- 16:9, letterboxed on any other screen shape. -->
+    <div id="scene-stage" class="scene-stage">
+    <img id="scene-backdrop" alt="" hidden>
+    <canvas id="scene-canvas"></canvas>
+    <!-- The broadcast shading at the top and bottom, as on the phone. -->
+    <div class="scene-shade" aria-hidden="true"></div>
+    <div id="scene-hud" class="scene-hud">
+      <div class="hud-top">
+        <div class="hud-left">
+          <div id="hud-score" class="hud-scorebug">
+            <strong id="hud-runs">0/0</strong>
+            <span class="hud-overs"><small>OVERS</small><b id="hud-overs">0.0 of 2</b></span>
+          </div>
+          <div id="hud-check" class="hud-scorebug hud-check" hidden>
+            <small id="hud-check-title">TIMING CHECK</small><strong id="hud-check-ball">Ball 1 of 6</strong>
+          </div>
+          <div id="hud-friend" class="hud-friend" hidden></div>
+        </div>
+        <div id="hud-status" class="hud-status">
+          <strong id="hud-status-title"></strong>
+          <span id="hud-status-detail" hidden></span>
+        </div>
+        <div class="hud-right">
+          <div class="hud-over-card">
+            <div id="hud-over"><small>THIS OVER</small><div id="hud-over-dots" class="hud-dots"><i></i><i></i><i></i><i></i><i></i><i></i></div></div>
+            <div id="hud-verdicts" hidden><small>YOUR TIMING</small><div id="hud-verdict-dots" class="hud-dots hud-verdict-dots"></div></div>
+          </div>
+          <div id="hud-speed" class="hud-speed" hidden></div>
+        </div>
+      </div>
+      <div id="hud-cards" class="hud-cards" hidden>
+        <div id="hud-timing" class="hud-timing"></div>
+        <div id="hud-cue" class="hud-cue" hidden>
+          <strong id="hud-cue-title"></strong>
+          <b id="hud-cue-direction"></b>
+          <span id="hud-cue-detail"></span>
+        </div>
+      </div>
+      <div id="hud-moves" class="hud-moves" hidden></div>
+      <div id="hud-caption" class="hud-caption" hidden>
+        <svg class="hud-mic" viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="2" width="8" height="13" rx="4"/><path d="M5 11a7 7 0 0 0 14 0" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/><rect x="10.8" y="18" width="2.4" height="4" rx="1"/></svg>
+        <span id="hud-caption-text"></span>
+      </div>
+      <div id="hud-interruption" class="hud-interruption" hidden>
+        <!-- The phone's pause.fill at .title: two bars about 22 points tall in a 34-point line. -->
+        <svg class="hud-pause" viewBox="0 0 34 34" aria-hidden="true"><rect x="9" y="6" width="6.5" height="22" rx="1.6"/><rect x="18.5" y="6" width="6.5" height="22" rx="1.6"/></svg>
+        <span id="hud-int-title" class="hud-int-title"></span>
+        <strong id="hud-int-instruction" class="hud-int-instruction" hidden></strong>
+        <span id="hud-int-detail" class="hud-int-detail"></span>
+        <!-- The card already says how to play on: only the ring, while hands are up. -->
+        <div id="hud-int-progress" class="hold" hidden>
+          <span id="hud-int-hold-label" class="hold-label" hidden></span>
+          <svg class="hold-ring" viewBox="0 0 100 100" aria-hidden="true">
+            <circle class="hold-track" cx="50" cy="50" r="44"></circle>
+            <circle class="hold-fill" cx="50" cy="50" r="44"></circle>
+          </svg>
+        </div>
+      </div>
+    </div>
+    </div>
+  </section>
+  <!-- ?v= keeps a Chromecast from mixing cached files of two receiver versions. -->
+  <script src="receiver-core.js?v=62"></script>
+  <script src="receiver-card-core.js?v=62"></script>
+  <script src="receiver-video.js?v=62"></script>
+  <script src="receiver-scene-core.js?v=62"></script>
+  <script src="receiver-scene.js?v=62"></script>
+  <script src="receiver-welcome.js?v=62"></script>
+  <script src="receiver-music.js?v=62"></script>
+  <script src="receiver.js?v=62"></script>
+</body>
+</html>
