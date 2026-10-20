@@ -1,8 +1,8 @@
 {
   "environment": "staging",
-  "commit": "b6c7369449eff2adc1f4bb4db228a2593e003ebc",
-  "subject": "Chromecast staging receiver: deploy to staging/, promote, Debug builds on 9AFC369F",
-  "receiverTree": "0780185028b648ae6d48862b8f2259a2e75de187",
-  "revision": 62,
-  "deployedAt": "2026-10-20T07:12:14Z"
+  "commit": "c86ffc827b165f412250b079390fab0306120651",
+  "subject": "Bowler's-end inset: parity baseline at 3bdf114f",
+  "receiverTree": "ccc796c49fd6898cd624d6428dab8c6aaf77af14",
+  "revision": 63,
+  "deployedAt": "2026-10-20T18:00:11Z"
 }

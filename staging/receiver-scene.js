@@ -19,7 +19,7 @@
 
   function createScene(options) {
     const root = options.root;
-    const canvas = options.canvas;
+    let canvas = options.canvas;
     const hud = options.hud;
     const send = options.send;
     // The 16:9 box the stadium fills, in CSS pixels.
@@ -29,7 +29,40 @@
     // Chromecast page's thread, the bench's cpu=3 profile).
     let measuredBox = 0;
     const boxWidth = () => measuredBox || (measuredBox = stageBox.clientWidth || 0) || window.innerWidth;
-    const ctx = canvas.getContext("2d");
+    // Oct 19 2026 (iOS 202 on a 32-bit Chromecast: the weak plan's 854
+    // canvas drew no faster than the 1280 one, 7–10 a second, each draw under
+    // 10 ms of script; the loop's rate was set by what the TV did besides
+    // the script). On a weak dongle the canvas is opaque and draws the photo
+    // and the shading itself (`WEAK_TUNED`), so the TV composites one opaque
+    // layer and the HUD, not the photo's layer, a see-through canvas over it
+    // and two shading layers. `opaqueCanvas` is what the canvas was made with.
+    let opaqueCanvas = false;
+    let ctx = core.isWeakDongle(navigator.userAgent) ? opaqueContext(canvas) : canvas.getContext("2d");
+    function opaqueContext(target) {
+      const context = target.getContext("2d", { alpha: false });
+      opaqueCanvas = true;
+      return context;
+    }
+    // The canvas's alpha is fixed once it has a context: the other kind
+    // takes a new canvas element in the same place (the bench's `x.weak` on
+    // an Ultra; a weak dongle starts opaque).
+    function setOpaque(want) {
+      if (want === opaqueCanvas) return;
+      const parent = canvas.parentNode;
+      if (parent && parent.replaceChild && document.createElement) {
+        const fresh = document.createElement("canvas");
+        fresh.id = canvas.id;
+        fresh.className = canvas.className;
+        fresh.width = canvas.width;
+        fresh.height = canvas.height;
+        parent.replaceChild(fresh, canvas);
+        canvas = fresh;
+      }
+      if (want) ctx = opaqueContext(canvas);
+      else { ctx = canvas.getContext("2d"); opaqueCanvas = false; }
+      layers.length = 0;
+      needsRedraw = true;
+    }
     // The opaque photo a frame starts from (the stadium, or the replay's
     // outfield) sits behind the canvas as an image the TV's GPU composites:
     // the Chromecast's canvas is drawn in software and can't fill the screen
@@ -86,7 +119,27 @@
     let readyToAnswer = false;
     let pendingHello = false;
     let helloKit = null;
-    const counters = { draws: 0, blended: 0, frames: 0, late: [], drawMs: [], missing: 0, redraws: 0, gaps: [], live: 0, pose: [], ahead: [], eff: [] };
+    const counters = { draws: 0, blended: 0, frames: 0, late: [], drawMs: [], missing: 0, redraws: 0, gaps: [], live: 0, pose: [], ahead: [], eff: [],
+      js: 0, long: 0, lag: [] };
+
+    // What the page's thread does besides drawing (Oct 19 2026): `js`, the
+    // script's own time in the loop and the messages; `long`, tasks of 50 ms
+    // or more (any work: the canvas's raster, layers, garbage); `lag`, how
+    // late a 50 ms timer fires. A TV whose loop runs every 105 ms with the
+    // thread free (lag near 0) waits on its compositor, not on this page.
+    try {
+      if (window.PerformanceObserver) {
+        new window.PerformanceObserver((list) => { list.getEntries().forEach((entry) => { if (on) counters.long += entry.duration; }); })
+          .observe({ entryTypes: ["longtask"] });
+      }
+    } catch (error) { /* no long tasks here */ }
+    function lagTick() {
+      const due = performance.now() + 50;
+      window.setTimeout(() => {
+        if (on) counters.lag.push(Math.max(0, performance.now() - due));
+        lagTick();
+      }, 50);
+    }
 
     // MARK: Sizing
 
@@ -304,7 +357,12 @@
     let preloadQueue = [];
     let preloading = 0;
     let preloadKit = null;
+    const insetOff = core.isWeakDongle(navigator.userAgent);
     function preloadRank(key) {
+      // The bowler's-end inset (Oct 20 2026): its view, the batter at the
+      // crease and the keeper down are in the first frame; the strokes later.
+      if (/^bowler-end-(inset|batter-stance|keeper-crouch)-/.test(key)) return 2;
+      if (/^bowler-end-/.test(key)) return 8;
       if (/^stadium-/.test(key)) return 0;
       if (/^stroke-/.test(key)) return 1;
       if (preloadKit && key.indexOf("kit-" + preloadKit + "-") === 0) return 1;
@@ -323,7 +381,9 @@
       // photo the TV had cached but not yet loaded.
       const byRank = (a, b) => preloadRank(a) - preloadRank(b);
       const extra = Array.from(cached).filter((key) => !bundled.has(key)).sort(byRank).slice(0, MAX_CACHED_PRELOAD);
-      preloadQueue = Array.from(bundled.keys()).concat(extra).sort(byRank);
+      // A weak dongle draws no bowler's-end inset (the phone leaves it out).
+      const wanted = (key) => !(insetOff && /^bowler-end-/.test(key));
+      preloadQueue = Array.from(bundled.keys()).concat(extra).filter(wanted).sort(byRank);
       while (preloading < 3 && pumpPreload()) { /* three at a time */ }
     }
     function pumpPreload() {
@@ -577,6 +637,7 @@
     }
 
     function showBackdrop(op) {
+      if (tune.photo === "canvas") return false;
       const entry = backdropLayer(op[3]);
       if (!entry) return false;
       // Stage points to the screen's CSS pixels. The layer is laid out at
@@ -640,11 +701,15 @@
     // "thirds", "full" or "none".
     // Bitmaps are off by default (receiver 59b): with them the Living Room
     // TV refused to start RallyCade again for minutes after a stop.
-    const TUNED = Object.freeze({ blur: "shadow", layers: "bounded", cover: "clip", bitmaps: 0, shade: "thirds", blend: 1, cache: 1 });
+    // `photo` "layer" (the photo an image the GPU composites) or "canvas";
+    // `opaque` 1 for an opaque canvas (it must then draw the photo).
+    const TUNED = Object.freeze({ blur: "shadow", layers: "bounded", cover: "clip", bitmaps: 0, shade: "thirds", blend: 1, cache: 1, photo: "layer", opaque: 0 });
     // A weak dongle (core.isWeakDongle): no redraw only to blend between
     // frames (each draw costs it ~30 ms of its page's thread) and glows
     // drawn plain, never blurred.
-    const WEAK_TUNED = Object.freeze(Object.assign({}, TUNED, { blur: "off", blend: 0 }));
+    // Oct 19 2026: and one opaque canvas with the photo and the shading drawn
+    // in, no CSS animation in the HUD (see `opaqueCanvas`).
+    const WEAK_TUNED = Object.freeze(Object.assign({}, TUNED, { blur: "off", blend: 0, photo: "canvas", shade: "canvas", opaque: 1 }));
     const tune = Object.assign({}, TUNED);
     // Each hello starts from the defaults (the weak ones on a weak dongle);
     // the bench's `x` changes them.
@@ -652,7 +717,12 @@
       const base = plan && plan.weak ? WEAK_TUNED : TUNED;
       Object.assign(tune, base);
       if (x && typeof x === "object") Object.keys(base).forEach((name) => { if (x[name] !== undefined) tune[name] = x[name]; });
+      // An opaque canvas hides whatever is under it: it draws the photo.
+      if (tune.opaque) tune.photo = "canvas";
       document.body.dataset.sceneShade = tune.shade;
+      document.body.dataset.sceneWeak = plan && plan.weak ? "1" : "0";
+      setOpaque(!!tune.opaque);
+      if (tune.photo === "canvas") hideBackdrops(null);
     }
     setTune(null);
 
@@ -935,25 +1005,56 @@
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.globalAlpha = 1;
       ctx.globalCompositeOperation = "source-over";
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      // An opaque canvas starts from the stadium's colour (its CSS background is hidden).
+      if (opaqueCanvas) { ctx.fillStyle = "#0c1a17"; ctx.fillRect(0, 0, canvas.width, canvas.height); }
+      else ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.imageSmoothingQuality = smoothing;
       const cover = coverIndex(frame);
       let from = 0;
+      const inCanvas = tune.photo === "canvas";
       const layered = cover >= 0 && showBackdrop(frame.o[cover]);
       if (layered) {
         from = cover + 1;
         if (photoPending || !layerShownAt) layerShownAt = started;
       } else if (cover < 0) {
         hideBackdrops(null);
+      } else if (inCanvas) {
+        // The photo drawn here: what is under it is never seen.
+        from = cover;
+        if (!layerShownAt) layerShownAt = started;
       }
-      photoPending = cover >= 0 && !layered;
+      photoPending = cover >= 0 && !layered && !inCanvas;
       framePhoto = cover >= 0;
       const rest = drawStatic(frame, from);
       // A photo whose layer isn't decoded yet is drawn on the canvas, over
       // whichever layer was showing: never an empty frame.
       paint(ctx, rest.frame, rest.from, { s: scale, width: canvas.width, height: canvas.height, layers: null, live: live.current });
+      if (tune.shade === "canvas") drawShade();
       counters.drawMs.push(performance.now() - started);
       counters.draws += 1;
+    }
+
+    // The broadcast shading (CSS .scene-shade) drawn on the canvas: the top
+    // and bottom thirds darkened, the middle clear.
+    let shadeCache = null;
+    function drawShade() {
+      const h = canvas.height, w = canvas.width, third = Math.ceil(h / 3);
+      if (!shadeCache || shadeCache.h !== h || shadeCache.c !== ctx) {
+        const top = ctx.createLinearGradient(0, 0, 0, third);
+        top.addColorStop(0, "rgba(0,0,0,0.22)");
+        top.addColorStop(1, "rgba(0,0,0,0)");
+        const bottom = ctx.createLinearGradient(0, h - third, 0, h);
+        bottom.addColorStop(0, "rgba(0,0,0,0)");
+        bottom.addColorStop(1, "rgba(0,0,0,0.24)");
+        shadeCache = { h, c: ctx, top, bottom };
+      }
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.globalAlpha = 1;
+      ctx.globalCompositeOperation = "source-over";
+      ctx.fillStyle = shadeCache.top;
+      ctx.fillRect(0, 0, w, third);
+      ctx.fillStyle = shadeCache.bottom;
+      ctx.fillRect(0, h - third, w, third);
     }
 
     // MARK: Static layer (Oct 19 2026)
@@ -1363,7 +1464,13 @@
     function frameLoop() {
       window.requestAnimationFrame(frameLoop);
       if (!on) return;
-      const local = performance.now();
+      const began = performance.now();
+      frameStep(began);
+      counters.js += performance.now() - began;
+    }
+
+    function frameStep(began) {
+      const local = began;
       // Shown once whole with its photo on its layer for a frame, or at
       // COVER_MS whatever.
       if (root.dataset.warming && (local >= coverUntil
@@ -1431,7 +1538,11 @@
           gap90: Number(core.percentile(counters.gaps, 0.9).toFixed(1)),
           // Live batters received; and how old the pose of the batter on
           // screen was (camera capture to drawn, ms) when the phone says.
-          live: counters.live
+          live: counters.live,
+          // The page's thread (see lagTick): script ms a second, long-task
+          // ms a second, a 50 ms timer's lateness (90th percentile), hidden.
+          js: Math.round(counters.js / seconds), long: Math.round(counters.long / seconds),
+          lag: Math.round(core.percentile(counters.lag, 0.9)), hidden: document.hidden ? 1 : 0, opaque: opaqueCanvas ? 1 : 0
         };
         if (counters.pose.length) {
           stats.pose = Math.round(core.percentile(counters.pose, 0.5));
@@ -1447,6 +1558,7 @@
         counters.draws = 0; counters.blended = 0; counters.frames = 0; counters.redraws = 0;
         counters.late = []; counters.drawMs = []; counters.missing = 0; counters.gaps = [];
         counters.live = 0; counters.pose = []; counters.ahead = []; counters.eff = [];
+        counters.js = 0; counters.long = 0; counters.lag = [];
       }
     }
 
@@ -1538,7 +1650,9 @@
       // `predict`: it reports how far ahead of its pose the live batter was
       // drawn (`ph`) and the age that leaves (`ahead`, `eff` in stats), so the
       // phone may draw it ahead (receiver 55).
-      const ready = { t: "ready", scene: 1, pic: 1, card: 1, live: 1, setup: 1, whole: 1, predict: 1, screen: screenPixels(), version: VERSION, ua: navigator.userAgent, have };
+      // `shared`: one phone owns the TV when a room shares it, by `claim`
+      // (receiver 63, receiver-shared.js).
+      const ready = { t: "ready", scene: 1, pic: 1, card: 1, live: 1, setup: 1, whole: 1, predict: 1, shared: 1, screen: screenPixels(), version: VERSION, ua: navigator.userAgent, have };
       // A weak dongle: the phone sends frames and live batters at its pace.
       if (plan.weak) ready.weak = 1;
       send(ready);
@@ -1586,6 +1700,11 @@
     // MARK: Messages
 
     function handle(message) {
+      const began = performance.now();
+      try { handleMessage(message); } finally { if (on) counters.js += performance.now() - began; }
+    }
+
+    function handleMessage(message) {
       if (!message || typeof message !== "object") return;
       switch (message.t) {
         case "hello":
@@ -1757,6 +1876,8 @@
       else if (!options.noPreload) preloadBundled();
     });
     window.requestAnimationFrame(frameLoop);
+    // A browser's page (a test's pretend page has no PerformanceObserver and no end).
+    if (window.PerformanceObserver) lagTick();
 
     // The receiver is going away (CAF's SHUTDOWN, the page hidden): every
     // decoded bitmap and canvas let go at once (receiver 59). After a stop,
