@@ -31,7 +31,7 @@ lease stops audio. Reordered/expired commands and other senders cannot restart
 it. Phone fallback waits for a stopped acknowledgement or the last lease plus
 its clock/round-trip margin, so the two outputs do not play together.
 
-Receiver files share cache revision 61. Deployment of this receiver and updated
+Receiver files share cache revision 62. Deployment of this receiver and updated
 iOS/Android apps is required for TV playback; this source change deploys nothing.
 See [the feedback validation record](../docs/cast-music-feedback.md).
 
@@ -55,6 +55,6 @@ node --test CastReceiverTests/*.cjs
 
 Drawing parity with the phone and a real-Chromecast bench: `scripts/cast-scene-check.sh` and `scripts/cast-scene-bench.py` (see `docs/design/CAST_SCENE.md`).
 
-Google Cast setup requires a registered Custom Receiver using the production URL. Put the issued 8-character receiver application ID in `RALLYCADE_CAST_APP_ID` in `project.yml`, regenerate the project, and verify that both Bonjour service entries expand to that ID. Keep relay casting disabled in the Cast Developer Console so gameplay state remains local to the selected network.
+Google Cast setup requires a registered Custom Receiver using the production URL. The receiver application ID is `SLIPSPARK_CAST_APP_ID` in `project.yml` (per configuration) and `CAST_APP_ID` in `android/app/build.gradle.kts` (per build type); regenerate the project and verify that both Bonjour service entries expand to that ID. Keep relay casting disabled in the Cast Developer Console so gameplay state remains local to the selected network.
 
-Registered receiver ID: `CE947E6B`.
+Registered receiver IDs: `CE947E6B` (production, the site's root: Release builds) and `9AFC369F` ("RallyCade Staging", unpublished, the site's `staging/` folder: Debug builds and the bench scripts, registered TVs only). `scripts/deploy-cast-receiver.sh --staging` publishes this folder to `staging/`, `--promote` moves it to production. Served from a `staging/` folder the receiver keeps its own localStorage and IndexedDB names. See "Chromecast environments" in `docs/design/CAST_SCENE.md`.

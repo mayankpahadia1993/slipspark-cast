@@ -1,0 +1,8 @@
+{
+  "environment": "production",
+  "commit": "3b973c01c5e883f62eeab296138be9d9eaff84bc",
+  "subject": "Parity inventory after the staging merge",
+  "receiverTree": "50aadbcd6cb07f0c787c4942b89e1a29135ffd10",
+  "revision": 62,
+  "deployedAt": "2026-10-20T07:45:09Z"
+}

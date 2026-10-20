@@ -357,6 +357,19 @@
   // (Chromecast 1st–3rd generation, Ultra) stay at 1280 and never try.
   const CANVAS = { wide: 1920, narrow: 1280, weak: 854, minFps: 25 };
 
+  // Where the TV keeps what it remembers (the canvas width it settled on)
+  // and the pictures phones sent (IndexedDB). The staging receiver is the
+  // same files in the production site's `staging/` folder (Oct 19 2026,
+  // docs/design/CAST_SCENE.md "Chromecast environments"): one origin, so one
+  // localStorage and one IndexedDB. Served from a folder named `staging` it
+  // keeps its own names, so a test on it never narrows production's canvas
+  // or fills production's picture cache. Production keeps the names it has
+  // always had.
+  function storageNames(pathname) {
+    const suffix = /\/staging\/[^/]*$/.test(String(pathname || "")) ? "-staging" : "";
+    return { canvas: "rallycade-scene-canvas" + suffix, pictures: "rallycade-scene" + suffix };
+  }
+
   // The 32-bit Cast dongles (Chromecast 2nd and 3rd generation: "Linux
   // armv7l", CrKey) draw a quarter as fast as an Ultra ("Linux aarch64").
   // iOS 184–199 at a house party (Oct 18 2026) drew 7–10 fps on one, the
@@ -575,7 +588,7 @@
   }
 
   return {
-    isWeakDongle, STAGE, MAX_BLEND_GAP, CANVAS, normalizeFrame, shapeKey, blendFrames, blendFramesInto, cloneFrame, createTimeline, createClock,
+    isWeakDongle, storageNames, STAGE, MAX_BLEND_GAP, CANVAS, normalizeFrame, shapeKey, blendFrames, blendFramesInto, cloneFrame, createTimeline, createClock,
     percentile, tracePath, cssColor, pictureSize, canvasPlan, canvasWidth, createRateWatch, createLiveLayer, hasLiveSlot, poseAge, poseAhead,
     filterParts, opBounds, layerEnd, clipsWholeStage
   };
