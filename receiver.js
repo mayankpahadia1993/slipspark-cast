@@ -367,9 +367,16 @@
   if (!preview && !query.get("scene") && window.cast && window.cast.framework) {
     const context = window.cast.framework.CastReceiverContext.getInstance();
     let reportFailure = () => {};
+    // Receiver 63: one phone owns the TV when a room shares it (receiver-shared.js).
+    const sharedTV = window.RallycadeSharedTV ? window.RallycadeSharedTV.createSharedTV() : null;
+    const drawState = (data) => {
+      try { render(core.parseMessage(data)); } catch (error) { reportFailure("render", error); }
+    };
     context.addCustomMessageListener(NAMESPACE, (event) => {
-      try { render(core.parseMessage(event.data)); } catch (error) { reportFailure("render", error); }
+      if (sharedTV && !sharedTV.receive(event.senderId, "game", event.data).accept) return;
+      drawState(event.data);
     });
+    if (sharedTV) context.addEventListener(window.cast.framework.system.EventType.SENDER_DISCONNECTED, (event) => sharedTV.disconnected(event.senderId));
     // The phone's own picture, when it streams one; the scoreboard above
     // stays underneath as the fallback.
     const videoModule = window.RallycadeReceiverVideo;
@@ -415,7 +422,13 @@
           scene.snapshot(event.data.q, (message) => context.sendCustomMessage(sceneModule.NAMESPACE, event.senderId, message));
           return;
         }
+        if (sharedTV) {
+          const verdict = sharedTV.receive(event.senderId, "scene", event.data);
+          if (!verdict.accept) return;
+          if (verdict.replay) drawState(verdict.replay);
+        }
         sceneSender = event.senderId;
+        if (event.data && event.data.t === "claim") return;
         if (event.data && event.data.t === "hello") {
           stadiumPhone = true;
           window.clearTimeout(sceneGone);

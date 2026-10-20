@@ -357,7 +357,12 @@
     let preloadQueue = [];
     let preloading = 0;
     let preloadKit = null;
+    const insetOff = core.isWeakDongle(navigator.userAgent);
     function preloadRank(key) {
+      // The bowler's-end inset (Oct 20 2026): its view, the batter at the
+      // crease and the keeper down are in the first frame; the strokes later.
+      if (/^bowler-end-(inset|batter-stance|keeper-crouch)-/.test(key)) return 2;
+      if (/^bowler-end-/.test(key)) return 8;
       if (/^stadium-/.test(key)) return 0;
       if (/^stroke-/.test(key)) return 1;
       if (preloadKit && key.indexOf("kit-" + preloadKit + "-") === 0) return 1;
@@ -376,7 +381,9 @@
       // photo the TV had cached but not yet loaded.
       const byRank = (a, b) => preloadRank(a) - preloadRank(b);
       const extra = Array.from(cached).filter((key) => !bundled.has(key)).sort(byRank).slice(0, MAX_CACHED_PRELOAD);
-      preloadQueue = Array.from(bundled.keys()).concat(extra).sort(byRank);
+      // A weak dongle draws no bowler's-end inset (the phone leaves it out).
+      const wanted = (key) => !(insetOff && /^bowler-end-/.test(key));
+      preloadQueue = Array.from(bundled.keys()).concat(extra).filter(wanted).sort(byRank);
       while (preloading < 3 && pumpPreload()) { /* three at a time */ }
     }
     function pumpPreload() {
@@ -1643,7 +1650,9 @@
       // `predict`: it reports how far ahead of its pose the live batter was
       // drawn (`ph`) and the age that leaves (`ahead`, `eff` in stats), so the
       // phone may draw it ahead (receiver 55).
-      const ready = { t: "ready", scene: 1, pic: 1, card: 1, live: 1, setup: 1, whole: 1, predict: 1, screen: screenPixels(), version: VERSION, ua: navigator.userAgent, have };
+      // `shared`: one phone owns the TV when a room shares it, by `claim`
+      // (receiver 63, receiver-shared.js).
+      const ready = { t: "ready", scene: 1, pic: 1, card: 1, live: 1, setup: 1, whole: 1, predict: 1, shared: 1, inset: 1, screen: screenPixels(), version: VERSION, ua: navigator.userAgent, have };
       // A weak dongle: the phone sends frames and live batters at its pace.
       if (plan.weak) ready.weak = 1;
       send(ready);

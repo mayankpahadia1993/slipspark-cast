@@ -32,13 +32,149 @@
 
   function isArray(value) { return Array.isArray(value); }
 
+  // MARK: The bowler's-end inset (Oct 20 2026, ready's `inset: 1`)
+
+  // The phone sends the inset as one command (iOS BowlerEndInsetArt.command,
+  // Android core BowlersEndInset.command): ["N", A, [x, y, w, h], plate key,
+  // parts far to near], its ~17 drawing commands a frame having taken the
+  // Cast channel past 300 KB/s. Drawn here as the phone draws it: the
+  // backing, the plate's view, the parts, the frame and its label. Parts:
+  // ["i", key, matrix, A] a picture; ["e", [cx, cy, rx, ry], C] a filled
+  // ellipse; ["w", [x, y, height, gap, width, outline, bail], splay, bails]
+  // the stumps; ["o", [cx, cy, r, ring], [sx, sy]] the ball and its shadow.
+  // A frame whose inset is unchanged says ["n"]: the last command's drawing, kept here (frames are read in the
+  // order the phone sent them; it sends the command whole after a redraw, a lost frame and every 15 frames).
+  let heldInset = null;
+  let heldInsetAt = 0;
+  let insetBetween = [];
+
+  // A frame that said "~", `u` of the way from the command before it to the one after: each command whose shape is
+  // the same (the same pictures, the same paths) drawn between the two, number by number; any other as before.
+  function interpolateInset(waiting, from, fromAt, to, toAt) {
+    if (from.length !== to.length || !(toAt > fromAt)) return;
+    const u = Math.max(0, Math.min(1, (waiting.s - fromAt) / (toAt - fromAt)));
+    for (let index = 0; index < from.length; index += 1) {
+      const a = from[index], b = to[index];
+      if (shapeKey({ o: [a], fl: [], cl: [] }) !== shapeKey({ o: [b], fl: [], cl: [] })) continue;
+      const discrete = DISCRETE[a[0]] || [];
+      const op = new Array(a.length);
+      op[0] = a[0];
+      for (let field = 1; field < a.length; field += 1) op[field] = discrete.indexOf(field) >= 0 ? a[field] : blendValue(a[field], b[field], u);
+      waiting.ops[waiting.start + index] = op;
+    }
+  }
+  const INSET_PLATE_WIDTH = 660;
+  const INSET_INK = [18, 43, 38];
+  const INSET_CREAM = [252, 245, 222];
+  const INSET_BALL = [[0, [255, 107, 92, 1000]], [500, [255, 92, 82, 1000]], [1000, [128, 20, 20, 1000]]];
+
+  function insetEllipse(cx, cy, rx, ry) {
+    const k = 0.5523;
+    return ["MCCCCZ", [cx + rx, cy, cx + rx, cy + ry * k, cx + rx * k, cy + ry, cx, cy + ry, cx - rx * k, cy + ry, cx - rx, cy + ry * k,
+      cx - rx, cy, cx - rx, cy - ry * k, cx - rx * k, cy - ry, cx, cy - ry, cx + rx * k, cy - ry, cx + rx, cy - ry * k, cx + rx, cy]
+      .map((v) => Math.round(v * 10))];
+  }
+
+  function insetRounded(x, y, w, h, r) {
+    const k = 0.5523;
+    return ["MLCLCLCLCZ", [x + r, y, x + w - r, y, x + w - r + r * k, y, x + w, y + r - r * k, x + w, y + r, x + w, y + h - r,
+      x + w, y + h - r + r * k, x + w - r + r * k, y + h, x + w - r, y + h, x + r, y + h, x + r - r * k, y + h, x, y + h - r + r * k,
+      x, y + h - r, x, y + r, x, y + r - r * k, x + r - r * k, y, x + r, y].map((v) => Math.round(v * 10))];
+  }
+
+  function expandInset(op, out) {
+    const rect = op[2], parts = op[4];
+    if (!isArray(rect) || rect.length < 4 || !isArray(parts)) return;
+    const [x, y, w, h] = rect.map((v) => Number(v) / 10);
+    if (!(w > 0) || !(h > 0) || ![x, y].every(Number.isFinite)) return;
+    const alpha = Math.max(0, Math.min(1000, Number(op[1]) || 0)) / 1000;
+    const A = (share) => Math.round(Math.max(0, Math.min(1, alpha * share)) * 1000);
+    const P = (v) => Math.round(v * 10);
+    const k = w / INSET_PLATE_WIDTH, edge = Math.max(1, h * 0.018);
+    const fill = (shape, color, share) => ["f", A(share == null ? 1 : share), "source-over", shape[0], shape[1], ["c", color], 0, -1, -1];
+    const line = (points, color, width, cap) => ["s", A(1), "source-over", "ML", points.map(P), ["c", color], [P(width), cap, 0, P(10)], [], 0, -1, -1];
+    out.push(fill(insetRounded(x - edge, y - edge, w + edge * 2, h + edge * 2, edge * 2), INSET_INK.concat(920)));
+    if (typeof op[3] === "string") out.push(["i", A(1), "source-over", op[3], [Math.round(k * 10000), 0, 0, Math.round(k * 10000), P(x), P(y)], -1, -1]);
+    for (const part of parts) {
+      if (!isArray(part)) continue;
+      if (part[0] === "i" && typeof part[1] === "string" && isArray(part[2]) && part[2].length === 6) {
+        out.push(["i", A((part[3] == null ? 1000 : Number(part[3])) / 1000), "source-over", part[1], part[2], -1, -1]);
+      } else if (part[0] === "e" && isArray(part[1]) && part[1].length === 4 && isArray(part[2])) {
+        const [cx, cy, rx, ry] = part[1].map((v) => Number(v) / 10);
+        out.push(fill(insetEllipse(cx, cy, rx, ry), part[2]));
+      } else if (part[0] === "w" && isArray(part[1]) && part[1].length === 7) {
+        const [bx, by, height, gap, width, outline, bail] = part[1].map((v) => Number(v) / 10);
+        const splay = Number(part[2]) / 1000 || 0, bails = Number(part[3]) / 1000 || 0;
+        for (let index = -1; index <= 1; index += 1) {
+          const sx = bx + index * gap, lean = index === 0 ? splay : splay * 0.35 * index;
+          const top = [sx + lean * height, by - height * (1 - Math.abs(lean) * 0.5)];
+          out.push(line([sx, by].concat(top), [0, 0, 0, 350], outline, 0));
+          out.push(line([sx, by].concat(top), INSET_CREAM.concat(1000), width, 0));
+        }
+        const top = by - height - height * 0.012 / 0.711, half = gap + width / 2;
+        if (splay < 0.02 && bails < 0.02) {
+          out.push(line([bx - half, top, bx + half, top], INSET_CREAM.concat(950), bail, 1));
+        } else {
+          [[0, -1], [1, 1]].forEach(([index, side]) => {
+            const lift = bails * height * (0.9 + index * 0.35), drift = side * bails * gap * 2.5;
+            const angle = bails * (index === 0 ? 3.2 : -2.6), length = gap * 0.7;
+            const cx = bx + side * gap * 0.5 + drift, cy = top - lift;
+            out.push(line([cx - Math.cos(angle) * length, cy - Math.sin(angle) * length, cx + Math.cos(angle) * length, cy + Math.sin(angle) * length],
+              INSET_CREAM.concat(1000), bail, 1));
+          });
+        }
+      } else if (part[0] === "o" && isArray(part[1]) && part[1].length === 4 && isArray(part[2]) && part[2].length === 2) {
+        const [cx, cy, r, ring] = part[1].map((v) => Number(v) / 10);
+        const [sx, sy] = part[2].map((v) => Number(v) / 10);
+        out.push(fill(insetEllipse(sx, sy, r * 1.2, r * 0.35), [0, 0, 0, 300]));
+        out.push(fill(insetEllipse(cx, cy, r + ring, r + ring), [255, 255, 255, 850]));
+        out.push(["f", A(1), "source-over", ...insetEllipse(cx, cy, r, r),
+          ["rg", [P(cx - r * 0.3), P(cy - r * 0.35), 0, P(r * 1.35)], INSET_BALL], 0, -1, -1]);
+        // The seam: a short bright arc through the middle at 45 degrees.
+        const length = r * 0.78, dx = Math.cos(Math.PI / 4) * length, dy = Math.sin(Math.PI / 4) * length;
+        out.push(["s", A(1), "source-over", "MQ", [cx - dx, cy - dy, cx + dy * 0.3, cy - dx * 0.3, cx + dx, cy + dy].map(P),
+          ["c", [255, 255, 255, 780]], [P(Math.max(k, r * 0.11)), 1, 0, P(10)], [], 0, -1, -1]);
+      }
+    }
+    out.push(["s", A(0.85), "source-over", ...insetRounded(x, y, w, h, edge), ["c", INSET_CREAM.concat(1000)],
+      [P(Math.max(1, edge * 0.6)), 0, 0, P(10)], [], 0, -1, -1]);
+    out.push(["t", A(1), "source-over", "BOWLER'S END", P(Math.max(7, h * 0.085)), 800, 0, INSET_CREAM.concat(1000),
+      [P(x + h * 0.06), P(y + h * 0.05)], [0, 0], -1]);
+  }
+
   // A frame from the phone: `s` its moment (phone milliseconds), `o` the
   // commands, `fl` filter lists, `cl` clip lists, `h` the HUD when it changed,
   // `p` when the camera saw the pose its batter follows (phone milliseconds;
   // build 157 on). A live batter ("b") has the same members but `h`.
   function normalizeFrame(raw) {
     if (!raw || typeof raw !== "object" || !Number.isFinite(Number(raw.s)) || !isArray(raw.o)) return null;
-    const ops = raw.o.filter((op) => isArray(op) && OPS.has(op[0]));
+    const ops = [];
+    const moment = Number(raw.s);
+    let insetSeen = false;
+    for (const op of raw.o) {
+      if (!isArray(op)) continue;
+      if (op[0] === "N") {
+        const start = ops.length;
+        expandInset(op, ops);
+        const fresh = ops.slice(start);
+        // The frames that said "~" since the last command: between it and this one.
+        if (heldInset) for (const waiting of insetBetween) interpolateInset(waiting, heldInset, heldInsetAt, fresh, moment);
+        insetBetween = [];
+        heldInset = fresh;
+        heldInsetAt = moment;
+        insetSeen = true;
+      } else if (op[0] === "n" || op[0] === "~") {
+        // "n": the inset as the last command drew it; "~": it moved, and the next command (sent at half the frame
+        // rate) says where to, so it is drawn between the two when that arrives (the phone sends it whole at least
+        // every 15 frames).
+        if (!heldInset) continue;
+        const start = ops.length;
+        for (const held of heldInset) ops.push(held);
+        if (op[0] === "~") insetBetween.push({ ops, start, s: moment });
+        insetSeen = true;
+      } else if (OPS.has(op[0])) ops.push(op);
+    }
+    if (!insetSeen) insetBetween = [];
     return {
       s: Number(raw.s),
       o: ops,
@@ -588,7 +724,7 @@
   }
 
   return {
-    isWeakDongle, storageNames, STAGE, MAX_BLEND_GAP, CANVAS, normalizeFrame, shapeKey, blendFrames, blendFramesInto, cloneFrame, createTimeline, createClock,
+    isWeakDongle, storageNames, STAGE, MAX_BLEND_GAP, CANVAS, normalizeFrame, expandInset, shapeKey, blendFrames, blendFramesInto, cloneFrame, createTimeline, createClock,
     percentile, tracePath, cssColor, pictureSize, canvasPlan, canvasWidth, createRateWatch, createLiveLayer, hasLiveSlot, poseAge, poseAhead,
     filterParts, opBounds, layerEnd, clipsWholeStage
   };

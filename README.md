@@ -31,7 +31,7 @@ lease stops audio. Reordered/expired commands and other senders cannot restart
 it. Phone fallback waits for a stopped acknowledgement or the last lease plus
 its clock/round-trip margin, so the two outputs do not play together.
 
-Receiver files share cache revision 62. Deployment of this receiver and updated
+Receiver files share cache revision 63. Deployment of this receiver and updated
 iOS/Android apps is required for TV playback; this source change deploys nothing.
 See [the feedback validation record](../docs/cast-music-feedback.md).
 
