@@ -188,6 +188,20 @@
     };
   }
 
+  // A frame that stands alone (the receiver's rehearsal, receiver 65): its
+  // inset commands drawn out, and nothing kept between frames, so the live
+  // stream's inset ("n", "~") is never touched.
+  function plainFrame(raw) {
+    if (!raw || typeof raw !== "object" || !Number.isFinite(Number(raw.s)) || !isArray(raw.o)) return null;
+    const ops = [];
+    for (const op of raw.o) {
+      if (!isArray(op)) continue;
+      if (op[0] === "N") expandInset(op, ops);
+      else if (OPS.has(op[0])) ops.push(op);
+    }
+    return { s: Number(raw.s), o: ops, fl: isArray(raw.fl) ? raw.fl : [], cl: isArray(raw.cl) ? raw.cl : [], h: null, p: null, ph: 0 };
+  }
+
   // Whether a frame leaves its batter to the live layer.
   function hasLiveSlot(frame) {
     if (frame.__live === undefined) frame.__live = frame.o.some((op) => op[0] === "B");
@@ -201,31 +215,39 @@
 
   // The frame's shapes without their measurements: two frames with the same
   // key differ only in numbers, so they can be blended.
-  function shapeKey(frame) {
-    if (frame.__shape) return frame.__shape;
-    const parts = [];
-    const walk = (value) => {
-      if (isArray(value)) {
-        parts.push("[" + value.length);
-        for (let index = 0; index < value.length; index += 1) walk(value[index]);
-        parts.push("]");
-      } else if (typeof value === "string") {
-        parts.push("'" + value);
-      } else {
-        parts.push("#");
-      }
-    };
-    for (const op of frame.o) {
-      const discrete = DISCRETE[op[0]] || [];
-      parts.push("<" + op[0] + op.length);
-      for (let index = 1; index < op.length; index += 1) {
-        if (discrete.indexOf(index) >= 0 && !isArray(op[index])) parts.push("=" + op[index]);
-        else if (op[0] === "s" && index === 6 && isArray(op[6])) parts.push("g" + op[6].length + ":" + op[6][1] + ":" + op[6][2]);
-        else walk(op[index]);
-      }
+  function walkShape(value, parts) {
+    if (isArray(value)) {
+      parts.push("[" + value.length);
+      for (let index = 0; index < value.length; index += 1) walkShape(value[index], parts);
+      parts.push("]");
+    } else if (typeof value === "string") {
+      parts.push("'" + value);
+    } else {
+      parts.push("#");
     }
-    parts.push("|fl");
-    walk(frame.fl);
+  }
+
+  // One command's shape: its kind, what it names and how many numbers it has.
+  const opShapes = new WeakMap();
+  function opShape(op) {
+    let shape = opShapes.get(op);
+    if (shape !== undefined) return shape;
+    const parts = [];
+    const discrete = DISCRETE[op[0]] || [];
+    parts.push("<" + op[0] + op.length);
+    for (let index = 1; index < op.length; index += 1) {
+      if (discrete.indexOf(index) >= 0 && !isArray(op[index])) parts.push("=" + op[index]);
+      else if (op[0] === "s" && index === 6 && isArray(op[6])) parts.push("g" + op[6].length + ":" + op[6][1] + ":" + op[6][2]);
+      else walkShape(op[index], parts);
+    }
+    shape = parts.join("");
+    opShapes.set(op, shape);
+    return shape;
+  }
+
+  function listsShape(frame) {
+    const parts = ["|fl"];
+    walkShape(frame.fl, parts);
     parts.push("|cl");
     for (const clip of frame.cl) {
       if (!isArray(clip)) { parts.push("?"); continue; }
@@ -234,8 +256,180 @@
         if (isArray(entry)) { parts.push(String(entry[0]) + ":" + (isArray(entry[1]) ? entry[1].length : 0) + ":" + entry[2]); }
       }
     }
+    return parts.join("");
+  }
+
+  function shapeKey(frame) {
+    if (frame.__shape) return frame.__shape;
+    const parts = [];
+    for (const op of frame.o) parts.push(opShape(op));
+    if (frame.__lists === undefined) frame.__lists = listsShape(frame);
+    parts.push(frame.__lists);
     frame.__shape = parts.join("");
     return frame.__shape;
+  }
+
+  // MARK: Blending what matches (receiver 65)
+  //
+  // Oct 21 2026 (the owner: "lag with chromecast"; the batting-feel plan's TV
+  // item): two frames whose shapes differed anywhere were not blended at all.
+  // After contact that is nearly every pair: a running fielder's stride
+  // picture changes every few frames, a trail comes and goes. So the struck
+  // ball, the fielders and the camera stepped at the 25–30 frames a second the
+  // phone sends while an onn drew 45–60. Now the commands of the frame due are
+  // matched, in order, to the commands of the same shape in the next one (a
+  // longest common run of shapes), and each match is blended toward its
+  // partner; a command with no partner is drawn as it is. Never across a cut
+  // (the photo that covers the stage changes: the stadium to the replay's
+  // field), and never a match that would move further than `MAX_STEP` between
+  // two frames (two fielders of the same picture trading places in the
+  // drawing order would otherwise slide into each other).
+  const MAX_STEP = 2000;
+  // The most cells the matching may use: frames of ~60 commands need 3,600.
+  const MAX_MATCH_CELLS = 40000;
+
+  // The photo that covers the stage (the stadium, the replay's outfield):
+  // the key of the last plain top-level picture whose rect, from its key's
+  // size, covers the whole stage. Null when none does.
+  function viewOf(frame) {
+    if (frame.__view !== undefined) return frame.__view;
+    let depth = 0;
+    let view = null;
+    for (const op of frame.o) {
+      if (op[0] === "L") { depth += 1; continue; }
+      if (op[0] === "l") { depth -= 1; continue; }
+      if (depth || op[0] !== "i" || !(op[1] >= 1000) || !isArray(op[4])) continue;
+      const size = pictureSize(op[3]);
+      const m = op[4];
+      if (!size || m[1] !== 0 || m[2] !== 0 || !(m[0] > 0) || !(m[3] > 0)) continue;
+      const left = m[4] / 10, top = m[5] / 10;
+      const right = left + size.width * m[0] / 10000, bottom = top + size.height * m[3] / 10000;
+      if (left <= 0.5 && top <= 0.5 && right >= STAGE.width - 0.5 && bottom >= STAGE.height - 0.5) view = op[3];
+    }
+    frame.__view = view;
+    return view;
+  }
+
+  // Where a command is (tenths), to tell a move from a jump: a picture's
+  // translation, a path's first point, words' anchor; null when it has none.
+  function anchorOf(op) {
+    switch (op[0]) {
+      case "i": return isArray(op[4]) && op[4].length === 6 ? [op[4][4], op[4][5]] : null;
+      case "f":
+      case "s": return isArray(op[4]) && op[4].length >= 2 ? [op[4][0], op[4][1]] : null;
+      case "t": return isArray(op[8]) && op[8].length >= 2 ? [op[8][0], op[8][1]] : null;
+      default: return null;
+    }
+  }
+
+  function jumps(a, b) {
+    const from = anchorOf(a), to = anchorOf(b);
+    if (from && to && (Math.abs(to[0] - from[0]) > MAX_STEP || Math.abs(to[1] - from[1]) > MAX_STEP)) return true;
+    // A picture growing or shrinking more than twice over between two frames is another one.
+    if (a[0] === "i" && isArray(a[4]) && isArray(b[4])) {
+      const sa = Math.abs(a[4][0]) + Math.abs(a[4][1]), sb = Math.abs(b[4][0]) + Math.abs(b[4][1]);
+      if (sa > 0 && sb > 0 && (sa > sb * 2 || sb > sa * 2)) return true;
+    }
+    return false;
+  }
+
+  // For each command of `a`, the index of its partner in `b` (or -1), and how
+  // many have one: the longest run of commands of the same shapes in the
+  // same order, less any that would jump. Kept on `a` for the next draw.
+  function matchOps(a, b) {
+    if (a.__matchWith === b) return a.__match;
+    const n = a.o.length, m = b.o.length;
+    const pairs = new Int32Array(n).fill(-1);
+    let count = 0;
+    if (viewOf(a) === viewOf(b)) {
+      const ka = a.o.map(opShape), kb = b.o.map(opShape);
+      let start = 0;
+      while (start < n && start < m && ka[start] === kb[start]) { pairs[start] = start; start += 1; }
+      let endA = n, endB = m;
+      while (endA > start && endB > start && ka[endA - 1] === kb[endB - 1]) { endA -= 1; endB -= 1; pairs[endA] = endB; }
+      const rows = endA - start, cols = endB - start;
+      if (rows > 0 && cols > 0 && (rows + 1) * (cols + 1) <= MAX_MATCH_CELLS) {
+        const width = cols + 1;
+        const run = new Uint16Array((rows + 1) * width);
+        for (let i = rows - 1; i >= 0; i -= 1) {
+          for (let j = cols - 1; j >= 0; j -= 1) {
+            run[i * width + j] = ka[start + i] === kb[start + j] ? run[(i + 1) * width + j + 1] + 1
+              : Math.max(run[(i + 1) * width + j], run[i * width + j + 1]);
+          }
+        }
+        let i = 0, j = 0;
+        while (i < rows && j < cols) {
+          if (ka[start + i] === kb[start + j]) { pairs[start + i] = start + j; i += 1; j += 1; }
+          else if (run[(i + 1) * width + j] >= run[i * width + j + 1]) i += 1;
+          else j += 1;
+        }
+      }
+      for (let index = 0; index < n; index += 1) {
+        if (pairs[index] >= 0 && jumps(a.o[index], b.o[pairs[index]])) pairs[index] = -1;
+      }
+      // A command left without a partner (the longest run paired it with
+      // another of its shape, too far away: the inset's ball for the
+      // stadium's) takes the nearest free command of its shape between its
+      // neighbours' partners, so the order still holds.
+      const used = new Uint8Array(m);
+      for (let index = 0; index < n; index += 1) if (pairs[index] >= 0) used[pairs[index]] = 1;
+      let low = 0;
+      for (let index = 0; index < n; index += 1) {
+        if (pairs[index] >= 0) { low = pairs[index] + 1; continue; }
+        let high = m;
+        for (let after = index + 1; after < n; after += 1) if (pairs[after] >= 0) { high = pairs[after]; break; }
+        const from = anchorOf(a.o[index]);
+        let best = -1, bestDistance = Infinity;
+        for (let candidate = low; candidate < high; candidate += 1) {
+          if (used[candidate] || kb[candidate] !== ka[index] || jumps(a.o[index], b.o[candidate])) continue;
+          const to = anchorOf(b.o[candidate]);
+          const distance = from && to ? Math.abs(to[0] - from[0]) + Math.abs(to[1] - from[1]) : 0;
+          if (distance < bestDistance) { best = candidate; bestDistance = distance; }
+        }
+        if (best >= 0) { pairs[index] = best; used[best] = 1; low = best + 1; }
+      }
+      for (let index = 0; index < n; index += 1) if (pairs[index] >= 0) count += 1;
+    }
+    a.__matchWith = b;
+    a.__match = { pairs, count, lists: (a.__lists === undefined ? (a.__lists = listsShape(a)) : a.__lists)
+      === (b.__lists === undefined ? (b.__lists = listsShape(b)) : b.__lists) };
+    return a.__match;
+  }
+
+  // Blends `a` toward `b` into `out` (a frame of a's shapes, from
+  // `cloneFrame`) where `match` pairs their commands; every other command,
+  // and the filter and clip lists when theirs differ, as `a` has them.
+  function blendMatchedInto(out, a, b, match, u) {
+    const pairs = match.pairs;
+    for (let index = 0; index < a.o.length; index += 1) {
+      const opA = a.o[index];
+      const partner = pairs[index];
+      const opB = partner >= 0 ? b.o[partner] : opA;
+      const t = partner >= 0 ? u : 0;
+      const op = out.o[index];
+      const discrete = DISCRETE[opA[0]] || [];
+      op[0] = opA[0];
+      for (let field = 1; field < opA.length; field += 1) {
+        const x = opA[field];
+        if (discrete.indexOf(field) >= 0) op[field] = x;
+        else if (typeof x === "number") op[field] = x + (opB[field] - x) * t;
+        else if (isArray(x) && isArray(op[field])) blendInto(op[field], x, opB[field], t);
+        else op[field] = x;
+      }
+    }
+    out.s = a.s + (b.s - a.s) * u;
+    out.p = blendPose(a, b, u);
+    blendInto(out.fl, a.fl, match.lists ? b.fl : a.fl, match.lists ? u : 0);
+    blendInto(out.cl, a.cl, match.lists ? b.cl : a.cl, match.lists ? u : 0);
+    return out;
+  }
+
+  // A fresh frame `u` of the way from `a` to `b`, blending what matches (as
+  // the timeline does; for films and previews).
+  function blendMatched(a, b, u) {
+    if (shapeKey(a) === shapeKey(b)) return blendFrames(a, b, u);
+    const out = cloneFrame(a);
+    return blendMatchedInto(out, a, b, matchOps(a, b), u);
   }
 
   function blendValue(a, b, u) {
@@ -313,9 +507,14 @@
   // The frames on their way to the screen, by moment. A redraw (a newer
   // epoch) replaces everything from its first moment on, and frames of an
   // older epoch still arriving are dropped.
-  function createTimeline() {
+  function createTimeline(options) {
     let frames = [];
     let epoch = 0;
+    // Whether frames of different shapes blend the commands that match
+    // (receiver 65; the bench's `x.blend: "whole"` turns it off).
+    let blendsMatches = !(options && options.matches === false);
+    // How a message becomes a frame (`plainFrame` for the rehearsal).
+    const normalize = (options && options.normalize) || normalizeFrame;
     // The blended frame `at` hands out, reused while the shapes stay the same.
     let scratch = null;
     let scratchShape = null;
@@ -338,11 +537,15 @@
     return {
       get epoch() { return epoch; },
       get length() { return frames.length; },
+      get blendsMatches() { return blendsMatches; },
+      // The frames held, oldest first (tests).
+      get frames() { return frames.slice(); },
+      set blendsMatches(value) { blendsMatches = !!value; },
       get newest() { return frames.length ? frames[frames.length - 1] : null; },
 
       // One frame ("f"): ignored when an older epoch's.
       add(rawFrame, frameEpoch) {
-        const frame = normalizeFrame(rawFrame);
+        const frame = normalize(rawFrame);
         if (!frame) return null;
         const e = Number(frameEpoch) || 0;
         if (e < epoch) return null;
@@ -356,7 +559,7 @@
         const e = Number(frameEpoch) || 0;
         if (e < epoch || !isArray(rawFrames)) return [];
         epoch = e;
-        const incoming = rawFrames.map(normalizeFrame).filter(Boolean).sort((x, y) => x.s - y.s);
+        const incoming = rawFrames.map((raw) => normalize(raw)).filter(Boolean).sort((x, y) => x.s - y.s);
         if (!incoming.length) return [];
         const from = incoming[0].s;
         frames = frames.filter((frame) => frame.s < from);
@@ -377,11 +580,17 @@
         if (due > 0) frames = frames.slice(due);
         const a = frames[0];
         const b = frames[1];
-        if (b && b.s - a.s <= MAX_BLEND_GAP && shapeKey(a) === shapeKey(b)) {
-          const u = Math.min(1, Math.max(0, (now - a.s) / (b.s - a.s)));
-          if (u <= 0) return { frame: a, stamp: a.s, blended: false };
-          if (scratchShape !== shapeKey(a)) { scratch = cloneFrame(a); scratch.scratch = true; scratchShape = shapeKey(a); }
-          return { frame: blendFramesInto(scratch, a, b, u), stamp: a.s, blended: true };
+        if (b && b.s - a.s <= MAX_BLEND_GAP && b.s > a.s) {
+          const same = shapeKey(a) === shapeKey(b);
+          // Receiver 65: frames of different shapes blend what matches.
+          const match = same || !blendsMatches ? null : matchOps(a, b);
+          if (same || (match && match.count > 0)) {
+            const u = Math.min(1, Math.max(0, (now - a.s) / (b.s - a.s)));
+            if (u <= 0) return { frame: a, stamp: a.s, blended: false };
+            if (scratchShape !== shapeKey(a)) { scratch = cloneFrame(a); scratch.scratch = true; scratchShape = shapeKey(a); }
+            const frame = same ? blendFramesInto(scratch, a, b, u) : blendMatchedInto(scratch, a, b, match, u);
+            return { frame, stamp: a.s, blended: true, partly: !same };
+          }
         }
         return { frame: a, stamp: a.s, blended: false };
       },
@@ -573,6 +782,74 @@
     };
   }
 
+  // MARK: Steady before the first ball (receiver 65)
+  //
+  // Oct 21 2026 (the owner: "worse at the start"; the batting-feel plan's TV
+  // item): an onn drew 17, 32, 18, 32 frames a second through the first ball
+  // and 45 only from ~14 s; build 207 on the Ultra climbed 1 → 27 over 18 s.
+  // The phone held the first ball only until a frame had every picture
+  // (`whole`). Now the TV says `steady` once it has drawn at least `fps`
+  // frames a second for `window` ms with no gap over `maxGap` (a hitch), and
+  // a phone that says it waits (hello `steady: 1`) holds the first ball until
+  // then, at most its own cap. A TV that can't reach `fps` (a 32-bit
+  // Chromecast at 9, an LG C3 at 23) is steady once `plateau` ms in its rate
+  // holds (the last window within 15% of the one before: neither falling nor
+  // still climbing): it is as smooth as it gets. `start` at the first whole frame, `draw` at each
+  // drawn one; the verdict comes once.
+  const STEADY = { fps: 25, window: 2000, maxGap: 100, plateau: 4000, hold: 0.85 };
+
+  function createSteadyWatch(options) {
+    const fps = (options && options.fps) || STEADY.fps;
+    const span = (options && options.window) || STEADY.window;
+    const maxGap = (options && options.maxGap) || STEADY.maxGap;
+    const plateau = (options && options.plateau) || STEADY.plateau;
+    const hold = (options && options.hold) || STEADY.hold;
+    let since = null;
+    let times = [];
+    let verdict = null;
+    // When the current run without a hitch began.
+    let runFrom = null;
+    function rate(from, to) {
+      let count = 0;
+      for (const t of times) if (t > from && t <= to) count += 1;
+      return count * 1000 / (to - from);
+    }
+    return {
+      get verdict() { return verdict; },
+      get started() { return since !== null; },
+      start(now) { since = now; times = []; verdict = null; runFrom = now; },
+      reset() { since = null; times = []; verdict = null; runFrom = null; },
+      // How far along the current run without a hitch is, 0…1 (1 once steady).
+      progress(now) {
+        if (verdict) return 1;
+        if (since === null || runFrom === null) return 0;
+        return Math.max(0, Math.min(1, (now - runFrom) / span));
+      },
+      draw(now) {
+        if (since === null || verdict) return null;
+        const last = times.length ? times[times.length - 1] : since;
+        // A hitch: a gap over `maxGap`, or over two and a half of this TV's
+        // usual gaps (a 32-bit Chromecast draws every ~110 ms).
+        const gaps = [];
+        for (let index = Math.max(1, times.length - 30); index < times.length; index += 1) gaps.push(times[index] - times[index - 1]);
+        const usual = gaps.length >= 10 ? percentile(gaps, 0.5) : 0;
+        if (now - last > Math.max(maxGap, usual * 2.5)) runFrom = now;
+        times.push(now);
+        while (times.length && times[0] < now - 2 * span) times.shift();
+        if (now - runFrom < span) return null;
+        const recent = rate(now - span, now);
+        if (recent >= fps - 0.01) {
+          verdict = { fps: Math.round(recent * 10) / 10, why: "fast", after: Math.round(now - since) };
+        } else if (now - since >= plateau && recent >= 4) {
+          const before = rate(now - 2 * span, now - span);
+          // Neither falling nor still climbing: within `1 - hold` of the window before.
+          if (before > 0 && recent >= before * hold && recent * hold <= before) verdict = { fps: Math.round(recent * 10) / 10, why: "plateau", after: Math.round(now - since) };
+        }
+        return verdict;
+      }
+    };
+  }
+
   // Path commands and their points (tenths) to drawing calls, given a target
   // with moveTo/lineTo/quadraticCurveTo/bezierCurveTo/closePath (Path2D).
   function tracePath(target, commands, points) {
@@ -724,8 +1001,9 @@
   }
 
   return {
-    isWeakDongle, storageNames, STAGE, MAX_BLEND_GAP, CANVAS, normalizeFrame, expandInset, shapeKey, blendFrames, blendFramesInto, cloneFrame, createTimeline, createClock,
-    percentile, tracePath, cssColor, pictureSize, canvasPlan, canvasWidth, createRateWatch, createLiveLayer, hasLiveSlot, poseAge, poseAhead,
+    isWeakDongle, storageNames, STAGE, MAX_BLEND_GAP, MAX_STEP, CANVAS, normalizeFrame, plainFrame, expandInset, shapeKey, opShape, viewOf, matchOps, blendMatched, blendMatchedInto,
+    blendFrames, blendFramesInto, cloneFrame, createTimeline, createClock,
+    percentile, tracePath, cssColor, pictureSize, canvasPlan, canvasWidth, createRateWatch, STEADY, createSteadyWatch, createLiveLayer, hasLiveSlot, poseAge, poseAhead,
     filterParts, opBounds, layerEnd, clipsWholeStage
   };
 });

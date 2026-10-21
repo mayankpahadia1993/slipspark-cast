@@ -120,7 +120,7 @@
     let pendingHello = false;
     let helloKit = null;
     const counters = { draws: 0, blended: 0, frames: 0, late: [], drawMs: [], missing: 0, redraws: 0, gaps: [], live: 0, pose: [], ahead: [], eff: [],
-      js: 0, long: 0, lag: [] };
+      js: 0, long: 0, lag: [], partly: 0, stale: [] };
 
     // What the page's thread does besides drawing (Oct 19 2026): `js`, the
     // script's own time in the loop and the messages; `long`, tasks of 50 ms
@@ -510,7 +510,9 @@
           // The stadium's photos get their GPU layer now, decoded while the
           // setup shows: made at the first frame, it took the first stadium
           // of a cast 0.7-1 s on a Chromecast Ultra.
-          if (/^stadium-(ground|backdrop)-/.test(key) && opaque.has(key)) backdropLayer(key);
+          // Receiver 65: the replay's outfield too (made at the first replay,
+          // it cost an onn's first replay a 283 ms/s of long tasks).
+          if (/^(stadium-(ground|backdrop)|field-outfield)-/.test(key) && opaque.has(key)) backdropLayer(key);
           warmDecode(key);
         }, () => loading.delete(key))
         .then(() => { preloading -= 1; window.setTimeout(pumpPreload, 20); });
@@ -560,13 +562,167 @@
       warmCanvas = null;
     }
 
+    // MARK: The rehearsal (receiver 65)
+    //
+    // Oct 21 2026 (the owner: "worse at the start"): with every picture
+    // loaded and warmed, an onn still drew the first ball at 17–32 frames a
+    // second, its draws taking 6–12 ms of script against 3.5–4.5 by the
+    // third ball and its long tasks 160–280 ms a second; the stream replay at
+    // CPU/24 opened at 7 frames a second against 28 a ball later. That is the
+    // drawing's own first time: its code not yet compiled for speed, each
+    // picture decoded and uploaded at the size it is drawn, its layers and
+    // gradients made. So while the stadium is off, once the phone has said
+    // hello and the pictures are in, the receiver draws a recorded ball
+    // (`rehearsal.json`, scripts/cast-rehearsal.mjs: the stadium, the
+    // run-up, the delivery, the shot and its replay, each with its live
+    // batter) into a canvas of the stadium's size off screen, one moment an
+    // animation frame, blended as play is, `REHEARSAL_DRAWS` times. It stops
+    // the moment the stadium comes on. `stats.rehearsed` counts its draws and
+    // `rehearseMs` says how long its first and last ten took.
+    const REHEARSAL_DRAWS = 200;
+    // A weak dongle (each draw costs it ~30 ms of its page's thread) draws
+    // fewer, about every third animation frame, so its setup screen stays
+    // smooth meanwhile.
+    const WEAK_REHEARSAL_DRAWS = 60;
+    const WEAK_REHEARSAL_GAP = 90;
+    let rehearsing = false;
+    // A frame older than this when drawn is a pause's held frame, not a stale picture (stats `stale`).
+    const STALE_FLOWING = 250;
+    const rehearsal = { data: null, wanted: false, timeline: null, canvas: null, ctx: null, moment: 0, end: 0, draws: 0, ms: [], firstMs: 0, lastAt: -Infinity };
+
+    function loadRehearsal() {
+      return fetch("rehearsal.json").then((response) => (response && response.ok && typeof response.json === "function" ? response.json() : null))
+        .then((data) => {
+          if (!data || !Array.isArray(data.frames) || !data.frames.length) return;
+          rehearsal.data = data;
+          // A hello that came first.
+          if (rehearsal.asked && !on) wantRehearsal();
+        }).catch(() => {});
+    }
+
+    // Due after each hello (the phone's innings is coming) once the
+    // pictures are in; the weak plan's own canvas and tune with it.
+    function wantRehearsal() {
+      rehearsal.asked = true;
+      if (!rehearsal.data || options.noRehearsal) return;
+      rehearsal.wanted = true;
+      rehearsal.draws = 0;
+      rehearsal.ms = [];
+      rehearsal.firstMs = 0;
+    }
+
+    function startRehearsalPass() {
+      const step = Number(rehearsal.data.step) || 33;
+      rehearsal.timeline = core.createTimeline({ normalize: core.plainFrame });
+      rehearsal.data.frames.forEach((frame, index) => rehearsal.timeline.add(Object.assign({ s: index * step }, frame), 1));
+      rehearsal.live = rehearsal.data.frames.map((_, index) => {
+        const batter = rehearsal.data.live && rehearsal.data.live[index];
+        return batter ? core.plainFrame(Object.assign({ s: index * step }, batter)) : null;
+      });
+      rehearsal.step = step;
+      rehearsal.moment = 0;
+      rehearsal.end = (rehearsal.data.frames.length - 1) * step;
+    }
+
+    function rehearse(local) {
+      if (!rehearsal.wanted || on || released || preloadQueue.length || preloading) return;
+      if (plan.weak && local - rehearsal.lastAt < WEAK_REHEARSAL_GAP) return;
+      if (!rehearsal.canvas || rehearsal.canvas.width !== canvas.width || rehearsal.canvas.height !== canvas.height) {
+        rehearsal.canvas = document.createElement("canvas");
+        rehearsal.canvas.width = canvas.width;
+        rehearsal.canvas.height = canvas.height;
+        rehearsal.ctx = rehearsal.canvas.getContext("2d", { alpha: !opaqueCanvas });
+      }
+      if (!rehearsal.timeline || rehearsal.moment > rehearsal.end) startRehearsalPass();
+      const result = rehearsal.timeline.at(rehearsal.moment);
+      const batter = rehearsal.live[Math.min(rehearsal.live.length - 1, Math.floor(rehearsal.moment / rehearsal.step))];
+      // Half a recorded frame a draw: every other one blended, as a TV
+      // drawing twice the phone's rate does.
+      rehearsal.moment += rehearsal.step / 2;
+      rehearsal.lastAt = local;
+      if (!result) return;
+      const savedCtx = ctx, savedCanvas = canvas;
+      // The static layer's counts are the stadium's (stats `cached`, `rebuilt`).
+      const counts = { built: staticLayer.built, hits: staticLayer.hits, ops: staticLayer.ops, draws: staticLayer.draws };
+      ctx = rehearsal.ctx;
+      canvas = rehearsal.canvas;
+      rehearsing = true;
+      const began = performance.now();
+      try {
+        drawFrame(result.frame, batter);
+      } catch (error) {
+        rehearsal.wanted = false;
+        report("rehearsal", error);
+      } finally {
+        ctx = savedCtx;
+        canvas = savedCanvas;
+        rehearsing = false;
+        Object.assign(staticLayer, counts);
+      }
+      const ms = performance.now() - began;
+      rehearsal.draws += 1;
+      rehearsal.ms.push(ms);
+      if (rehearsal.ms.length === 10) rehearsal.firstMs = Number(core.percentile(rehearsal.ms, 0.5).toFixed(1));
+      if (rehearsal.ms.length > 40) rehearsal.ms.splice(10, rehearsal.ms.length - 40);
+      if (rehearsal.draws >= (plan.weak ? WEAK_REHEARSAL_DRAWS : REHEARSAL_DRAWS)) endRehearsal();
+    }
+
+    // Done, or the stadium came on: the canvas let go, and the static layer
+    // starts afresh from the first real frame.
+    function endRehearsal() {
+      rehearsal.wanted = false;
+      rehearsal.timeline = null;
+      if (rehearsal.canvas) { try { rehearsal.canvas.width = 0; rehearsal.canvas.height = 0; } catch (error) { /* gone */ } }
+      rehearsal.canvas = null;
+      rehearsal.ctx = null;
+      staticLayer.key = null;
+      staticLayer.keys = null;
+      lastStaticKeys = null;
+      lastCandidateKey = null;
+    }
+
     // The first frame after the stadium comes on drawn with every picture
     // it needs: the phone holds the first ball until then (receiver 53).
     let wholeSent = false;
+    let wholeAt = 0;
     function noteWhole(missingBefore) {
       if (wholeSent || !on || counters.missing !== missingBefore) return;
       wholeSent = true;
+      wholeAt = performance.now();
       send({ t: "whole" });
+      // Receiver 65: from the first whole frame, how steadily it draws.
+      if (!steadyWatch.started) steadyWatch.start(wholeAt);
+      // A phone that waits for steady waits up to its own cap from the stadium coming on.
+      if (phoneWaitsSteady && root.dataset.warming) coverUntil = Math.max(coverUntil, onAt + STEADY_COVER_MS);
+    }
+
+    // Receiver 65: the TV draws steadily (core.createSteadyWatch), once a
+    // stadium-on; a phone that says so in its hello holds the first ball
+    // until then and the phone's picture stays over the stadium meanwhile, at
+    // most STEADY_COVER_MS (the phone's own cap, CastSceneStreamer.steadyLimit).
+    const steadyWatch = core.createSteadyWatch();
+    const STEADY_COVER_MS = 8000;
+    let phoneWaitsSteady = false;
+    let onAt = 0;
+    function noteSteady(verdict, local) {
+      if (!verdict) return;
+      send({ t: "steady", fps: verdict.fps, why: verdict.why, ms: verdict.after, on: Math.round(local - onAt) });
+    }
+
+    // The words over the phone's picture while the TV gets ready: the setup's
+    // pill and ring (card-hold), filling as the TV draws without a hitch.
+    let warmingShown = false;
+    let warmingDrawnAt = 0;
+    function showWarming(local) {
+      const node = document.getElementById ? document.getElementById("card-warming") : null;
+      const want = !!root.dataset.warming && phoneWaitsSteady && wholeSent && local - wholeAt >= 400
+        && document.body.dataset.card === "picture";
+      if (!node) return;
+      if (want !== warmingShown) { node.hidden = !want; warmingShown = want; }
+      if (want && local - warmingDrawnAt >= 100 && window.RallycadeHold) {
+        warmingDrawnAt = local;
+        window.RallycadeHold(node, steadyWatch.progress(local), "Getting the TV ready");
+      }
     }
 
     // Receiver 60: as the stadium comes on, the phone's picture (its setup,
@@ -588,6 +744,36 @@
     let framePhoto = false;
     function uncover() {
       if (root.dataset.warming) delete root.dataset.warming;
+      if (warmingShown) { const node = document.getElementById("card-warming"); if (node) node.hidden = true; warmingShown = false; }
+      settleLayers();
+    }
+
+    // Receiver 65: under the phone's picture, each photo layer that hasn't
+    // been on screen yet (the replay's outfield) is shown for a few frames so
+    // the TV uploads it now, not at the first replay. Only while the picture
+    // covers the stadium (the stadium all but transparent under it).
+    let layerWarming = null;
+    function warmLayers(local) {
+      if (document.body.dataset.card !== "picture") return;
+      if (layerWarming) {
+        if (local - layerWarming.at < 70) return;
+        if (backdropKey !== layerWarming.key) layerWarming.entry.element.style.opacity = "0";
+        layerWarming = null;
+        return;
+      }
+      for (const [key, entry] of backdropLayers) {
+        if (entry.ready && !entry.shown && key !== backdropKey) {
+          entry.shown = true;
+          entry.element.style.opacity = "1";
+          layerWarming = { key, entry, at: local };
+          return;
+        }
+      }
+    }
+    function settleLayers() {
+      if (!layerWarming) return;
+      if (backdropKey !== layerWarming.key) layerWarming.entry.element.style.opacity = "0";
+      layerWarming = null;
     }
 
     // Cached pictures loaded at hello, at most.
@@ -605,6 +791,8 @@
       const atlases = fetch("scene-images/atlases.json")
         .then((response) => (response && response.ok && typeof response.json === "function" ? response.json() : null))
         .then(readAtlases).catch(() => {});
+      // Receiver 65: the rehearsal's recorded ball (~26 KB on the wire), never in the hello's way.
+      loadRehearsal();
       return Promise.all([pictures, atlases]);
     }
 
@@ -790,8 +978,11 @@
         entry.element.style.transform = transform;
       }
       if (backdropKey !== op[3]) {
+        if (layerWarming && layerWarming.key !== op[3]) settleLayers();
+        else layerWarming = null;
         hideBackdrops(op[3]);
         entry.element.style.opacity = "1";
+        entry.shown = true;
         backdropKey = op[3];
       }
       backdropTransform = transform;
@@ -837,7 +1028,9 @@
     // TV refused to start RallyCade again for minutes after a stop.
     // `photo` "layer" (the photo an image the GPU composites) or "canvas";
     // `opaque` 1 for an opaque canvas (it must then draw the photo).
-    const TUNED = Object.freeze({ blur: "shadow", layers: "bounded", cover: "clip", bitmaps: 0, shade: "thirds", blend: 1, cache: 1, photo: "layer", opaque: 0 });
+    // `match` 0 blends only frames of the same shapes, as before receiver 65.
+    const TUNED = Object.freeze({ blur: "shadow", layers: "bounded", cover: "clip", bitmaps: 0, shade: "thirds", blend: 1, cache: 1, photo: "layer", opaque: 0,
+      match: 1 });
     // A weak dongle (core.isWeakDongle): no redraw only to blend between
     // frames (each draw costs it ~30 ms of its page's thread) and glows
     // drawn plain, never blurred.
@@ -857,6 +1050,7 @@
       document.body.dataset.sceneWeak = plan && plan.weak ? "1" : "0";
       setOpaque(!!tune.opaque);
       if (tune.photo === "canvas") hideBackdrops(null);
+      timeline.blendsMatches = !!tune.match;
     }
     setTune(null);
 
@@ -963,6 +1157,8 @@
     function pictureFor(key) {
       const image = images.get(key);
       if (image) return drawable(key, image, sizes.get(key));
+      // A rehearsal draws what is here and asks for nothing.
+      if (rehearsing) return null;
       ensure(key);
       counters.missing += 1;
       // A picture still being made: its undyed photo meanwhile.
@@ -1154,7 +1350,7 @@
       return true;
     }
 
-    function drawFrame(frame) {
+    function drawFrame(frame, batter) {
       const started = performance.now();
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.globalAlpha = 1;
@@ -1166,24 +1362,30 @@
       const cover = coverIndex(frame);
       let from = 0;
       const inCanvas = tune.photo === "canvas";
-      const layered = cover >= 0 && showBackdrop(frame.o[cover]);
+      // A rehearsal (receiver 65) draws as play does with the photo on its
+      // layer, and leaves the layers, the counters and the cover alone.
+      const layered = cover >= 0 && (rehearsing ? !inCanvas : showBackdrop(frame.o[cover]));
       if (layered) {
         from = cover + 1;
-        if (photoPending || !layerShownAt) layerShownAt = started;
+        if (!rehearsing && (photoPending || !layerShownAt)) layerShownAt = started;
       } else if (cover < 0) {
-        hideBackdrops(null);
+        if (!rehearsing) hideBackdrops(null);
       } else if (inCanvas) {
         // The photo drawn here: what is under it is never seen.
         from = cover;
-        if (!layerShownAt) layerShownAt = started;
+        if (!rehearsing && !layerShownAt) layerShownAt = started;
       }
-      photoPending = cover >= 0 && !layered && !inCanvas;
-      framePhoto = cover >= 0;
+      if (!rehearsing) {
+        photoPending = cover >= 0 && !layered && !inCanvas;
+        framePhoto = cover >= 0;
+      }
       const rest = drawStatic(frame, from);
       // A photo whose layer isn't decoded yet is drawn on the canvas, over
       // whichever layer was showing: never an empty frame.
-      paint(ctx, rest.frame, rest.from, { s: scale, width: canvas.width, height: canvas.height, layers: null, live: live.current });
+      paint(ctx, rest.frame, rest.from, { s: scale, width: canvas.width, height: canvas.height, layers: null,
+        live: batter === undefined ? live.current : batter });
       if (tune.shade === "canvas") drawShade();
+      if (rehearsing) return;
       counters.drawMs.push(performance.now() - started);
       counters.draws += 1;
     }
@@ -1617,7 +1819,7 @@
 
     function frameLoop() {
       window.requestAnimationFrame(frameLoop);
-      if (!on) return;
+      if (!on) { if (rehearsal.wanted) rehearse(performance.now()); return; }
       const began = performance.now();
       frameStep(began);
       counters.js += performance.now() - began;
@@ -1628,7 +1830,9 @@
       // Shown once whole with its photo on its layer for a frame, or at
       // COVER_MS whatever.
       if (root.dataset.warming && (local >= coverUntil
-        || (wholeSent && (!framePhoto || (!photoPending && layerShownAt && local - layerShownAt >= 30))))) uncover();
+        || (wholeSent && (!framePhoto || (!photoPending && layerShownAt && local - layerShownAt >= 30))
+          && (!phoneWaitsSteady || steadyWatch.verdict)))) uncover();
+      if (root.dataset.warming) { warmLayers(local); showWarming(local); }
       if (lastLoop) counters.gaps.push(local - lastLoop);
       lastLoop = local;
       const phoneNow = clock.phoneNow(local);
@@ -1644,8 +1848,16 @@
         drew = true;
         needsRedraw = false;
         if (result.blended) counters.blended += 1;
+        if (result.partly) counters.partly += 1;
         lastStamp = result.stamp;
+        if (steadyWatch.started && !steadyWatch.verdict) noteSteady(steadyWatch.draw(local), local);
       }
+      // How far behind the clock the stadium on screen is (receiver 65): 0
+      // while blending toward the next frame, the time since the frame shown
+      // otherwise (more when frames come late). The phone times its sounds
+      // to the TV's picture with it (`stale` in stats).
+      // Only while frames flow: paused, the phone sends a frame a second and the picture is meant to stand.
+      if (result && (result.blended || phoneNow - result.stamp <= STALE_FLOWING)) counters.stale.push(result.blended ? 0 : Math.max(0, phoneNow - result.stamp));
       // How old the batter's pose on screen is: what the live batter is for.
       if (result) {
         const age = core.poseAge(phoneNow, result.frame, live.current);
@@ -1696,8 +1908,15 @@
           // The page's thread (see lagTick): script ms a second, long-task
           // ms a second, a 50 ms timer's lateness (90th percentile), hidden.
           js: Math.round(counters.js / seconds), long: Math.round(counters.long / seconds),
-          lag: Math.round(core.percentile(counters.lag, 0.9)), hidden: document.hidden ? 1 : 0, opaque: opaqueCanvas ? 1 : 0
+          lag: Math.round(core.percentile(counters.lag, 0.9)), hidden: document.hidden ? 1 : 0, opaque: opaqueCanvas ? 1 : 0,
+          // Receiver 65: draws that blended only what matched; how stale the
+          // picture was (p50, p90 ms); the rehearsal's draws and their ms
+          // (the first ten's median, the last ten's: the drawing code warming).
+          partly: counters.partly, stale: Math.round(core.percentile(counters.stale, 0.5)), stale90: Math.round(core.percentile(counters.stale, 0.9)),
+          rehearsed: rehearsal.draws
         };
+        if (rehearsal.ms.length >= 20) stats.rehearseMs = [rehearsal.firstMs, Number(core.percentile(rehearsal.ms.slice(-10), 0.5).toFixed(1))];
+        if (steadyWatch.verdict) stats.steady = steadyWatch.verdict.fps;
         if (counters.pose.length) {
           stats.pose = Math.round(core.percentile(counters.pose, 0.5));
           stats.pose90 = Math.round(core.percentile(counters.pose, 0.9));
@@ -1713,6 +1932,7 @@
         counters.late = []; counters.drawMs = []; counters.missing = 0; counters.gaps = [];
         counters.live = 0; counters.pose = []; counters.ahead = []; counters.eff = [];
         counters.js = 0; counters.long = 0; counters.lag = [];
+        counters.partly = 0; counters.stale = [];
       }
     }
 
@@ -1769,9 +1989,14 @@
       holding = false;
       if (!!value && !on) {
         dropWarmCanvas();
+        if (rehearsal.wanted || rehearsal.canvas) endRehearsal();
         wholeSent = false;
+        steadyWatch.reset();
         root.dataset.warming = "1";
-        coverUntil = performance.now() + COVER_MS;
+        onAt = performance.now();
+        // Until its first whole frame as receiver 60; then, for a phone that
+        // waits for steady, up to STEADY_COVER_MS (noteWhole).
+        coverUntil = onAt + COVER_MS;
         layerShownAt = 0;
       }
       if (!value) uncover();
@@ -1806,7 +2031,9 @@
       // phone may draw it ahead (receiver 55).
       // `shared`: one phone owns the TV when a room shares it, by `claim`
       // (receiver 63, receiver-shared.js).
-      const ready = { t: "ready", scene: 1, pic: 1, card: 1, live: 1, setup: 1, whole: 1, predict: 1, shared: 1, inset: 1, screen: screenPixels(), version: VERSION, ua: navigator.userAgent, have };
+      // `steady`: it says when it draws steadily after the stadium comes on,
+      // and how stale its picture is (`stale` in stats; receiver 65).
+      const ready = { t: "ready", scene: 1, pic: 1, card: 1, live: 1, setup: 1, whole: 1, predict: 1, shared: 1, inset: 1, steady: 1, screen: screenPixels(), version: VERSION, ua: navigator.userAgent, have };
       // A weak dongle: the phone sends frames and live batters at its pace.
       if (plan.weak) ready.weak = 1;
       send(ready);
@@ -1882,6 +2109,10 @@
           wholeSent = false;
           // Receiver 60: the phone's kit, whose cached pieces load with the batter's.
           helloKit = typeof message.kit === "string" ? message.kit : null;
+          // Receiver 65: the phone holds its first ball until the TV draws steadily.
+          phoneWaitsSteady = message.steady === 1;
+          steadyWatch.reset();
+          wantRehearsal();
           if (readyToAnswer) answerHello(); else pendingHello = true;
           break;
         case "ping":
@@ -1963,6 +2194,9 @@
                 let frame = a;
                 if (b && t > a.s && b.s - a.s <= core.MAX_BLEND_GAP && core.shapeKey(a) === core.shapeKey(b)) {
                   frame = core.blendFrames(a, b, Math.min(1, (t - a.s) / (b.s - a.s)));
+                } else if (b && t > a.s && b.s - a.s <= core.MAX_BLEND_GAP && tune.match) {
+                  // Receiver 65: what matches, as the timeline draws it.
+                  frame = core.blendMatched(a, b, Math.min(1, (t - a.s) / (b.s - a.s)));
                 }
                 live.clear();
                 for (let k = liveFrames.length - 1; k >= 0; k -= 1) {
@@ -2061,6 +2295,7 @@
       backdropLayers.forEach((entry) => { try { entry.element.removeAttribute("src"); } catch (error) { /* gone */ } });
       empty(canvas);
       dropWarmCanvas();
+      endRehearsal();
       dropStaticLayer();
     }
 

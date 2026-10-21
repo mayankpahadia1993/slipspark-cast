@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800;900&family=Nunito:wght@600;700;800;900&display=swap">
-  <link rel="stylesheet" href="receiver.css?v=64">
+  <link rel="stylesheet" href="receiver.css?v=65">
   <script src="https://www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>
 </head>
 <body>
@@ -128,6 +128,16 @@
       </svg>
       <span class="hold-label" hidden></span>
     </div>
+    <!-- Receiver 65: the TV getting ready before the first ball, over the
+         phone's picture, its ring filling as the TV draws without a hitch
+         (receiver-scene.js showWarming). -->
+    <div id="card-warming" class="hold card-hold card-warming" hidden>
+      <svg class="hold-ring" viewBox="0 0 100 100" aria-hidden="true">
+        <circle class="hold-track" cx="50" cy="50" r="44"></circle>
+        <circle class="hold-fill" cx="50" cy="50" r="44"></circle>
+      </svg>
+      <span class="hold-label">Getting the TV ready</span>
+    </div>
     <!-- Build 158: the setup's hold ring, where the phone's picture has it,
          filling live (receiver-card-core.js ringPlacement). -->
     <svg id="card-ring" class="card-ring" viewBox="-5 -5 110 110" aria-hidden="true" hidden>
@@ -228,14 +238,14 @@
     </div>
   </section>
   <!-- ?v= keeps a Chromecast from mixing cached files of two receiver versions. -->
-  <script src="receiver-core.js?v=64"></script>
-  <script src="receiver-card-core.js?v=64"></script>
-  <script src="receiver-video.js?v=64"></script>
-  <script src="receiver-scene-core.js?v=64"></script>
-  <script src="receiver-scene.js?v=64"></script>
-  <script src="receiver-welcome.js?v=64"></script>
-  <script src="receiver-music.js?v=64"></script>
-  <script src="receiver-shared.js?v=64"></script>
-  <script src="receiver.js?v=64"></script>
+  <script src="receiver-core.js?v=65"></script>
+  <script src="receiver-card-core.js?v=65"></script>
+  <script src="receiver-video.js?v=65"></script>
+  <script src="receiver-scene-core.js?v=65"></script>
+  <script src="receiver-scene.js?v=65"></script>
+  <script src="receiver-welcome.js?v=65"></script>
+  <script src="receiver-music.js?v=65"></script>
+  <script src="receiver-shared.js?v=65"></script>
+  <script src="receiver.js?v=65"></script>
 </body>
 </html>

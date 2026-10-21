@@ -1,8 +1,8 @@
 {
   "environment": "production",
-  "commit": "e2e55509d990298151407c71da5574ca6e90597e",
-  "subject": "Receiver 64: the cache-version test",
-  "receiverTree": "8d65904a1d46366adb1aeb987ef879eac0b3ca92",
-  "revision": 64,
-  "deployedAt": "2026-10-21T04:29:51Z"
+  "commit": "58f9119320f3a6aedc66a06a97a701960e77ee1a",
+  "subject": "Parity: fixtures, shot parity and the contracts' source hash regenerated; inventory and IOS_BASELINE at 2de0ed9c",
+  "receiverTree": "0d3570f73aca35cf46df59e71bfc26019529d02a",
+  "revision": 65,
+  "deployedAt": "2026-10-21T19:18:11Z"
 }
