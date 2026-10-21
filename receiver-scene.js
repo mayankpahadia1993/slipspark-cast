@@ -317,10 +317,10 @@
     }
 
     // A picture from `url` (its bytes in `blob` if at hand): the image, the
-    // GPU layer's source, and its decoded bitmap, both in before a frame
-    // draws it.
-    function loadPicture(key, url, blob) {
-      if (!canBitmap || !tune.bitmaps) return loadImage(url).then((image) => { addImage(key, image); return image; });
+    // GPU layer's source, and its decoded bitmap (null without), both in
+    // before a frame draws it.
+    function decodePicture(key, url, blob) {
+      if (!canBitmap || !tune.bitmaps) return loadImage(url).then((image) => ({ image, bitmap: null }));
       const bytes = blob ? Promise.resolve(blob)
         : fetch(url).then((response) => { if (!response.ok) throw new Error("fetch " + url); return response.blob(); });
       const bitmap = bytes.then((data) => {
@@ -329,16 +329,110 @@
         return options ? window.createImageBitmap(data, options).catch(() => window.createImageBitmap(data)) : window.createImageBitmap(data);
       }).then((made) => (made && made.width > 0 && made.height > 0 ? made : null)).catch(() => null);
       return Promise.all([loadImage(url, false), bitmap]).then(([image, decoded]) => {
-        if (!decoded) {
-          // No bitmap: the image, decoded as before.
-          return (image.decode ? image.decode().catch(() => {}) : Promise.resolve()).then(() => { addImage(key, image); return image; });
+        // No bitmap: the image, decoded as before.
+        if (!decoded) return (image.decode ? image.decode().catch(() => {}) : Promise.resolve()).then(() => ({ image, bitmap: null }));
+        return { image, bitmap: decoded };
+      });
+    }
+
+    function loadPicture(key, url, blob) {
+      return decodePicture(key, url, blob).then(({ image, bitmap }) => {
+        if (bitmap) {
+          const old = bitmaps.get(key);
+          if (old && old.close) old.close();
+          bitmaps.set(key, bitmap);
         }
-        const old = bitmaps.get(key);
-        if (old && old.close) old.close();
-        bitmaps.set(key, decoded);
         addImage(key, image);
         return image;
       });
+    }
+
+    // MARK: Atlases (Oct 20 2026)
+    //
+    // Build 207 on the Living Room TV's Chromecast Ultra ("Lag with
+    // chromecast"): build 206's bowler's-end inset added 75 pictures, about
+    // half the receiver's 141. Three at a time, ~9 a second, they were still
+    // loading, and decoding as they were first drawn, through the innings'
+    // first 18 s: 1, 6, 18, 11, 14, 20, 20, 18 fps, then 26–28 once all were
+    // in. Its batter frames and keeper poses now come in a few atlases
+    // (`atlases.json`, scripts/cast-inset-atlas.mjs): three files, loaded and
+    // warmed with the first frame's pictures. A picture from an atlas is its
+    // rect there, drawn where that rect sits in the picture's own frame
+    // (`drawPicture`): the same pixels as its own file, but for the browser's
+    // rounding of where it samples (under 1 pixel in 2,000, mostly by a step
+    // of one: receiver-inset-atlas.test.cjs). Its key, the `have` in `ready` and what
+    // the phone sends are as before; its own file stays the fallback if an
+    // atlas won't load.
+    const sheets = new Map();
+    const cuts = new Map();
+
+    // `atlases.json`: each atlas's file and size, and each picture's atlas,
+    // rect there, where that rect sits in its frame, and the frame's size.
+    // Anything that doesn't add up is left to its own file.
+    function readAtlases(data) {
+      if (!data || typeof data !== "object" || !data.sheets || !data.frames) return;
+      const whole = (value, low) => Number.isInteger(value) && value >= low;
+      Object.entries(data.sheets).forEach(([id, sheet]) => {
+        if (!sheet || typeof sheet.file !== "string" || !/^[A-Za-z0-9._-]+\.png$/.test(sheet.file)) return;
+        if (!whole(sheet.width, 1) || !whole(sheet.height, 1) || sheet.width > 4096 || sheet.height > 4096) return;
+        sheets.set(id, { id, file: sheet.file, width: sheet.width, height: sheet.height, keys: [], image: null, bitmap: null,
+          promise: null, failed: false, warmed: false });
+      });
+      Object.entries(data.frames).forEach(([key, frame]) => {
+        const sheet = frame && sheets.get(frame.atlas);
+        if (!sheet || !Array.isArray(frame.rect) || !Array.isArray(frame.offset) || !Array.isArray(frame.size)) return;
+        const [x, y, w, h] = frame.rect, [ox, oy] = frame.offset, [width, height] = frame.size;
+        if (![x, y, ox, oy].every((v) => whole(v, 0)) || ![w, h, width, height].every((v) => whole(v, 1))) return;
+        if (x + w > sheet.width || y + h > sheet.height || ox + w > width || oy + h > height) return;
+        cuts.set(key, { atlas: sheet.id, x, y, w, h, ox, oy, width, height });
+        sheet.keys.push(key);
+      });
+    }
+
+    function addSprites(sheet) {
+      sheet.keys.forEach((key) => {
+        const cut = cuts.get(key);
+        if (!images.has(key)) addImage(key, { sprite: true, sheet, cut, naturalWidth: cut.width, naturalHeight: cut.height });
+      });
+    }
+
+    // The atlas a picture comes from, unless that atlas wouldn't load.
+    function cutOf(key) {
+      const cut = cuts.get(key);
+      return cut && !sheets.get(cut.atlas).failed ? cut : null;
+    }
+
+    // Loads an atlas once (again after a release): each of its pictures is
+    // then in `images` as a sprite, drawn from it. Its pictures already here
+    // (a recording's, the phone's) stay as they are.
+    function loadSheet(id) {
+      const sheet = sheets.get(id);
+      if (!sheet || sheet.failed) return Promise.resolve();
+      if (sheet.image) addSprites(sheet);
+      if (sheet.promise) return sheet.promise;
+      const waiting = sheet.keys.filter((key) => !images.has(key));
+      waiting.forEach((key) => loading.add(key));
+      sheet.promise = decodePicture(id, "scene-images/" + sheet.file).then(({ image, bitmap }) => {
+        // A file that isn't the size the manifest says is out of date.
+        if ((image.naturalWidth || image.width) !== sheet.width || (image.naturalHeight || image.height) !== sheet.height) {
+          throw new Error("atlas " + sheet.file + " is " + (image.naturalWidth || image.width) + "x" + (image.naturalHeight || image.height));
+        }
+        if (released) { if (bitmap && bitmap.close) bitmap.close(); sheet.promise = null; return; }
+        sheet.image = image;
+        sheet.bitmap = bitmap;
+        addSprites(sheet);
+        warmSheet(sheet);
+      }).catch((error) => {
+        // Each of its pictures from its own file, as before the atlases.
+        sheet.failed = true;
+        waiting.forEach((key) => loading.delete(key));
+        if (!insetOff) {
+          preloadQueue.push(...waiting.filter((key) => bundled.has(key) && !images.has(key)));
+          while (preloading < 3 && pumpPreload()) { /* three at a time */ }
+        }
+        report("atlas", error);
+      });
+      return sheet.promise;
     }
 
     // The receiver's own pictures, and those earlier casts left in its cache
@@ -361,6 +455,9 @@
     function preloadRank(key) {
       // The bowler's-end inset (Oct 20 2026): its view, the batter at the
       // crease and the keeper down are in the first frame; the strokes later.
+      // Its atlases hold all three of those with every stroke: with the
+      // first frame's, so all are in and warmed before the first ball.
+      if (cutOf(key)) return 2;
       if (/^bowler-end-(inset|batter-stance|keeper-crouch)-/.test(key)) return 2;
       if (/^bowler-end-/.test(key)) return 8;
       if (/^stadium-/.test(key)) return 0;
@@ -383,7 +480,16 @@
       const extra = Array.from(cached).filter((key) => !bundled.has(key)).sort(byRank).slice(0, MAX_CACHED_PRELOAD);
       // A weak dongle draws no bowler's-end inset (the phone leaves it out).
       const wanted = (key) => !(insetOff && /^bowler-end-/.test(key));
-      preloadQueue = Array.from(bundled.keys()).concat(extra).filter(wanted).sort(byRank);
+      // An atlas once, in its first picture's place.
+      const atlases = new Set();
+      const once = (key) => {
+        const cut = cutOf(key);
+        if (!cut) return true;
+        if (atlases.has(cut.atlas)) return false;
+        atlases.add(cut.atlas);
+        return true;
+      };
+      preloadQueue = Array.from(bundled.keys()).concat(extra).filter(wanted).sort(byRank).filter(once);
       while (preloading < 3 && pumpPreload()) { /* three at a time */ }
     }
     function pumpPreload() {
@@ -391,6 +497,11 @@
       if (!preloadQueue.length) return false;
       const key = preloadQueue.shift();
       preloading += 1;
+      const cut = cutOf(key);
+      if (cut) {
+        loadSheet(cut.atlas).then(() => { preloading -= 1; window.setTimeout(pumpPreload, 20); });
+        return true;
+      }
       loading.add(key);
       const source = bundled.has(key) ? Promise.resolve("scene-images/" + bundled.get(key))
         : database ? loadCached(key) : Promise.reject(new Error("no cache"));
@@ -424,13 +535,24 @@
       if (backdropLayers.has(key)) return;
       const image = images.get(key);
       if (!image) return;
+      if (image.sprite) { warmSheet(image.sheet); return; }
+      if (warmUpload(bitmaps.get(key) || image)) warmed.add(key);
+    }
+    // An atlas is warmed once, whole: each of its pictures with it.
+    function warmSheet(sheet) {
+      if (WARM_MODE === "off" || on || sheet.warmed || released || !sheet.image) return;
+      if (!warmUpload(sheet.bitmap || sheet.image)) return;
+      sheet.warmed = true;
+      sheet.keys.forEach((key) => { const image = images.get(key); if (image && image.sheet === sheet) warmed.add(key); });
+    }
+    function warmUpload(source) {
       try {
         // "gpu": a 256×256 canvas, big enough to be on the GPU, so each picture's texture is uploaded now.
         const side = WARM_MODE === "gpu" ? 256 : 1;
         if (!warmCanvas) { warmCanvas = document.createElement("canvas"); warmCanvas.width = side; warmCanvas.height = side; }
-        warmCanvas.getContext("2d").drawImage(bitmaps.get(key) || image, 0, 0, side, side);
-        warmed.add(key);
-      } catch (error) { /* decoded at the first frame instead */ }
+        warmCanvas.getContext("2d").drawImage(source, 0, 0, side, side);
+        return true;
+      } catch (error) { return false; /* decoded at the first frame instead */ }
     }
     function dropWarmCanvas() {
       if (!warmCanvas) return;
@@ -472,13 +594,18 @@
     const MAX_CACHED_PRELOAD = 48;
 
     function loadBundled() {
-      return fetch("scene-images/manifest.json").then((response) => response.ok ? response.json() : { images: {} })
+      const pictures = fetch("scene-images/manifest.json").then((response) => response.ok ? response.json() : { images: {} })
         .then((manifest) => {
           Object.entries((manifest && manifest.images) || {}).forEach(([key, file]) => {
             bundled.set(key, file);
             if (/\.jpe?g$/i.test(file)) opaque.add(key);
           });
         }).catch(() => {});
+      // The inset's atlases (a receiver folder without them: each picture its own file).
+      const atlases = fetch("scene-images/atlases.json")
+        .then((response) => (response && response.ok && typeof response.json === "function" ? response.json() : null))
+        .then(readAtlases).catch(() => {});
+      return Promise.all([pictures, atlases]);
     }
 
     let database = null;
@@ -525,6 +652,9 @@
       const picture = pictures.get(key);
       if (picture) { compose(key); return; }
       if (loading.has(key)) return;
+      // A picture in an atlas comes with the atlas (its own file if that fails).
+      const cut = cutOf(key);
+      if (cut) { loadSheet(cut.atlas); return; }
       const ask = () => { loading.delete(key); cached.delete(key); bundled.delete(key); wanted.add(key); };
       if (bundled.has(key)) {
         loading.add(key);
@@ -564,21 +694,25 @@
       }).catch((error) => report("image", error));
     }
 
-    // A picture with a colour multiplied in (`colorMultiply`), made once.
-    function tint(key, image, color) {
-      const id = key + ":" + color.join(",");
+    // A picture with a colour multiplied in (`colorMultiply`), made once
+    // (`drawn` as pictureFor gives it). One from an atlas is made at its own
+    // frame's size, its rect where it sits in the frame.
+    function tint(drawn, color) {
+      const id = drawn.key + ":" + color.join(",");
       let canvasTint = tinted.get(id);
       if (canvasTint) return canvasTint;
+      const image = drawn.image, cut = drawn.cut;
       canvasTint = document.createElement("canvas");
-      canvasTint.width = image.naturalWidth || image.width;
-      canvasTint.height = image.naturalHeight || image.height;
+      canvasTint.width = cut ? cut.width : image.naturalWidth || image.width;
+      canvasTint.height = cut ? cut.height : image.naturalHeight || image.height;
       const t = canvasTint.getContext("2d");
-      t.drawImage(image, 0, 0);
+      const place = () => (cut ? t.drawImage(image, cut.x, cut.y, cut.w, cut.h, cut.ox, cut.oy, cut.w, cut.h) : t.drawImage(image, 0, 0));
+      place();
       t.globalCompositeOperation = "multiply";
       t.fillStyle = core.cssColor([color[0], color[1], color[2], 1000]);
       t.fillRect(0, 0, canvasTint.width, canvasTint.height);
       t.globalCompositeOperation = "destination-in";
-      t.drawImage(image, 0, 0);
+      place();
       tinted.set(id, canvasTint);
       return canvasTint;
     }
@@ -828,14 +962,33 @@
     // nothing can be drawn.
     function pictureFor(key) {
       const image = images.get(key);
-      if (image) return { image: bitmaps.get(key) || image, size: sizes.get(key), key };
+      if (image) return drawable(key, image, sizes.get(key));
       ensure(key);
       counters.missing += 1;
       // A picture still being made: its undyed photo meanwhile.
       const picture = pictures.get(key);
       const fallback = picture && picture.fallback && images.get(picture.fallback);
       if (!fallback) return null;
-      return { image: bitmaps.get(picture.fallback) || fallback, size: { width: picture.width, height: picture.height }, key: picture.fallback };
+      return drawable(picture.fallback, fallback, { width: picture.width, height: picture.height });
+    }
+
+    // A sprite is drawn from its atlas (`cut`: its rect there).
+    function drawable(key, image, size) {
+      if (image.sprite) return { image: image.sheet.bitmap || image.sheet.image, size, key, cut: image.cut };
+      return { image: bitmaps.get(key) || image, size, key };
+    }
+
+    // A picture into `size` (the rect its key gives) under `c`'s transform.
+    // One from an atlas: its rect there, drawn where that rect sits in its
+    // frame, at the scale the whole frame would be drawn. A filter reading
+    // past the rect reads what it would read in the frame alone (its edges
+    // repeated around it in the atlas, scripts/cast-inset-atlas.mjs), so the
+    // pixels are the same but for rounding in where they are sampled.
+    function drawPicture(c, drawn) {
+      const size = drawn.size, cut = drawn.cut;
+      if (!cut) { c.drawImage(drawn.image, 0, 0, size.width, size.height); return; }
+      const kx = size.width / cut.width, ky = size.height / cut.height;
+      c.drawImage(drawn.image, cut.x, cut.y, cut.w, cut.h, cut.ox * kx, cut.oy * ky, cut.w * kx, cut.h * ky);
     }
 
     function pictureSize(key) {
@@ -875,7 +1028,8 @@
         const m = op[4];
         c.setTransform(scale * m[0] / 10000, scale * m[1] / 10000, scale * m[2] / 10000, scale * m[3] / 10000,
           scale * m[4] / 10, scale * m[5] / 10);
-        c.drawImage(multiply ? tint(drawn.key, drawn.image, multiply) : drawn.image, 0, 0, drawn.size.width, drawn.size.height);
+        if (multiply) c.drawImage(tint(drawn, multiply), 0, 0, drawn.size.width, drawn.size.height);
+        else drawPicture(c, drawn);
         c.restore();
       }
     }
@@ -1890,6 +2044,11 @@
       on = false;
       bitmaps.forEach((bitmap) => { try { if (bitmap.close) bitmap.close(); } catch (error) { /* gone */ } });
       bitmaps.clear();
+      // The atlases too (loaded again after a hello).
+      sheets.forEach((sheet) => {
+        try { if (sheet.bitmap && sheet.bitmap.close) sheet.bitmap.close(); } catch (error) { /* gone */ }
+        sheet.bitmap = null; sheet.image = null; sheet.promise = null; sheet.warmed = false;
+      });
       const empty = (target) => { try { if (target && target.getContext) { target.width = 0; target.height = 0; } } catch (error) { /* gone */ } };
       layers.forEach(empty);
       layers.length = 0;

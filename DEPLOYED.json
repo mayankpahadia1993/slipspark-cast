@@ -1,8 +1,8 @@
 {
   "environment": "production",
-  "commit": "c0734b019c5fcfa2021b39647b2d8725ac280700",
-  "subject": "E2EBowlersEndUITests: the left-hander's bar is checked whenever it is up (at least 3 of 5 moments)",
-  "receiverTree": "872211cdda7b8e9b4ad1636ead8ccb2e782ec2ac",
-  "revision": 63,
-  "deployedAt": "2026-10-20T23:52:21Z"
+  "commit": "e2e55509d990298151407c71da5574ca6e90597e",
+  "subject": "Receiver 64: the cache-version test",
+  "receiverTree": "8d65904a1d46366adb1aeb987ef879eac0b3ca92",
+  "revision": 64,
+  "deployedAt": "2026-10-21T04:29:51Z"
 }
