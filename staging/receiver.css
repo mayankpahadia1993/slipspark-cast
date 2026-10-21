@@ -355,6 +355,10 @@ body[data-card="waiting"] .card-screen[data-screen="positioning"] {
 .card-hold { position: absolute; left: 50%; bottom: 4vh; margin: 0; padding: 1vh 1.6vw; transform: translateX(-50%); border-radius: 999px; background: rgba(9, 22, 19, .82); }
 .card-hold .hold-ring { width: clamp(56px, 5vw, 96px); height: clamp(56px, 5vw, 96px); }
 .card-hold .hold-label { font-size: clamp(20px, 1.8vw, 34px); }
+/* Receiver 65: "Getting the TV ready" at the top, clear of the setup's own words and ring at the bottom. */
+.card-warming { top: 4vh; bottom: auto; display: flex; align-items: center; }
+.card-warming[hidden] { display: none; }
+.card-warming .hold-ring { width: clamp(36px, 3vw, 60px); height: clamp(36px, 3vw, 60px); }
 body[data-card="picture"] #app, body[data-card="waiting"] #app { visibility: hidden; }
 
 /* Receiver 56: the app-open welcome over the ready screen

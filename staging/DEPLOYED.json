@@ -1,8 +1,8 @@
 {
   "environment": "staging",
-  "commit": "c86ffc827b165f412250b079390fab0306120651",
-  "subject": "Bowler's-end inset: parity baseline at 3bdf114f",
-  "receiverTree": "ccc796c49fd6898cd624d6428dab8c6aaf77af14",
-  "revision": 63,
-  "deployedAt": "2026-10-20T18:00:11Z"
+  "commit": "1ba4917da0d02b4892cf7f515845ecec4e5c83a3",
+  "subject": "Receiver 65: a weak dongle rehearses 60 draws, not 200",
+  "receiverTree": "70d50fe3564b8d7893892605a5c9ae15ac436e43",
+  "revision": 65,
+  "deployedAt": "2026-10-21T11:43:50Z"
 }
