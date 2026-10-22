@@ -1777,6 +1777,8 @@
           caption.classList.add("is-in");
         }
         if (caption.hidden) caption.hidden = false;
+        // Build 212: while a ball is bowled the line sits under the top banner, clear of the pitch.
+        caption.classList.toggle("is-raised", h.captionRaised === true);
       } else {
         if (!caption.hidden) caption.hidden = true;
         if (caption.dataset.line) caption.dataset.line = "";

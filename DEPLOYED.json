@@ -1,8 +1,8 @@
 {
   "environment": "production",
-  "commit": "58f9119320f3a6aedc66a06a97a701960e77ee1a",
-  "subject": "Parity: fixtures, shot parity and the contracts' source hash regenerated; inventory and IOS_BASELINE at 2de0ed9c",
-  "receiverTree": "0d3570f73aca35cf46df59e71bfc26019529d02a",
+  "commit": "f9c8008023cb4294c3f3eb09ca3bdc3bdcb17167",
+  "subject": "Parity: inventory and IOS_BASELINE at 18364d26",
+  "receiverTree": "cd2184bfab8e2ef527800a1b49b78c4fc8670231",
   "revision": 65,
-  "deployedAt": "2026-10-21T19:18:11Z"
+  "deployedAt": "2026-10-22T19:14:31Z"
 }
