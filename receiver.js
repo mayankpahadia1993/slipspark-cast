@@ -115,6 +115,14 @@
     // "Raise both hands to bat again"); older ones only the number.
     if (result.scoreText) text("result-score", result.scoreText);
     text("result-hint", result.hint || "Raise both hands to go again · Results saved on your phone");
+    // Receiver 66: a cup's next match in a card of its own, in place of the
+    // reward's small last line (TestFlight 211).
+    const next = element("result-next");
+    next.hidden = !result.nextMatch;
+    if (result.nextMatch) {
+      text("result-next-eyebrow", result.nextMatch.eyebrow);
+      text("result-next-title", result.nextMatch.title);
+    }
     const reward = element("result-reward");
     reward.hidden = !result.reward;
     if (result.reward) {
@@ -122,6 +130,7 @@
       text("result-reward-xp", `+${result.reward.xp.toLocaleString("en-US")} XP`);
       text("result-reward-coins", `+${result.reward.coins.toLocaleString("en-US")} coins`);
       text("result-reward-detail", result.reward.detail);
+      element("result-reward-detail").hidden = !!result.nextMatch;
       const level = element("result-reward-level");
       level.hidden = !result.reward.levelUp;
       text("result-reward-level", result.reward.levelUp);
@@ -267,6 +276,26 @@
     requestFrame: (callback) => requestAnimationFrame(callback),
     cancelFrame: (id) => cancelAnimationFrame(id)
   });
+  // Receiver 66: a cup won, its celebration over the phone's scorecard
+  // while the phone shows it. ?preview=cupCelebration&at=3.4: that moment, held.
+  const celebrationHeld = /Celebration$/.test(welcomeQuery.get("preview") || "") && welcomeQuery.get("at") !== null;
+  const celebrationAt = Number(welcomeQuery.get("at")) * 1000 || 0;
+  const celebrationModule = window.RallycadeCelebration;
+  const celebrationRoot = element("celebration");
+  const celebrationView = celebrationModule && celebrationRoot && celebrationModule.createCelebrationView({
+    elements: {
+      root: celebrationRoot, stage: element("celebration-stage"), canvas: element("celebration-canvas"),
+      glow: element("celebration-glow"), rays: element("celebration-rays"), floor: element("celebration-floor"),
+      trophy: element("celebration-trophy"), eyebrow: element("celebration-eyebrow"), title: element("celebration-title"),
+      subtitle: element("celebration-subtitle"), cheque: element("celebration-cheque"), payee: element("celebration-payee"),
+      xp: element("celebration-xp"), coins: element("celebration-coins"), memo: element("celebration-memo"),
+      note: element("celebration-note"), seal: element("celebration-seal"), hint: element("celebration-hint"),
+      confetti: element("celebration-confetti")
+    },
+    now: () => (celebrationHeld ? 0 : performance.now()),
+    requestFrame: (callback) => requestAnimationFrame(callback),
+    cancelFrame: (id) => cancelAnimationFrame(id)
+  });
   // A phone has said hello on the scene channel this cast.
   let stadiumPhone = false;
   // The stadium came on during this stretch of play, and the scene's phone left.
@@ -304,6 +333,7 @@
     if (state.timingCheck) renderTimingCheck(state.timingCheck);
     if (cardView) cardView.update(state);
     if (welcomeView) welcomeView.update(state);
+    if (celebrationView) celebrationView.update(state);
   }
 
   const query = new URLSearchParams(window.location.search);
@@ -311,6 +341,10 @@
   if (welcomeHeld) {
     const state = core.sampleState(preview);
     if (state.welcome) state.welcome.elapsed = Math.round(Number(query.get("at")) * 1000);
+    render(state);
+  } else if (celebrationHeld) {
+    const state = core.sampleState(preview);
+    if (state.result && state.result.celebration) state.result.celebration.elapsed = Math.round(celebrationAt);
     render(state);
   } else {
     render(core.sampleState(preview || "ready"));

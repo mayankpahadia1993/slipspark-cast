@@ -43,6 +43,36 @@
     return Math.min(maximum, Math.max(minimum, number(value, minimum)));
   }
 
+  // A cup celebration as the phone sends it (CastDisplayState.Celebration):
+  // its words bounded, its amounts and times clamped, its trophy one of the
+  // three, its kit colours "#RRGGBB" only. Anything else is none.
+  function normalizeCelebration(value) {
+    if (!value || typeof value !== "object" || typeof value.id !== "string" || !/^[A-Za-z0-9:_-]{1,128}$/.test(value.id)) return null;
+    if (!["world", "club", "legend"].includes(value.trophy)) return null;
+    return {
+      id: value.id,
+      trophy: value.trophy,
+      eyebrow: boundedString(value.eyebrow, "", 60),
+      title: boundedString(value.title, "CHAMPIONS", 40),
+      subtitle: boundedString(value.subtitle, "", 80),
+      payee: boundedString(value.payee, "The champion", 40),
+      xp: Math.floor(clamp(value.xp, 0, 10000000)),
+      coins: Math.floor(clamp(value.coins, 0, 10000000)),
+      memo: boundedString(value.memo, "", 80),
+      note: boundedString(value.note, "", 80),
+      colors: Array.isArray(value.colors) ? value.colors.filter((c) => typeof c === "string" && /^#[0-9A-Fa-f]{6}$/.test(c)).slice(0, 4) : [],
+      reduced: value.reduced === true,
+      elapsed: Math.floor(clamp(value.elapsed, 0, 60000)),
+      duration: Math.floor(clamp(value.duration, 1000, 60000))
+    };
+  }
+
+  // A cup's next match for the HTML result (CupNextMatch).
+  function normalizeNextMatch(value) {
+    if (!value || typeof value !== "object" || typeof value.title !== "string" || !value.title) return null;
+    return { eyebrow: boundedString(value.eyebrow, "NEXT MATCH", 60), title: boundedString(value.title, "", 60) };
+  }
+
   function boundedString(value, fallback, maximumLength) {
     return String(value == null ? fallback : value).slice(0, maximumLength);
   }
@@ -220,7 +250,11 @@
           milestones: Array.isArray(result.reward.milestones)
             ? result.reward.milestones.filter((line) => typeof line === "string" && line).slice(0, 4).map((line) => boundedString(line, "", 80))
             : []
-        } : null
+        } : null,
+        // Receiver 66 (TestFlight 211): a cup won, while the phone shows its
+        // celebration, and a cup's next match.
+        celebration: normalizeCelebration(result.celebration),
+        nextMatch: normalizeNextMatch(result.nextMatch)
       };
     }
 
@@ -357,6 +391,25 @@
     if (kind === "cricketDuelHandoff") return normalizeState({ ...base, screen: "cricketDuelHandoff", cricketDuelHandoff: { target: 32, balls: 12, wickets: 3 } });
     if (kind === "cricketDuelResult") return normalizeState({ ...base, screen: "cricketDuelResult", cricketDuelResult: { headline: "PLAYER 2 WINS", margin: "BY 2 WICKETS · 1 BALL TO SPARE", winner: "second", firstRuns: 31, firstWickets: 3, secondRuns: 32, secondWickets: 1 } });
     if (kind === "timingCheck") return normalizeState({ ...base, screen: "timingCheck", timingCheck: { headline: "Mostly early", detail: "Your swings met the ball about a quarter of a second before it reached you.", verdicts: ["early", "littleEarly", "perfect", "early", "littleEarly", "noSwing"], lines: ["Balls 1 and 4 were early.", "Balls 2 and 5 were a little early.", "Ball 3 was perfect.", "Ball 6 had no swing.", "Wait for the ball to reach the crease before you swing."], note: "Raise both hands to play your innings" } });
+    // ?preview=cupCelebration / clubCelebration / legendCelebration: a cup
+    // won, its celebration over the result (receiver 66); ?preview=cupNext:
+    // a cup match with the next match.
+    if (kind === "cupCelebration" || kind === "clubCelebration" || kind === "legendCelebration") {
+      const world = kind === "cupCelebration", legend = kind === "legendCelebration";
+      return normalizeState({ ...base, sequence: 3, screen: "result", result: { mode: world ? "RALLYCADE WORLD CUP · INDIA · WORLD CHAMPIONS" : "STADIUM INNINGS",
+        headline: "Chased it down! Won with 4 balls to spare.", score: 42, scoreText: "42/2", caption: "RUNS", isPersonalBest: false,
+        stats: [{ label: "TARGET", value: "42" }, { label: "OVERS", value: "1.2" }, { label: "RUN RATE", value: "31.5" }], hint: "Raise a hand to bat again",
+        reward: { title: world ? "RALLYCADE WORLD CUP WON" : "CLUB CUP WON", xp: 306, coins: 391, detail: world ? "World Champion · Trophy · India kit" : "Club Champion · Trophy · Gold kit" },
+        celebration: world
+          ? { id: "preview-world", trophy: "world", eyebrow: "RALLYCADE WORLD CUP · INDIA", title: "WORLD CHAMPIONS", subtitle: "Beat West Indies in the final · Medium",
+              payee: "Asha", xp: 1060, coins: 615, memo: "RallyCade World Cup · India · 5 matches", note: "Includes the 300-coin prize · India kit",
+              colors: ["#1A73E6", "#FF8C1F"], reduced: false, elapsed: 0, duration: 6500 }
+          : { id: "preview-" + (legend ? "legend" : "club"), trophy: legend ? "legend" : "club", eyebrow: legend ? "CLUB CUP · LEGEND" : "CLUB CUP · EASY",
+              title: legend ? "CLUB CHAMPION" : "CUP WINNERS", subtitle: legend ? "All 3 chases won on Legend" : "All 3 chases won", payee: "The champion",
+              xp: legend ? 1090 : 418, coins: legend ? 405 : 212, memo: legend ? "Club Cup · Legend · 3 chases" : "Club Cup · Easy · 3 chases",
+              note: legend ? "Includes the 90-coin prize · Champion gold kit" : "Includes the 90-coin prize", colors: [], reduced: false, elapsed: 0, duration: 6500 } } });
+    }
+    if (kind === "cupNext") return normalizeState({ ...base, screen: "result", result: { mode: "RALLYCADE WORLD CUP · INDIA · INTO THE SEMI-FINALS", headline: "Chased it down! Won with 6 balls to spare.", score: 29, scoreText: "29/1", caption: "RUNS", isPersonalBest: false, stats: [{ label: "TARGET", value: "29" }, { label: "OVERS", value: "1.0" }, { label: "RUN RATE", value: "29.0" }], hint: "Raise a hand for the semi-final", reward: { title: "YOU EARNED", xp: 207, coins: 81, detail: "Semi-final v Sri Lanka next, for India." }, nextMatch: { eyebrow: "NEXT MATCH · SEMI-FINAL", title: "India v Sri Lanka" } } });
     if (kind === "ready" || !kind) return normalizeState({ ...base, sequence: 1, screen: "ready" });
     // ?preview=welcome: the app-open welcome as the phone sends it (an evening, a 4-day streak).
     if (kind === "welcome" || kind === "welcomeShort") {
@@ -416,6 +469,6 @@
     return null;
   }
 
-  return { clamp, formatTime, normalizeJoints, normalizeState, normalizeWelcome, parseMessage, sampleState, resultHeadlineSize, estimateWidth,
+  return { clamp, formatTime, normalizeJoints, normalizeState, normalizeWelcome, normalizeCelebration, normalizeNextMatch, parseMessage, sampleState, resultHeadlineSize, estimateWidth,
     wrapLines, hideTarget, TARGET_REVEAL_MS };
 });

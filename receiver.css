@@ -377,3 +377,51 @@ body[data-card="picture"] #app, body[data-card="waiting"] #app { visibility: hid
 .welcome-wordmark { position: absolute; left: 960px; top: 622px; transform: translate(-50%, -50%); opacity: 0; font-family: Inter, "Google Sans", sans-serif; font-size: 81px; font-weight: 900; letter-spacing: 16px; color: #ffc252; white-space: nowrap; }
 .welcome-caption { position: absolute; left: 50%; bottom: 30px; transform: translateX(-50%); max-width: 900px; display: flex; align-items: center; gap: 14px; padding: 14px 26px; border-radius: 999px; background: rgba(18, 43, 38, .9); color: #fcf5de; font-family: Inter, "Google Sans", sans-serif; font-size: 26px; font-weight: 700; line-height: 1.25; width: max-content; }
 .welcome-caption .hud-mic { flex: none; width: 24px; height: 24px; fill: #ffc252; color: #ffc252; }
+
+/* Receiver 66 (TestFlight 211): a cup won (receiver-celebration.js), over the
+   phone's scorecard picture. A 1920 x 1080 stage, scaled to fit, laid out
+   as the AirPlay TV draws the phone's CupCelebrationFrame (the phone's
+   points times 2.23). The view sets the moving parts each frame. */
+.celebration { position: fixed; inset: 0; z-index: 14; pointer-events: none; }
+.celebration-stage { position: absolute; left: 50%; top: 50%; width: min(100vw, 177.7778vh); height: min(56.25vw, 100vh); transform: translate(-50%, -50%); overflow: hidden; }
+.celebration-canvas { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; transform-origin: 0 0; overflow: hidden; color: #fcf5de; font-family: Inter, "Google Sans", system-ui, sans-serif; }
+.celebration-dim { position: absolute; inset: 0; background: rgba(18, 43, 38, .95); }
+.celebration-glow { position: absolute; inset: 0; background: radial-gradient(circle 893px at 557px 508px, rgba(255, 194, 82, .34), rgba(255, 194, 82, 0)); }
+.celebration-rays { position: absolute; left: 557px; top: 508px; width: 1786px; height: 1786px; transform: translate(-50%, -50%);
+  background: repeating-conic-gradient(from -2.6deg, rgba(255, 194, 82, .22) 0deg 5.2deg, rgba(255, 194, 82, 0) 5.2deg 20deg);
+  -webkit-mask-image: radial-gradient(circle closest-side, #000 8%, rgba(0, 0, 0, .55) 45%, rgba(0, 0, 0, 0) 100%);
+  mask-image: radial-gradient(circle closest-side, #000 8%, rgba(0, 0, 0, .55) 45%, rgba(0, 0, 0, 0) 100%); }
+.celebration-floor { position: absolute; left: 257px; top: 779px; width: 600px; height: 86px; border-radius: 50%; background: radial-gradient(closest-side, rgba(255, 194, 82, .35), rgba(255, 194, 82, 0)); }
+.celebration-trophy { position: absolute; left: 0; top: 0; width: 476px; height: 714px; will-change: transform, opacity; }
+.celebration-trophy svg, .cheque-seal svg { display: block; width: 100%; height: 100%; }
+.celebration-words { position: absolute; left: 922px; top: 518px; width: 845px; transform: translateY(-50%); display: flex; flex-direction: column; align-items: flex-start; gap: 13px; }
+.celebration-eyebrow { color: #ffc252; font-size: 27px; font-weight: 800; letter-spacing: 5.4px; white-space: nowrap; }
+.celebration-title { margin: 0; font: 900 89px/1 Nunito, "Varela Round", sans-serif; letter-spacing: 0; text-shadow: 0 0 31px rgba(255, 194, 82, .35); white-space: nowrap; }
+.celebration-subtitle { margin: 0; color: rgba(252, 245, 222, .85); font-size: 33px; font-weight: 600; }
+.cheque { position: relative; box-sizing: border-box; width: 845px; margin-top: 22px; padding: 29px 36px; border-radius: 31px; background: #fcf6e2; color: rgb(18, 43, 38);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, .45); transform-origin: 0 100%; display: flex; flex-direction: column; gap: 18px; overflow: hidden; }
+.cheque::after { content: ""; position: absolute; inset: 9px; border: 3.3px solid #ffc252; border-radius: 24px; pointer-events: none; }
+.cheque-waves { position: absolute; inset: 0; width: 100%; height: 100%; fill: none; stroke: rgba(255, 194, 82, .16); stroke-width: 1.4; }
+.cheque > div { position: relative; display: flex; align-items: baseline; gap: 18px; }
+.cheque-head { justify-content: space-between; }
+.cheque-bank { font: 900 27px/1 Nunito, sans-serif; letter-spacing: 5.8px; }
+.cheque-heading { color: #9e6619; font-size: 20px; font-weight: 800; letter-spacing: 4px; }
+.cheque-label { color: rgba(18, 43, 38, .55); font-size: 20px; font-weight: 800; letter-spacing: 3px; }
+.cheque-payee { flex: 1; font: 900 47px/1.1 Nunito, sans-serif; border-bottom: 2px solid rgba(18, 43, 38, .25); padding-bottom: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cheque-amounts strong { padding: 13px 27px; border-radius: 20px; font: 900 45px/1 Nunito, sans-serif; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.cheque-xp { background: rgb(18, 43, 38); color: #fcf5de; }
+.cheque-coins { background: #ffc252; color: rgb(18, 43, 38); display: inline-block; }
+.cheque-memo { font-size: 27px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cheque-foot { align-items: flex-end !important; }
+.cheque-seal { flex: 0 0 auto; width: 85px; height: 85px; box-sizing: border-box; padding: 13px; border-radius: 50%; background: rgb(18, 43, 38); box-shadow: inset 0 0 0 6px rgb(18, 43, 38), inset 0 0 0 9px #ffc252; }
+.cheque-note { flex: 1; color: rgba(18, 43, 38, .7); font-size: 25px; font-weight: 500; }
+.cheque-sign { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+.cheque-sign em { color: #9e6619; font: italic 600 42px/1 Georgia, "Times New Roman", serif; }
+.cheque-sign i { width: 188px; height: 2px; background: rgba(18, 43, 38, .35); }
+.cheque-sign small { color: rgba(18, 43, 38, .55); font-size: 17px; font-weight: 700; letter-spacing: 1.3px; }
+.celebration-confetti { position: absolute; inset: 0; width: 1920px; height: 1080px; }
+.celebration-hint { position: absolute; left: 50%; bottom: 36px; transform: translateX(-50%); padding: 18px 31px; border-radius: 999px; background: rgba(0, 0, 0, .4); color: rgba(252, 245, 222, .8); font-size: 27px; font-weight: 700; white-space: nowrap; }
+
+/* A cup's next match on the HTML result (receiver 66). */
+.result-next { display: flex; flex-direction: column; align-items: center; gap: .6vh; margin-top: 2.2vh; padding: 1.6vh 2.4vw; border: 3px solid rgba(255, 194, 82, .85); border-radius: 22px; background: rgba(18, 43, 38, .82); }
+.result-next strong { font: 900 clamp(26px, 2.6vw, 52px)/1.1 Nunito, sans-serif; color: #fcf5de; }
