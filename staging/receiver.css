@@ -156,6 +156,8 @@ body[data-scene-weak="1"] .scene-hud *, body[data-scene-weak="1"] .scene-hud { a
 .hud-scorebug { display: flex; align-items: baseline; gap: 17px; padding: 15px 31px; border-radius: 31px; background: var(--cream); color: rgb(var(--ink)); font-variant-numeric: tabular-nums; }
 .hud-scorebug > strong { font-size: 65px; font-weight: 900; line-height: 1; }
 .hud-overs b { display: block; margin-top: 3px; font-size: 22px; font-weight: 700; }
+/* Receiver 68: the level, behind a hairline so it never reads as the overs (the phone's 1 pt at 18% ink). */
+.hud-level { padding-left: 17px; border-left: 2px solid rgba(var(--ink), .18); white-space: nowrap; }
 .hud-check { display: block; }
 .hud-check strong { display: block; margin-top: 3px; font-size: 41px; font-weight: 900; line-height: 1.05; }
 .hud-friend { position: absolute; left: 0; top: 112px; padding: 10px 20px; border-radius: 999px; background: var(--gold); color: rgb(var(--ink)); white-space: nowrap; font-size: 19px; font-weight: 800; letter-spacing: 2px; font-variant-numeric: tabular-nums; }
@@ -190,6 +192,7 @@ body[data-scene-weak="1"] .scene-hud *, body[data-scene-weak="1"] .scene-hud { a
 .hud-moves { position: absolute; left: 50%; top: 130px; transform: translateX(-50%); max-width: 1500px; padding: 10px 18px; border-radius: 999px; background: rgba(var(--ink), .88); font-size: 22px; font-weight: 700; white-space: nowrap; }
 
 .hud-caption { position: absolute; left: 50%; bottom: 30px; transform: translateX(-50%); max-width: 900px; display: flex; align-items: center; gap: 14px; padding: 14px 26px; border-radius: 999px; background: rgba(var(--ink), .9); font-size: 26px; font-weight: 700; line-height: 1.25; width: max-content; }
+.hud-caption.is-raised { bottom: auto; top: 22.2%; }
 .hud-caption.is-in { animation: hud-caption-in .35s cubic-bezier(.2, .9, .3, 1.05) both; }
 .hud-mic { flex: none; width: 24px; height: 24px; fill: var(--gold); color: var(--gold); }
 
@@ -376,3 +379,39 @@ body[data-card="picture"] #app, body[data-card="waiting"] #app { visibility: hid
 .welcome-wordmark { position: absolute; left: 960px; top: 622px; transform: translate(-50%, -50%); opacity: 0; font-family: Inter, "Google Sans", sans-serif; font-size: 81px; font-weight: 900; letter-spacing: 16px; color: #ffc252; white-space: nowrap; }
 .welcome-caption { position: absolute; left: 50%; bottom: 30px; transform: translateX(-50%); max-width: 900px; display: flex; align-items: center; gap: 14px; padding: 14px 26px; border-radius: 999px; background: rgba(18, 43, 38, .9); color: #fcf5de; font-family: Inter, "Google Sans", sans-serif; font-size: 26px; font-weight: 700; line-height: 1.25; width: max-content; }
 .welcome-caption .hud-mic { flex: none; width: 24px; height: 24px; fill: #ffc252; color: #ffc252; }
+
+/* Receiver 66 (TestFlight 211): a cup won (receiver-celebration.js), over the
+   phone's scorecard picture. A 1920 x 1080 stage, scaled to fit, laid out
+   as the AirPlay TV draws the phone's CupCelebrationFrame (the phone's
+   points times 2.23). The view sets the moving parts each frame.
+   Receiver 67 (build 215): the words' column and the cheque are placed by
+   the view (layout()); the cheque is a 500 x 225 sheet scaled into it,
+   straight, its texts in the shared slots. */
+.celebration { position: fixed; inset: 0; z-index: 14; pointer-events: none; }
+.celebration-stage { position: absolute; left: 50%; top: 50%; width: min(100vw, 177.7778vh); height: min(56.25vw, 100vh); transform: translate(-50%, -50%); overflow: hidden; }
+.celebration-canvas { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; transform-origin: 0 0; overflow: hidden; color: #fcf5de; font-family: Inter, "Google Sans", system-ui, sans-serif; }
+.celebration-dim { position: absolute; inset: 0; background: radial-gradient(ellipse 1500px 1000px at 557px 508px, rgba(24, 56, 49, .975), rgba(10, 24, 21, .985)); }
+.celebration-glow { position: absolute; inset: 0; background: radial-gradient(circle 893px at 557px 508px, rgba(255, 194, 82, .30), rgba(255, 194, 82, 0)); }
+.celebration-rays { position: absolute; left: 557px; top: 508px; width: 1786px; height: 1786px; transform: translate(-50%, -50%);
+  background: repeating-conic-gradient(from -1.8deg, rgba(255, 214, 130, .085) 0deg 3.6deg, rgba(255, 194, 82, 0) 3.6deg 15deg);
+  -webkit-mask-image: radial-gradient(circle closest-side, #000 8%, rgba(0, 0, 0, .5) 42%, rgba(0, 0, 0, 0) 100%);
+  mask-image: radial-gradient(circle closest-side, #000 8%, rgba(0, 0, 0, .5) 42%, rgba(0, 0, 0, 0) 100%); }
+.celebration-floor { position: absolute; left: 257px; top: 822px; width: 600px; height: 86px; border-radius: 50%; background: radial-gradient(closest-side, rgba(255, 194, 82, .38), rgba(255, 194, 82, 0)); }
+.celebration-trophy { position: absolute; left: 0; top: 0; width: 476px; height: 714px; will-change: transform, opacity; }
+.celebration-trophy svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.celebration-words { position: absolute; left: 893px; top: 518px; width: 960px; transform: translateY(-50%); display: flex; flex-direction: column; align-items: flex-start; gap: 13px; }
+.celebration-eyebrow { color: #ffc252; font-size: 27px; font-weight: 800; letter-spacing: 5.4px; white-space: nowrap; }
+.celebration-title { margin: 0; font: 900 89px/1 Nunito, "Varela Round", sans-serif; letter-spacing: 0; text-shadow: 0 0 31px rgba(255, 194, 82, .35); white-space: nowrap; }
+.celebration-subtitle { margin: 0; color: rgba(252, 245, 222, .85); font-size: 33px; font-weight: 600; }
+.cheque { position: relative; flex: none; margin-top: 9px; width: 960px; height: 432px; transform-origin: 50% 100%; }
+.cq-sheet { position: absolute; left: 0; top: 0; transform-origin: 0 0; border-radius: 5px; box-shadow: 0 9px 22px rgba(0, 0, 0, .5), 0 1px 2px rgba(0, 0, 0, .3); }
+.cq-art { position: absolute; left: 0; top: 0; display: block; overflow: visible; }
+.cq-seal { transform-box: view-box; }
+.cq-slot { position: absolute; display: flex; align-items: center; white-space: nowrap; overflow: visible; }
+.cq-text { display: inline-block; white-space: nowrap; font-variant-numeric: tabular-nums; transform-origin: 100% 50%; }
+.celebration-confetti { position: absolute; inset: 0; width: 1920px; height: 1080px; }
+.celebration-hint { position: absolute; left: 50%; bottom: 36px; transform: translateX(-50%); padding: 18px 31px; border-radius: 999px; background: rgba(0, 0, 0, .4); color: rgba(252, 245, 222, .8); font-size: 27px; font-weight: 700; white-space: nowrap; }
+
+/* A cup's next match on the HTML result (receiver 66). */
+.result-next { display: flex; flex-direction: column; align-items: center; gap: .6vh; margin-top: 2.2vh; padding: 1.6vh 2.4vw; border: 3px solid rgba(255, 194, 82, .85); border-radius: 22px; background: rgba(18, 43, 38, .82); }
+.result-next strong { font: 900 clamp(26px, 2.6vw, 52px)/1.1 Nunito, sans-serif; color: #fcf5de; }

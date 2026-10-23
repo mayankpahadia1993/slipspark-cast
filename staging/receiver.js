@@ -115,6 +115,14 @@
     // "Raise both hands to bat again"); older ones only the number.
     if (result.scoreText) text("result-score", result.scoreText);
     text("result-hint", result.hint || "Raise both hands to go again · Results saved on your phone");
+    // Receiver 66: a cup's next match in a card of its own, in place of the
+    // reward's small last line (TestFlight 211).
+    const next = element("result-next");
+    next.hidden = !result.nextMatch;
+    if (result.nextMatch) {
+      text("result-next-eyebrow", result.nextMatch.eyebrow);
+      text("result-next-title", result.nextMatch.title);
+    }
     const reward = element("result-reward");
     reward.hidden = !result.reward;
     if (result.reward) {
@@ -122,6 +130,7 @@
       text("result-reward-xp", `+${result.reward.xp.toLocaleString("en-US")} XP`);
       text("result-reward-coins", `+${result.reward.coins.toLocaleString("en-US")} coins`);
       text("result-reward-detail", result.reward.detail);
+      element("result-reward-detail").hidden = !!result.nextMatch;
       const level = element("result-reward-level");
       level.hidden = !result.reward.levelUp;
       text("result-reward-level", result.reward.levelUp);
@@ -245,7 +254,11 @@
     },
     report: (where, error) => cardFailure(where, error),
     // Receiver 60: the phone's log says when each picture reached the TV.
-    onShown: (shown) => sendScene({ t: "shown", id: shown.id, w: shown.width, ms: shown.waited })
+    onShown: (shown) => sendScene({ t: "shown", id: shown.id, w: shown.width, ms: shown.waited }),
+    // Receiver 67: the pictures it holds, so the phone sends none of them
+    // again, and one the state names that it lacks.
+    onHeld: (cards) => sendScene({ t: "held", cards }),
+    onWant: (id) => sendScene({ t: "want", id })
   });
   let cardFailure = () => {};
 
@@ -264,6 +277,26 @@
     },
     // ?preview=welcome&at=1.3: that moment, held (for pictures of it).
     now: () => (welcomeHeld ? 0 : performance.now()),
+    requestFrame: (callback) => requestAnimationFrame(callback),
+    cancelFrame: (id) => cancelAnimationFrame(id)
+  });
+  // Receiver 66: a cup won, its celebration over the phone's scorecard
+  // while the phone shows it. ?preview=cupCelebration&at=3.4: that moment, held.
+  const celebrationHeld = /Celebration$/.test(welcomeQuery.get("preview") || "") && welcomeQuery.get("at") !== null;
+  const celebrationAt = Number(welcomeQuery.get("at")) * 1000 || 0;
+  const celebrationModule = window.RallycadeCelebration;
+  const celebrationRoot = element("celebration");
+  const celebrationView = celebrationModule && celebrationRoot && celebrationModule.createCelebrationView({
+    elements: {
+      root: celebrationRoot, stage: element("celebration-stage"), canvas: element("celebration-canvas"),
+      glow: element("celebration-glow"), rays: element("celebration-rays"), floor: element("celebration-floor"),
+      trophy: element("celebration-trophy"), words: element("celebration-words"), eyebrow: element("celebration-eyebrow"),
+      title: element("celebration-title"), subtitle: element("celebration-subtitle"), cheque: element("celebration-cheque"),
+      hint: element("celebration-hint"), confetti: element("celebration-confetti")
+    },
+    now: () => (celebrationHeld ? 0 : performance.now()),
+    // A held picture's cheque is dated the day build 215 drew it (receiver 67).
+    today: celebrationHeld ? () => new Date(2026, 9, 22) : undefined,
     requestFrame: (callback) => requestAnimationFrame(callback),
     cancelFrame: (id) => cancelAnimationFrame(id)
   });
@@ -304,6 +337,7 @@
     if (state.timingCheck) renderTimingCheck(state.timingCheck);
     if (cardView) cardView.update(state);
     if (welcomeView) welcomeView.update(state);
+    if (celebrationView) celebrationView.update(state);
   }
 
   const query = new URLSearchParams(window.location.search);
@@ -312,8 +346,29 @@
     const state = core.sampleState(preview);
     if (state.welcome) state.welcome.elapsed = Math.round(Number(query.get("at")) * 1000);
     render(state);
+  } else if (celebrationHeld) {
+    const state = core.sampleState(preview);
+    if (state.result && state.result.celebration) state.result.celebration.elapsed = Math.round(celebrationAt);
+    render(state);
   } else {
     render(core.sampleState(preview || "ready"));
+  }
+  // ?preview=…Celebration&at=8&measure=1 (receiver 67): each cheque text's
+  // fit written onto the page once the fonts are in, for the render test.
+  if (celebrationHeld && query.get("measure")) {
+    const write = () => requestAnimationFrame(() => {
+      const fits = [...document.querySelectorAll("#celebration .cq-slot")].map((slot) => {
+        const text = slot.firstElementChild, box = slot.getBoundingClientRect(), inner = text.getBoundingClientRect();
+        return { slot: slot.dataset.slot, fit: Number(slot.dataset.fit), text: text.textContent, width: Math.round(inner.width * 10) / 10,
+          room: Math.round(box.width * 10) / 10, height: Math.round(inner.height * 10) / 10, roomHeight: Math.round(box.height * 10) / 10 };
+      });
+      const sheet = document.querySelector("#celebration .cq-sheet").getBoundingClientRect();
+      const cheque = element("celebration-cheque");
+      celebrationRoot.dataset.fits = JSON.stringify({ fits, sheet: [sheet.left, sheet.top, sheet.width, sheet.height].map(Math.round),
+        transform: cheque.style.transform, font: getComputedStyle(document.querySelector("#celebration .cq-text")).fontFamily,
+        trophy: !!document.querySelector("#celebration-trophy svg path") });
+    });
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(write); else write();
   }
   // ?preview=…&card=<picture>: that picture as the phone's scorecard.
   if (preview && query.get("card") && cardView) {
@@ -352,6 +407,9 @@
     backdrop: document.getElementById("scene-backdrop"),
     hud: document.getElementById("scene-hud"),
     send: (message) => sendScene(message),
+    // Receiver 67: `ready` says which of the phone's pictures this TV holds.
+    heldCards: () => (cardView ? cardView.heldList() : []),
+    heldKeep: cardView ? cardCore.KEEP : 0,
     // ?canvas=1920 draws previews and films that wide (a Mac counts as a dongle).
     canvasWidth: Number(query.get("canvas")) || undefined
   });
