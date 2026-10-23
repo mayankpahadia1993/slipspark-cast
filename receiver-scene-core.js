@@ -728,6 +728,20 @@
     return /CrKey/.test(text) && /armv7l/.test(text) && !/Android|GoogleTV|Google TV|Fuchsia/i.test(text);
   }
 
+  // Receiver 68 (Oct 23 2026, kab7kfvv, the owner on 217 at a living-room TV:
+  // "Lagging on chromecast, lags more with bowlers view enabled"): a Chromecast
+  // dongle (CrKey on Linux, Ultra included: "Linux aarch64") held 30 fps for an
+  // innings without the bowler's-end view and fell to 22, frames drawn up to
+  // 451 ms late, with it on. Only TVs with Android or Google TV (and Fuchsia
+  // displays) draw it; on the dongles the receiver doesn't offer it in `ready`,
+  // so phones leave it out of every frame (iOS `receiverDrawsInset`, Android
+  // `receiverInset`), and it loads none of its pictures.
+  function drawsInset(ua) {
+    const text = String(ua || "");
+    if (!/CrKey/.test(text)) return true;
+    return /Android|GoogleTV|Google TV|Fuchsia/i.test(text);
+  }
+
   // `device`: `ua` (navigator.userAgent), `pinned` (a width the phone or the
   // bench asked for in `hello`), `wide` (the phone's hello allows 1920: build
   // 134 on), `remembered` (what this TV found last time: `{ua, width}`).
@@ -1069,7 +1083,7 @@
   }
 
   return {
-    isWeakDongle, storageNames, STAGE, MAX_BLEND_GAP, MAX_STEP, CANVAS, normalizeFrame, plainFrame, expandInset, shapeKey, opShape, viewOf, matchOps, blendMatched, blendMatchedInto,
+    isWeakDongle, drawsInset, storageNames, STAGE, MAX_BLEND_GAP, MAX_STEP, CANVAS, normalizeFrame, plainFrame, expandInset, shapeKey, opShape, viewOf, matchOps, blendMatched, blendMatchedInto,
     blendFrames, blendFramesInto, cloneFrame, createTimeline, createClock,
     percentile, tracePath, cssColor, pictureSize, canvasPlan, canvasWidth, createRateWatch, STEADY, createSteadyWatch, createLiveLayer, hasLiveSlot, poseAge, poseAhead,
     filterParts, opBounds, layerEnd, clipsWholeStage, mergeRects

@@ -1,8 +1,8 @@
 {
   "environment": "production",
-  "commit": "3e6ab96df77b360c8854affb591d783aafcc5b3c",
-  "subject": "Parity: inventory and IOS_BASELINE at 96d7ce6f",
-  "receiverTree": "bb20bd7766fef3068ddac038934a607ac0d5b0e8",
+  "commit": "3a02af5fb839c8f72ab9d6246f76a0632a9ffc78",
+  "subject": "Receiver 68 (kab7kfvv): no bowler's-end view on Chromecast dongles, Ultra included",
+  "receiverTree": "5ca34ae7816bdd148ea4bc531777b9a82accb1f0",
   "revision": 67,
-  "deployedAt": "2026-10-23T02:41:56Z"
+  "deployedAt": "2026-10-23T16:56:56Z"
 }

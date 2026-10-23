@@ -457,7 +457,8 @@
     let preloadQueue = [];
     let preloading = 0;
     let preloadKit = null;
-    const insetOff = core.isWeakDongle(navigator.userAgent);
+    // Receiver 68: no bowler's-end view on any Chromecast dongle (core.drawsInset).
+    const insetOff = !core.drawsInset(navigator.userAgent);
     function preloadRank(key) {
       // The bowler's-end inset (Oct 20 2026): its view, the batter at the
       // crease and the keeper down are in the first frame; the strokes later.
@@ -2076,7 +2077,7 @@
       // `held` (receiver 67): it keeps this many of the phone's pictures and
       // says which (`cards`, oldest first, [id, width] each; `held` messages
       // after each change), and asks for one it lacks (`want`).
-      const ready = { t: "ready", scene: 1, pic: 1, card: 1, live: 1, setup: 1, whole: 1, predict: 1, shared: 1, inset: 1, steady: 1,
+      const ready = { t: "ready", scene: 1, pic: 1, card: 1, live: 1, setup: 1, whole: 1, predict: 1, shared: 1, inset: insetOff ? 0 : 1, steady: 1,
         held: options.heldKeep || 0, cards: options.heldCards ? options.heldCards() : [], screen: screenPixels(), version: VERSION, ua: navigator.userAgent, have };
       // A weak dongle: the phone sends frames and live batters at its pace.
       if (plan.weak) ready.weak = 1;
