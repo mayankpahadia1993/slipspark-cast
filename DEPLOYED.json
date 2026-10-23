@@ -1,8 +1,8 @@
 {
   "environment": "production",
-  "commit": "22e94587c386421b49b760471c871ab1db1abf3a",
-  "subject": "Parity: inventory and IOS_BASELINE at 4c72b9cc",
-  "receiverTree": "d00b29ad29ce6c63d5e2224172e6c7d04a208ab5",
-  "revision": 66,
-  "deployedAt": "2026-10-22T22:39:08Z"
+  "commit": "3e6ab96df77b360c8854affb591d783aafcc5b3c",
+  "subject": "Parity: inventory and IOS_BASELINE at 96d7ce6f",
+  "receiverTree": "bb20bd7766fef3068ddac038934a607ac0d5b0e8",
+  "revision": 67,
+  "deployedAt": "2026-10-23T02:41:56Z"
 }

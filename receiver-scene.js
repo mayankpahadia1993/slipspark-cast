@@ -29,6 +29,10 @@
     // Chromecast page's thread, the bench's cpu=3 profile).
     let measuredBox = 0;
     const boxWidth = () => measuredBox || (measuredBox = stageBox.clientWidth || 0) || window.innerWidth;
+    // Receiver 67 (build 215): where the TV's canvas holds anything, whole
+    // pixels [l, t, r, b] each, so a draw clears only that (drawFrame); null
+    // when that can't be told: cleared whole next time.
+    let canvasDrawn = null;
     // Oct 19 2026 (iOS 202 on a 32-bit Chromecast: the weak plan's 854
     // canvas drew no faster than the 1280 one, 7–10 a second, each draw under
     // 10 ms of script; the loop's rate was set by what the TV did besides
@@ -60,6 +64,7 @@
       }
       if (want) ctx = opaqueContext(canvas);
       else { ctx = canvas.getContext("2d"); opaqueCanvas = false; }
+      canvasDrawn = null;
       layers.length = 0;
       needsRedraw = true;
     }
@@ -173,6 +178,7 @@
       if (canvas.width !== width || canvas.height !== height) {
         canvas.width = width;
         canvas.height = height;
+        canvasDrawn = null;
         layers.length = 0;
         needsRedraw = true;
         backdropLayers.forEach((entry) => { entry.transform = ""; });
@@ -677,6 +683,7 @@
       rehearsal.ctx = null;
       staticLayer.key = null;
       staticLayer.keys = null;
+      staticLayer.rects = null;
       lastStaticKeys = null;
       lastCandidateKey = null;
     }
@@ -1029,8 +1036,10 @@
     // `photo` "layer" (the photo an image the GPU composites) or "canvas";
     // `opaque` 1 for an opaque canvas (it must then draw the photo).
     // `match` 0 blends only frames of the same shapes, as before receiver 65.
+    // `dirty` 0 clears the whole canvas and copies the whole static layer each
+    // draw, as before receiver 67 (build 215).
     const TUNED = Object.freeze({ blur: "shadow", layers: "bounded", cover: "clip", bitmaps: 0, shade: "thirds", blend: 1, cache: 1, photo: "layer", opaque: 0,
-      match: 1 });
+      match: 1, dirty: 1 });
     // A weak dongle (core.isWeakDongle): no redraw only to blend between
     // frames (each draw costs it ~30 ms of its page's thread) and glows
     // drawn plain, never blurred.
@@ -1326,7 +1335,13 @@
       bounds.top = Math.min(bounds.top, box[1] * scale - p);
       bounds.right = Math.max(bounds.right, box[2] * scale + p);
       bounds.bottom = Math.max(bounds.bottom, box[3] * scale + p);
+      // Receiver 67: the TV's canvas and the static layer keep each one (drawnInto).
+      if (bounds.rects) bounds.rects.push(box[0] * scale - p, box[1] * scale - p, box[2] * scale + p, box[3] * scale + p);
     }
+
+    // Receiver 67 (build 215): bounds that keep each command's box, for where
+    // a canvas was drawn into (core.mergeRects; `canvasDrawn` above).
+    function drawnInto() { const bounds = newBounds(); bounds.rects = []; return bounds; }
 
     // The whole pixels `bounds` covers in a `width` x `height` canvas, or
     // null when nothing was drawn.
@@ -1356,8 +1371,14 @@
       ctx.globalAlpha = 1;
       ctx.globalCompositeOperation = "source-over";
       // An opaque canvas starts from the stadium's colour (its CSS background is hidden).
+      // Receiver 67: a see-through one is cleared only where the last draw drew
+      // (all else is already clear); a rehearsal's own canvas whole.
+      const bounded = tune.dirty && tune.layers !== "full";
+      const drawn = rehearsing || opaqueCanvas || !bounded ? null : drawnInto();
       if (opaqueCanvas) { ctx.fillStyle = "#0c1a17"; ctx.fillRect(0, 0, canvas.width, canvas.height); }
-      else ctx.clearRect(0, 0, canvas.width, canvas.height);
+      else if (rehearsing || !canvasDrawn || !bounded) ctx.clearRect(0, 0, canvas.width, canvas.height);
+      else canvasDrawn.forEach((r) => ctx.clearRect(r[0], r[1], r[2] - r[0], r[3] - r[1]));
+      if (!rehearsing) canvasDrawn = null;
       ctx.imageSmoothingQuality = smoothing;
       const cover = coverIndex(frame);
       let from = 0;
@@ -1379,13 +1400,14 @@
         photoPending = cover >= 0 && !layered && !inCanvas;
         framePhoto = cover >= 0;
       }
-      const rest = drawStatic(frame, from);
+      const rest = drawStatic(frame, from, drawn);
       // A photo whose layer isn't decoded yet is drawn on the canvas, over
       // whichever layer was showing: never an empty frame.
       paint(ctx, rest.frame, rest.from, { s: scale, width: canvas.width, height: canvas.height, layers: null,
-        live: batter === undefined ? live.current : batter });
+        live: batter === undefined ? live.current : batter }, 0, drawn);
       if (tune.shade === "canvas") drawShade();
       if (rehearsing) return;
+      if (drawn && !drawn.full) canvasDrawn = core.mergeRects(drawn.rects, canvas.width, canvas.height);
       counters.drawMs.push(performance.now() - started);
       counters.draws += 1;
     }
@@ -1437,7 +1459,7 @@
     // commands' arrays rewritten each draw) is never keyed from the cache:
     // a stale key made a moving fielder look unchanged and blitted it where
     // it was a draw before.
-    const staticLayer = { canvas: null, key: null, keys: null, built: 0, hits: 0, ops: 0, draws: 0 };
+    const staticLayer = { canvas: null, key: null, keys: null, rects: null, built: 0, hits: 0, ops: 0, draws: 0 };
     let lastStaticKeys = null;
     let lastCandidateKey = null;
     const opKeys = new WeakMap();
@@ -1512,13 +1534,17 @@
       c.globalCompositeOperation = "source-over";
       c.clearRect(0, 0, layer.width, layer.height);
       c.imageSmoothingQuality = smoothing;
+      // Receiver 67: where its commands drew, as rects that don't overlap: a
+      // draw copies those, not the whole layer (the rest is see-through).
+      const parts = drawnInto();
       paint(c, { s: frame.s, o: statics.map((index) => frame.o[index]), fl: frame.fl, cl: frame.cl }, 0,
-        { s: scale, width: layer.width, height: layer.height, layers: null, live: null });
+        { s: scale, width: layer.width, height: layer.height, layers: null, live: null }, 0, parts);
+      staticLayer.rects = parts.full ? null : core.mergeRects(parts.rects, layer.width, layer.height, { disjoint: true });
       staticLayer.keys = statics.map((index) => keys[index]);
       staticLayer.key = canvas.width + "x" + canvas.height + "|" + staticLayer.keys.join("|");
       staticLayer.built += 1;
     }
-    function drawStatic(frame, from) {
+    function drawStatic(frame, from, drawn) {
       if (!tune.cache) { lastStaticKeys = null; lastCandidateKey = null; return { frame, from }; }
       staticLayer.draws += 1;
       const fresh = !!frame.scratch;
@@ -1548,7 +1574,17 @@
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.globalAlpha = 1;
       ctx.globalCompositeOperation = "source-over";
-      ctx.drawImage(staticLayer.canvas, 0, 0);
+      if (staticLayer.rects && tune.dirty && tune.layers !== "full") {
+        // Receiver 67: its parts, pixel for pixel where they are.
+        for (const r of staticLayer.rects) {
+          const w = r[2] - r[0], h = r[3] - r[1];
+          ctx.drawImage(staticLayer.canvas, r[0], r[1], w, h, r[0], r[1], w, h);
+          if (drawn) drawn.rects.push(r[0], r[1], r[2], r[3]);
+        }
+      } else {
+        ctx.drawImage(staticLayer.canvas, 0, 0);
+        if (drawn) drawn.full = true;
+      }
       staticLayer.ops += used.length;
       const skip = new Set(used);
       const rest = Object.assign({}, frame, { o: frame.o.filter((op, index) => index >= from && !skip.has(index)) });
@@ -1557,6 +1593,7 @@
     function dropStaticLayer() {
       staticLayer.key = null;
       staticLayer.keys = null;
+      staticLayer.rects = null;
       lastStaticKeys = null;
       lastCandidateKey = null;
       if (staticLayer.canvas) { try { staticLayer.canvas.width = 0; staticLayer.canvas.height = 0; } catch (error) { /* gone */ } staticLayer.canvas = null; }
@@ -1642,7 +1679,8 @@
           case "s":
           case "i": {
             const filters = filtersOf(frame, op[0] === "f" ? op[7] : op[0] === "s" ? op[9] : op[5]);
-            const box = top.bounds ? core.opBounds(op, pictureSize) : null;
+            // Receiver 67: a blend that clears what it doesn't cover reaches the whole canvas.
+            const box = top.bounds && !UNBOUNDED.has(op[2]) ? core.opBounds(op, pictureSize) : null;
             if (!(filters.blur > 0)) {
               drawOp(c, frame, op, scale);
               if (top.bounds) grow(top.bounds, box, scale, 0);
@@ -1698,7 +1736,7 @@
             const lift = (lines.length - 1) * lineHeight * (anchor[1] / 1000);
             lines.forEach((line, index) => c.fillText(line, op[8][0] / 10, op[8][1] / 10 - lift + index * lineHeight));
             c.restore();
-            if (top.bounds) grow(top.bounds, core.opBounds(op), scale, 0);
+            if (top.bounds) grow(top.bounds, UNBOUNDED.has(op[2]) ? null : core.opBounds(op), scale, 0);
             break;
           }
           default: break;
@@ -2035,7 +2073,11 @@
       // (receiver 63, receiver-shared.js).
       // `steady`: it says when it draws steadily after the stadium comes on,
       // and how stale its picture is (`stale` in stats; receiver 65).
-      const ready = { t: "ready", scene: 1, pic: 1, card: 1, live: 1, setup: 1, whole: 1, predict: 1, shared: 1, inset: 1, steady: 1, screen: screenPixels(), version: VERSION, ua: navigator.userAgent, have };
+      // `held` (receiver 67): it keeps this many of the phone's pictures and
+      // says which (`cards`, oldest first, [id, width] each; `held` messages
+      // after each change), and asks for one it lacks (`want`).
+      const ready = { t: "ready", scene: 1, pic: 1, card: 1, live: 1, setup: 1, whole: 1, predict: 1, shared: 1, inset: 1, steady: 1,
+        held: options.heldKeep || 0, cards: options.heldCards ? options.heldCards() : [], screen: screenPixels(), version: VERSION, ua: navigator.userAgent, have };
       // A weak dongle: the phone sends frames and live batters at its pace.
       if (plan.weak) ready.weak = 1;
       send(ready);
@@ -2296,6 +2338,7 @@
       images.clear();
       backdropLayers.forEach((entry) => { try { entry.element.removeAttribute("src"); } catch (error) { /* gone */ } });
       empty(canvas);
+      canvasDrawn = null;
       dropWarmCanvas();
       endRehearsal();
       dropStaticLayer();

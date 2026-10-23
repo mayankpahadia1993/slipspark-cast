@@ -60,6 +60,8 @@
       coins: Math.floor(clamp(value.coins, 0, 10000000)),
       memo: boundedString(value.memo, "", 80),
       note: boundedString(value.note, "", 80),
+      // Receiver 67: the cup's matches, for the cheque's MICR line (0 from an older phone).
+      matches: Math.floor(clamp(value.matches, 0, 99)),
       colors: Array.isArray(value.colors) ? value.colors.filter((c) => typeof c === "string" && /^#[0-9A-Fa-f]{6}$/.test(c)).slice(0, 4) : [],
       reduced: value.reduced === true,
       elapsed: Math.floor(clamp(value.elapsed, 0, 60000)),
@@ -402,13 +404,19 @@
         reward: { title: world ? "RALLYCADE WORLD CUP WON" : "CLUB CUP WON", xp: 306, coins: 391, detail: world ? "World Champion · Trophy · India kit" : "Club Champion · Trophy · Gold kit" },
         celebration: world
           ? { id: "preview-world", trophy: "world", eyebrow: "RALLYCADE WORLD CUP · INDIA", title: "WORLD CHAMPIONS", subtitle: "Beat West Indies in the final · Medium",
-              payee: "Asha", xp: 1060, coins: 615, memo: "RallyCade World Cup · India · 5 matches", note: "Includes the 300-coin prize · India kit",
-              colors: ["#1A73E6", "#FF8C1F"], reduced: false, elapsed: 0, duration: 6500 }
+              payee: "Asha", xp: 1060, coins: 615, matches: 5, memo: "RallyCade World Cup · India · 5 matches", note: "Includes the 300-coin prize · India kit",
+              colors: ["#1A73E6", "#FF8C1F"], reduced: false, elapsed: 0, duration: 15000 }
           : { id: "preview-" + (legend ? "legend" : "club"), trophy: legend ? "legend" : "club", eyebrow: legend ? "CLUB CUP · LEGEND" : "CLUB CUP · EASY",
               title: legend ? "CLUB CHAMPION" : "CUP WINNERS", subtitle: legend ? "All 3 chases won on Legend" : "All 3 chases won", payee: "The champion",
-              xp: legend ? 1090 : 418, coins: legend ? 405 : 212, memo: legend ? "Club Cup · Legend · 3 chases" : "Club Cup · Easy · 3 chases",
-              note: legend ? "Includes the 90-coin prize · Champion gold kit" : "Includes the 90-coin prize", colors: [], reduced: false, elapsed: 0, duration: 6500 } } });
+              xp: legend ? 1090 : 418, coins: legend ? 405 : 212, matches: 3, memo: legend ? "Club Cup · Legend · 3 chases" : "Club Cup · Easy · 3 chases",
+              note: legend ? "Includes the 90-coin prize · Champion gold kit" : "Includes the 90-coin prize", colors: [], reduced: false, elapsed: 0, duration: 15000 } } });
     }
+    // ?preview=longCelebration: the cheque's longest words (a 16-letter name, thousands in words, the longest country).
+    if (kind === "longCelebration") return normalizeState({ ...base, sequence: 3, screen: "result", result: { mode: "RALLYCADE WORLD CUP · AFGHANISTAN · WORLD CHAMPIONS",
+      headline: "Chased it down!", score: 61, scoreText: "61/2", caption: "RUNS", isPersonalBest: false, stats: [], hint: "Raise a hand to bat again",
+      celebration: { id: "preview-long", trophy: "world", eyebrow: "RALLYCADE WORLD CUP · AFGHANISTAN", title: "WORLD CHAMPIONS", subtitle: "Beat South Africa in the final · Legend",
+        payee: "Venkatanarasimha", xp: 7777, coins: 3777, matches: 5, memo: "RallyCade World Cup · Afghanistan · 5 matches",
+        note: "Includes the 300-coin prize · Afghanistan kit", colors: [], reduced: false, elapsed: 0, duration: 15000 } } });
     if (kind === "cupNext") return normalizeState({ ...base, screen: "result", result: { mode: "RALLYCADE WORLD CUP · INDIA · INTO THE SEMI-FINALS", headline: "Chased it down! Won with 6 balls to spare.", score: 29, scoreText: "29/1", caption: "RUNS", isPersonalBest: false, stats: [{ label: "TARGET", value: "29" }, { label: "OVERS", value: "1.0" }, { label: "RUN RATE", value: "29.0" }], hint: "Raise a hand for the semi-final", reward: { title: "YOU EARNED", xp: 207, coins: 81, detail: "Semi-final v Sri Lanka next, for India." }, nextMatch: { eyebrow: "NEXT MATCH · SEMI-FINAL", title: "India v Sri Lanka" } } });
     if (kind === "ready" || !kind) return normalizeState({ ...base, sequence: 1, screen: "ready" });
     // ?preview=welcome: the app-open welcome as the phone sends it (an evening, a 4-day streak).

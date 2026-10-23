@@ -141,7 +141,7 @@
       return { status: "complete", id, picture: { id, width: entry.width, height: entry.height, ring: entry.ring, data } };
     }
 
-    return { add, get pendingCount() { return pending.size; } };
+    return { add, get pendingCount() { return pending.size; }, isPending(id) { return pending.has(id); } };
   }
 
   // What the TV shows for the current state: "html" (its own result, or any
@@ -187,6 +187,20 @@
     return { expect, arrived, forget, decide, get expected() { return expected; }, get since() { return since; } };
   }
 
+  // Receiver 67 (build 215, w84tyjvq: innings 2's setup flipped between two
+  // pictures every ~0.8 s for 8 s and the phone sent each again, 2.37 MB, a
+  // re-sent draft replacing a sharp one held here, and a sharp one taken in
+  // as the stadium came on): the TV says which pictures it holds and how
+  // wide (`held`, oldest first, after each it takes in or lets go, and in
+  // `ready`), so a phone that knows sends none of them again, and asks for
+  // one the state names that it lacks (`want`, `WANT_MS` after it is named
+  // with none of its parts on the way): a phone that guessed wrong sends it.
+  const WANT_MS = 700;
+  // How many of the phone's pictures stay decoded here (a Chromecast's memory is small).
+  const KEEP = 3;
+  // The same picture asked for again at most this often.
+  const WANT_AGAIN_MS = 3000;
+
   // Ids to let go so at most `keep` pictures stay decoded, oldest first,
   // never the one on screen or wanted.
   function prune(ids, keep, protect) {
@@ -203,7 +217,6 @@
     const urls = new Map();
     // Each picture's size and the setup's ring on it.
     const meta = new Map();
-    const KEEP = 3;
     let state = null;
     let timer = null;
     let last = { mode: "html" };
@@ -252,13 +265,29 @@
 
     function update(next) {
       state = next;
+      const before = display.expected;
       display.expect(cardId(next), o.now(), next && next.screen === "positioning" ? SETUP_TIMEOUT_MS : undefined);
+      if (display.expected !== before) watchWanted();
       return apply();
     }
 
+    // Receiver 67: the pictures held, oldest first, [id, width] each.
+    function heldList() {
+      return Array.from(urls.keys()).map((id) => [id, (meta.get(id) || {}).width || 0]);
+    }
+
     function keep(id, url, picture) {
-      // A sharper picture under the same id replaces the draft.
+      // A sharper picture under the same id replaces the draft. Receiver 67:
+      // never the other way: a draft sent again after its sharp picture (a
+      // phone before build 215 sends a setup's pictures again) is let go.
       const previous = urls.get(id);
+      const width = picture ? picture.width : 0;
+      const held = meta.get(id);
+      if (previous && previous !== url && held && held.width > width) {
+        o.revoke(url);
+        display.arrived(id);
+        return apply();
+      }
       if (previous && previous !== url) o.revoke(previous);
       urls.set(id, url);
       meta.set(id, picture ? { width: picture.width, height: picture.height, ring: picture.ring || null } : { width: 0, height: 0, ring: null });
@@ -269,7 +298,27 @@
         meta.delete(old);
         display.forget(old);
       });
+      if (o.onHeld) o.onHeld(heldList());
       return apply();
+    }
+
+    // Receiver 67: a picture the state names that isn't here and isn't on
+    // its way is asked for once it has been named `WANT_MS`.
+    let wantTimer = null;
+    const asked = new Map();
+    function watchWanted() {
+      if (!o.onWant) return;
+      const id = display.expected;
+      if (wantTimer != null) { o.clearTimer(wantTimer); wantTimer = null; }
+      if (!id || urls.has(id)) return;
+      wantTimer = o.setTimer(() => {
+        wantTimer = null;
+        if (display.expected !== id || urls.has(id) || assembler.isPending(id)) return;
+        const now = o.now();
+        if (asked.has(id) && now - asked.get(id) < WANT_AGAIN_MS) return;
+        asked.set(id, now);
+        o.onWant(id);
+      }, WANT_MS);
     }
 
     function receive(message) {
@@ -301,8 +350,8 @@
       });
     }
 
-    return { receive, update, apply, keep, get decision() { return last; }, get urls() { return urls; } };
+    return { receive, update, apply, keep, heldList, get decision() { return last; }, get urls() { return urls; } };
   }
 
-  return { TIMEOUT_MS, SETUP_TIMEOUT_MS, MAX_PARTS, CARD_SCREENS, checksum, fold, family, validId, cardId, validRing, ringPlacement, createAssembler, createDisplay, prune, createCardView };
+  return { TIMEOUT_MS, SETUP_TIMEOUT_MS, WANT_MS, KEEP, MAX_PARTS, CARD_SCREENS, checksum, fold, family, validId, cardId, validRing, ringPlacement, createAssembler, createDisplay, prune, createCardView };
 });

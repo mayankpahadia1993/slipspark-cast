@@ -254,7 +254,11 @@
     },
     report: (where, error) => cardFailure(where, error),
     // Receiver 60: the phone's log says when each picture reached the TV.
-    onShown: (shown) => sendScene({ t: "shown", id: shown.id, w: shown.width, ms: shown.waited })
+    onShown: (shown) => sendScene({ t: "shown", id: shown.id, w: shown.width, ms: shown.waited }),
+    // Receiver 67: the pictures it holds, so the phone sends none of them
+    // again, and one the state names that it lacks.
+    onHeld: (cards) => sendScene({ t: "held", cards }),
+    onWant: (id) => sendScene({ t: "want", id })
   });
   let cardFailure = () => {};
 
@@ -286,13 +290,13 @@
     elements: {
       root: celebrationRoot, stage: element("celebration-stage"), canvas: element("celebration-canvas"),
       glow: element("celebration-glow"), rays: element("celebration-rays"), floor: element("celebration-floor"),
-      trophy: element("celebration-trophy"), eyebrow: element("celebration-eyebrow"), title: element("celebration-title"),
-      subtitle: element("celebration-subtitle"), cheque: element("celebration-cheque"), payee: element("celebration-payee"),
-      xp: element("celebration-xp"), coins: element("celebration-coins"), memo: element("celebration-memo"),
-      note: element("celebration-note"), seal: element("celebration-seal"), hint: element("celebration-hint"),
-      confetti: element("celebration-confetti")
+      trophy: element("celebration-trophy"), words: element("celebration-words"), eyebrow: element("celebration-eyebrow"),
+      title: element("celebration-title"), subtitle: element("celebration-subtitle"), cheque: element("celebration-cheque"),
+      hint: element("celebration-hint"), confetti: element("celebration-confetti")
     },
     now: () => (celebrationHeld ? 0 : performance.now()),
+    // A held picture's cheque is dated the day build 215 drew it (receiver 67).
+    today: celebrationHeld ? () => new Date(2026, 9, 22) : undefined,
     requestFrame: (callback) => requestAnimationFrame(callback),
     cancelFrame: (id) => cancelAnimationFrame(id)
   });
@@ -349,6 +353,23 @@
   } else {
     render(core.sampleState(preview || "ready"));
   }
+  // ?preview=…Celebration&at=8&measure=1 (receiver 67): each cheque text's
+  // fit written onto the page once the fonts are in, for the render test.
+  if (celebrationHeld && query.get("measure")) {
+    const write = () => requestAnimationFrame(() => {
+      const fits = [...document.querySelectorAll("#celebration .cq-slot")].map((slot) => {
+        const text = slot.firstElementChild, box = slot.getBoundingClientRect(), inner = text.getBoundingClientRect();
+        return { slot: slot.dataset.slot, fit: Number(slot.dataset.fit), text: text.textContent, width: Math.round(inner.width * 10) / 10,
+          room: Math.round(box.width * 10) / 10, height: Math.round(inner.height * 10) / 10, roomHeight: Math.round(box.height * 10) / 10 };
+      });
+      const sheet = document.querySelector("#celebration .cq-sheet").getBoundingClientRect();
+      const cheque = element("celebration-cheque");
+      celebrationRoot.dataset.fits = JSON.stringify({ fits, sheet: [sheet.left, sheet.top, sheet.width, sheet.height].map(Math.round),
+        transform: cheque.style.transform, font: getComputedStyle(document.querySelector("#celebration .cq-text")).fontFamily,
+        trophy: !!document.querySelector("#celebration-trophy svg path") });
+    });
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(write); else write();
+  }
   // ?preview=…&card=<picture>: that picture as the phone's scorecard.
   if (preview && query.get("card") && cardView) {
     render(Object.assign({}, core.sampleState(preview), { card: "0.0" }));
@@ -386,6 +407,9 @@
     backdrop: document.getElementById("scene-backdrop"),
     hud: document.getElementById("scene-hud"),
     send: (message) => sendScene(message),
+    // Receiver 67: `ready` says which of the phone's pictures this TV holds.
+    heldCards: () => (cardView ? cardView.heldList() : []),
+    heldKeep: cardView ? cardCore.KEEP : 0,
     // ?canvas=1920 draws previews and films that wide (a Mac counts as a dongle).
     canvasWidth: Number(query.get("canvas")) || undefined
   });

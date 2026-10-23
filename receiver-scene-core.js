@@ -796,13 +796,25 @@
   // holds (the last window within 15% of the one before: neither falling nor
   // still climbing): it is as smooth as it gets. `start` at the first whole frame, `draw` at each
   // drawn one; the verdict comes once.
-  const STEADY = { fps: 25, window: 2000, maxGap: 100, plateau: 4000, hold: 0.85 };
+  //
+  // Receiver 67 (build 215, w84tyjvq/x4n1rrhk, Oct 22 2026): the owner's
+  // Chromecast Ultra draws 19–21.5 a second, never 25, so every innings
+  // waited for the plateau: 5.7–7.9 s after the stadium came on, once the
+  // phone's 8 s cap, with the player standing at the crease ("TV pauses 5
+  // (loading 5)"). Its rate now holds when its last `plateauWindow` ms (1 s)
+  // is within 15% of the first second of the last `plateau` ms (3 s; two
+  // windows of 2 s before), so a TV drawing evenly at 21 is steady 3 s after
+  // its first whole frame (with 2 s since its last hitch); one still climbing
+  // or falling 2 a second each second waits until it is within 15% of where
+  // it settles.
+  const STEADY = { fps: 25, window: 2000, maxGap: 100, plateau: 3000, plateauWindow: 1000, hold: 0.85 };
 
   function createSteadyWatch(options) {
     const fps = (options && options.fps) || STEADY.fps;
     const span = (options && options.window) || STEADY.window;
     const maxGap = (options && options.maxGap) || STEADY.maxGap;
     const plateau = (options && options.plateau) || STEADY.plateau;
+    const plateauSpan = (options && options.plateauWindow) || STEADY.plateauWindow;
     const hold = (options && options.hold) || STEADY.hold;
     let since = null;
     let times = [];
@@ -841,9 +853,10 @@
         if (recent >= fps - 0.01) {
           verdict = { fps: Math.round(recent * 10) / 10, why: "fast", after: Math.round(now - since) };
         } else if (now - since >= plateau && recent >= 4) {
-          const before = rate(now - 2 * span, now - span);
+          const last = rate(now - plateauSpan, now);
+          const before = rate(now - plateau, now - plateau + plateauSpan);
           // Neither falling nor still climbing: within `1 - hold` of the window before.
-          if (before > 0 && recent >= before * hold && recent * hold <= before) verdict = { fps: Math.round(recent * 10) / 10, why: "plateau", after: Math.round(now - since) };
+          if (before > 0 && last >= before * hold && last * hold <= before) verdict = { fps: Math.round(recent * 10) / 10, why: "plateau", after: Math.round(now - since) };
         }
         return verdict;
       }
@@ -1000,10 +1013,65 @@
     return true;
   }
 
+  // MARK: Where a canvas was drawn into (receiver 67, build 215)
+  //
+  // Oct 22 2026 (w84tyjvq/x4n1rrhk: the owner's Chromecast Ultra drew 19-21.5
+  // a second, its frame loop every 43-56 ms): a draw cleared the whole
+  // 1280 x 720 canvas and copied the whole static layer onto it, though the
+  // stadium's commands cover a fraction of it (the photo is its own layer
+  // under the canvas). Of a draw's cost in scripts/cast-frame-cost.mjs those
+  // two were 13% and 29%. Now a draw clears only where the one before drew,
+  // and copies only the static layer's own parts. `flat` is [left, top,
+  // right, bottom, ...] in canvas pixels (each command's padded bounds): the
+  // whole pixels they cover, clamped to `width` x `height`, merged where two
+  // overlap or their union is at most `slack` times both their areas. With
+  // `disjoint` it merges until no two overlap (a copy must not land twice: a
+  // see-through pixel would darken); without, one pass (clearing twice is
+  // harmless). Over `most` rects: their bounding box.
+  function mergeRects(flat, width, height, options) {
+    const slack = (options && options.slack) || 1.25;
+    const most = (options && options.most) || 16;
+    const disjoint = !!(options && options.disjoint);
+    const area = (r) => (r[2] - r[0]) * (r[3] - r[1]);
+    const out = [];
+    for (let index = 0; index + 3 < flat.length; index += 4) {
+      const r = [Math.max(0, Math.floor(flat[index])), Math.max(0, Math.floor(flat[index + 1])),
+        Math.min(width, Math.ceil(flat[index + 2])), Math.min(height, Math.ceil(flat[index + 3]))];
+      if (!(r[2] > r[0] && r[3] > r[1])) continue;
+      let into = -1;
+      for (let k = 0; k < out.length && into < 0; k += 1) {
+        const o = out[k];
+        const overlaps = r[0] < o[2] && o[0] < r[2] && r[1] < o[3] && o[1] < r[3];
+        const union = [Math.min(r[0], o[0]), Math.min(r[1], o[1]), Math.max(r[2], o[2]), Math.max(r[3], o[3])];
+        if (overlaps || area(union) <= (area(r) + area(o)) * slack) { out[k] = union; into = k; }
+      }
+      if (into < 0) out.push(r);
+    }
+    // A union can reach rects it didn't touch before: merge again until none overlap.
+    for (let changed = disjoint; changed;) {
+      changed = false;
+      for (let i = 0; i < out.length && !changed; i += 1) {
+        for (let j = i + 1; j < out.length && !changed; j += 1) {
+          const a = out[i], c = out[j];
+          if (a[0] < c[2] && c[0] < a[2] && a[1] < c[3] && c[1] < a[3]) {
+            out[i] = [Math.min(a[0], c[0]), Math.min(a[1], c[1]), Math.max(a[2], c[2]), Math.max(a[3], c[3])];
+            out.splice(j, 1);
+            changed = true;
+          }
+        }
+      }
+    }
+    if (out.length > most) {
+      const box = out.reduce((b, r) => [Math.min(b[0], r[0]), Math.min(b[1], r[1]), Math.max(b[2], r[2]), Math.max(b[3], r[3])]);
+      return [box];
+    }
+    return out;
+  }
+
   return {
     isWeakDongle, storageNames, STAGE, MAX_BLEND_GAP, MAX_STEP, CANVAS, normalizeFrame, plainFrame, expandInset, shapeKey, opShape, viewOf, matchOps, blendMatched, blendMatchedInto,
     blendFrames, blendFramesInto, cloneFrame, createTimeline, createClock,
     percentile, tracePath, cssColor, pictureSize, canvasPlan, canvasWidth, createRateWatch, STEADY, createSteadyWatch, createLiveLayer, hasLiveSlot, poseAge, poseAhead,
-    filterParts, opBounds, layerEnd, clipsWholeStage
+    filterParts, opBounds, layerEnd, clipsWholeStage, mergeRects
   };
 });
