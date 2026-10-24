@@ -1,8 +1,8 @@
 {
   "environment": "staging",
-  "commit": "b96a8e48391fa41aa4e1b569317d10ff0c848bca",
-  "subject": "Receiver 70: the setup picture is held only until the stadium draws, then hidden and let go (it stayed composited under the stadium all innings); bench REPEAT, GAME_STATE",
-  "receiverTree": "9b997abc412255883445fb3bf184f42235b4bb9c",
+  "commit": "1ebb302787b394f2d4b34b788b62fadaaad4615b",
+  "subject": "Receiver 70: the stadium shows at its first whole frame (photo layers warmed), not held under the picture until steady; steadiness watched on the stadium itself; bench STEADY=1",
+  "receiverTree": "0f4d5eb983f2620e8783d39585a549ebf5dc5f99",
   "revision": 70,
-  "deployedAt": "2026-10-24T01:36:14Z"
+  "deployedAt": "2026-10-24T01:48:21Z"
 }
