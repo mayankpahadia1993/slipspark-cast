@@ -246,7 +246,10 @@
     // A phone that draws the stadium: as its innings starts, its setup
     // picture stays up until the stadium draws over it, never the HTML
     // scoreboard (receiver 53).
-    holdLast: (state) => !!(state && state.screen === "cricket" && stadiumPhone),
+    // Receiver 70 (t4yvzm24, r7ak7c4w): only until it has drawn. Held all innings, the picture stayed under the
+    // stadium (z-index 11 under 12), composited every frame: the owner's Ultra drew ~21-25 a second, frames up to
+    // 451 ms late, against 28-30 after a reconnect let it go; a bench of eight innings, 25 against 28.
+    holdLast: (state) => !!(state && state.screen === "cricket" && stadiumPhone && !stadiumDrawn),
     decode(url) {
       const probe = new Image();
       probe.src = url;
@@ -261,19 +264,6 @@
     onWant: (id) => sendScene({ t: "want", id })
   });
   let cardFailure = () => {};
-  // Receiver 70: after the stadium comes on, its pictures are let go once none is on screen (each second, 10 s at most).
-  let cardRelease = 0;
-  function releaseCards(on) {
-    window.clearTimeout(cardRelease);
-    if (!on || !cardView) return;
-    let tries = 0;
-    const attempt = () => {
-      if (document.body.dataset.scene !== "on" && document.body.dataset.scene !== "hold") return;
-      if (cardView.decision.mode !== "picture") { cardView.release(); return; }
-      if (++tries < 10) cardRelease = window.setTimeout(attempt, 1000);
-    };
-    cardRelease = window.setTimeout(attempt, 2000);
-  }
 
   // Receiver 56: the app-open welcome, while the phone plays it.
   const welcomeQuery = new URLSearchParams(window.location.search);
@@ -315,6 +305,9 @@
   });
   // A phone has said hello on the scene channel this cast.
   let stadiumPhone = false;
+  // Receiver 70: the stadium on and drawn over the phone's picture (receiver-scene.js onCover); false again
+  // when it goes off or a phone says hello, so the next innings' picture is held until it draws.
+  let stadiumDrawn = false;
   // The stadium came on during this stretch of play, and the scene's phone left.
   let stadiumThisPlay = false;
   let sceneLost = false;
@@ -422,6 +415,14 @@
     send: (message) => sendScene(message),
     // Receiver 67: `ready` says which of the phone's pictures this TV holds.
     heldCards: () => (cardView ? cardView.heldList() : []),
+    // Receiver 70: the stadium covered by the phone's picture while it warms, then drawn over it; the picture
+    // then goes (hidden, and let go: the phone hears it holds none and sends the next screen's afresh).
+    onCover(covered) {
+      stadiumDrawn = !covered;
+      if (!cardView) return;
+      cardView.apply();
+      if (!covered) cardView.release();
+    },
     heldKeep: cardView ? cardCore.KEEP : 0,
     // ?canvas=1920 draws previews and films that wide (a Mac counts as a dongle).
     canvasWidth: Number(query.get("canvas")) || undefined
@@ -507,11 +508,10 @@
         try { scene.handle(event.data); } catch (error) { scene.report("handle", error); }
         if (event.data && event.data.t === "scene") {
           if (event.data.on === 1) { sceneLost = false; if (lastState && PLAY_SCREENS.has(lastState.screen)) stadiumThisPlay = true; }
-          // Receiver 70: the setup's and last scorecard's pictures go once the stadium draws over them (see release).
-          releaseCards(event.data.on === 1);
+          else stadiumDrawn = false;
           updateHold();
         }
-        if (event.data && event.data.t === "hello") { sceneLost = false; updateHold(); }
+        if (event.data && event.data.t === "hello") { sceneLost = false; stadiumDrawn = false; updateHold(); }
       });
       window.addEventListener("error", (event) => scene.report("script", event.message + " @" + event.lineno));
       cardFailure = (where, error) => scene.report(where, error);

@@ -751,6 +751,8 @@
     let layerShownAt = 0;
     let framePhoto = false;
     function uncover() {
+      // Receiver 70: the page hears the stadium has drawn over the phone's picture (or gone off).
+      if (root.dataset.warming && options.onCover) options.onCover(false);
       if (root.dataset.warming) delete root.dataset.warming;
       if (warmingShown) { const node = document.getElementById("card-warming"); if (node) node.hidden = true; warmingShown = false; }
       settleLayers();
@@ -2042,6 +2044,8 @@
         wholeSent = false;
         steadyWatch.reset();
         root.dataset.warming = "1";
+        // Receiver 70: the phone's picture covers the stadium until it is drawn (uncover).
+        if (options.onCover) options.onCover(true);
         onAt = performance.now();
         // Until its first whole frame as receiver 60; then, for a phone that
         // waits for steady, up to STEADY_COVER_MS (noteWhole).
