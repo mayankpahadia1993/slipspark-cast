@@ -350,7 +350,24 @@
       });
     }
 
-    return { receive, update, apply, keep, heldList, get decision() { return last; }, get urls() { return urls; } };
+    // Receiver 70 (t4yvzm24, r7ak7c4w, Oct 23 2026: the owner's Chromecast Ultra drew an innings at ~21 a second,
+    // its frames up to 451 ms late, after the setup and scorecard pictures, and at 28-30 after a reconnect; two
+    // 1920-wide pictures before the stadium took a bench's median from 29 a second to 26): once the stadium
+    // draws, the pictures go, the one decoded on the hidden image too. The phone hears it holds none (`held`) and
+    // sends the next screen's pictures as it does for a new one. Not while a picture is still on screen.
+    function release() {
+      if (last.mode === "picture") return [];
+      const gone = Array.from(urls.keys());
+      gone.forEach((id) => { o.revoke(urls.get(id)); display.forget(id); });
+      urls.clear();
+      meta.clear();
+      if (typeof o.image.removeAttribute === "function") o.image.removeAttribute("src"); else o.image.src = "";
+      reported = null;
+      if (gone.length && o.onHeld) o.onHeld(heldList());
+      return gone;
+    }
+
+    return { receive, update, apply, keep, heldList, release, get decision() { return last; }, get urls() { return urls; } };
   }
 
   return { TIMEOUT_MS, SETUP_TIMEOUT_MS, WANT_MS, KEEP, MAX_PARTS, CARD_SCREENS, checksum, fold, family, validId, cardId, validRing, ringPlacement, createAssembler, createDisplay, prune, createCardView };

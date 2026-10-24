@@ -261,6 +261,19 @@
     onWant: (id) => sendScene({ t: "want", id })
   });
   let cardFailure = () => {};
+  // Receiver 70: after the stadium comes on, its pictures are let go once none is on screen (each second, 10 s at most).
+  let cardRelease = 0;
+  function releaseCards(on) {
+    window.clearTimeout(cardRelease);
+    if (!on || !cardView) return;
+    let tries = 0;
+    const attempt = () => {
+      if (document.body.dataset.scene !== "on" && document.body.dataset.scene !== "hold") return;
+      if (cardView.decision.mode !== "picture") { cardView.release(); return; }
+      if (++tries < 10) cardRelease = window.setTimeout(attempt, 1000);
+    };
+    cardRelease = window.setTimeout(attempt, 2000);
+  }
 
   // Receiver 56: the app-open welcome, while the phone plays it.
   const welcomeQuery = new URLSearchParams(window.location.search);
@@ -494,6 +507,8 @@
         try { scene.handle(event.data); } catch (error) { scene.report("handle", error); }
         if (event.data && event.data.t === "scene") {
           if (event.data.on === 1) { sceneLost = false; if (lastState && PLAY_SCREENS.has(lastState.screen)) stadiumThisPlay = true; }
+          // Receiver 70: the setup's and last scorecard's pictures go once the stadium draws over them (see release).
+          releaseCards(event.data.on === 1);
           updateHold();
         }
         if (event.data && event.data.t === "hello") { sceneLost = false; updateHold(); }

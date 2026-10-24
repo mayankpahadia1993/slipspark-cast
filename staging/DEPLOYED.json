@@ -1,8 +1,8 @@
 {
   "environment": "staging",
-  "commit": "facc81d649f80d688b37adc23fc31f923d865d2a",
-  "subject": "Build 218 / Android 21701 (2.9.1-android.45): fewer balls bowled again, the level on Today and in the scorebug",
-  "receiverTree": "0ac83d5a32caa471b8bc38a3272e188991375292",
-  "revision": 69,
-  "deployedAt": "2026-10-23T21:15:57Z"
+  "commit": "49d9be443b218bdcf6117c210286c26199e46252",
+  "subject": "Receiver 70 (t4yvzm24, r7ak7c4w): the setup's and scorecard's pictures go once the stadium draws; bench CARDS",
+  "receiverTree": "53799e5f6e374c945124f92bac589fdb7dcec849",
+  "revision": 70,
+  "deployedAt": "2026-10-24T01:08:47Z"
 }
