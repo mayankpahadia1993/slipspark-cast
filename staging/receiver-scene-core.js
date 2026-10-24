@@ -1082,10 +1082,40 @@
     return out;
   }
 
+  // MARK: THIS OVER, ball by ball (receiver 71, Oct 24 2026)
+
+  // The owner: "we show dots for the over on the top right. Instead can we
+  // show what happened, 4,6, wickets, 1,2,3 etc". The phone sends the HUD's
+  // `overBalls` (each ball of this over as its glyph, in order: "1"…"6", "•"
+  // a dot, "W" a wicket, "wd" a wide) and `overLeft` (legal balls still to
+  // come); shared/stadium/this-over.json. The strip is a chip per ball, toned
+  // as the phone tones it (4 and 6 the boundary gold, W the wicket red, a dot
+  // and a wide quiet, other runs plain), then an empty ring per ball to come.
+  // Null when the phone sends no `overBalls` (older phones): the six dots
+  // from `over`, as before.
+  const OVER_TONES = { "4": "boundary", "6": "boundary", W: "wicket", "•": "quiet", wd: "quiet" };
+  // At most this many chips (the over's latest): an over is 6 balls and its wides.
+  const OVER_MOST = 12;
+  function overGlyph(ball) {
+    const glyph = String(ball == null ? "" : ball).trim();
+    if (glyph === "0") return "•";
+    if (glyph.toLowerCase() === "wd") return "wd";
+    return glyph.slice(0, 3);
+  }
+  function overStrip(balls, left) {
+    if (!isArray(balls)) return null;
+    const glyphs = balls.map(overGlyph).filter((glyph) => glyph !== "").slice(-OVER_MOST);
+    const legal = glyphs.filter((glyph) => glyph !== "wd").length;
+    const rings = Number.isFinite(left) ? Math.max(0, Math.min(6, Math.round(left))) : Math.max(0, 6 - legal);
+    const items = glyphs.map((glyph) => ({ glyph, tone: OVER_TONES[glyph] || "plain" }));
+    for (let index = 0; index < rings; index += 1) items.push({ glyph: "", tone: "ring" });
+    return items;
+  }
+
   return {
     isWeakDongle, drawsInset, storageNames, STAGE, MAX_BLEND_GAP, MAX_STEP, CANVAS, normalizeFrame, plainFrame, expandInset, shapeKey, opShape, viewOf, matchOps, blendMatched, blendMatchedInto,
     blendFrames, blendFramesInto, cloneFrame, createTimeline, createClock,
     percentile, tracePath, cssColor, pictureSize, canvasPlan, canvasWidth, createRateWatch, STEADY, createSteadyWatch, createLiveLayer, hasLiveSlot, poseAge, poseAhead,
-    filterParts, opBounds, layerEnd, clipsWholeStage, mergeRects
+    filterParts, opBounds, layerEnd, clipsWholeStage, mergeRects, overStrip
   };
 });
