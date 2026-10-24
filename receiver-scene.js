@@ -1775,6 +1775,14 @@
         setText("hud-runs", h.score.runs + "/" + h.score.wickets);
         setText("hud-overs", h.score.overs + " of " + h.score.of);
       }
+      // The level beside the overs (receiver 69, r7ak7c4w): BOWLING Easy, a
+      // friend's match's LEVEL. Older phones send none.
+      const level = h.level && typeof h.level.title === "string" && typeof h.level.value === "string" ? h.level : null;
+      show("hud-level", !!level);
+      if (level) {
+        setText("hud-level-title", level.title);
+        setText("hud-level-value", level.value);
+      }
       if (h.check) setText("hud-check-ball", "Ball " + h.check.ball + " of " + h.check.of);
       setText("hud-check-title", h.check && h.check.title === "NETS PRACTICE" ? "NETS PRACTICE" : "TIMING CHECK");
       show("hud-friend", !!h.friend);

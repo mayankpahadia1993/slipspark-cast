@@ -1,8 +1,10 @@
 {
   "environment": "production",
-  "commit": "3a02af5fb839c8f72ab9d6246f76a0632a9ffc78",
-  "subject": "Receiver 68 (kab7kfvv): no bowler's-end view on Chromecast dongles, Ultra included",
-  "receiverTree": "5ca34ae7816bdd148ea4bc531777b9a82accb1f0",
-  "revision": 67,
-  "deployedAt": "2026-10-23T16:56:56Z"
+  "commit": "facc81d649f80d688b37adc23fc31f923d865d2a",
+  "subject": "Build 218 / Android 21701 (2.9.1-android.45): fewer balls bowled again, the level on Today and in the scorebug",
+  "receiverTree": "0ac83d5a32caa471b8bc38a3272e188991375292",
+  "revision": 69,
+  "deployedAt": "2026-10-24T00:33:37Z",
+  "promotedFrom": "staging",
+  "stagedAt": "2026-10-23T21:15:57Z"
 }

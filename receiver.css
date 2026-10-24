@@ -156,6 +156,8 @@ body[data-scene-weak="1"] .scene-hud *, body[data-scene-weak="1"] .scene-hud { a
 .hud-scorebug { display: flex; align-items: baseline; gap: 17px; padding: 15px 31px; border-radius: 31px; background: var(--cream); color: rgb(var(--ink)); font-variant-numeric: tabular-nums; }
 .hud-scorebug > strong { font-size: 65px; font-weight: 900; line-height: 1; }
 .hud-overs b { display: block; margin-top: 3px; font-size: 22px; font-weight: 700; }
+/* Receiver 68: the level, behind a hairline so it never reads as the overs (the phone's 1 pt at 18% ink). */
+.hud-level { padding-left: 17px; border-left: 2px solid rgba(var(--ink), .18); white-space: nowrap; }
 .hud-check { display: block; }
 .hud-check strong { display: block; margin-top: 3px; font-size: 41px; font-weight: 900; line-height: 1.05; }
 .hud-friend { position: absolute; left: 0; top: 112px; padding: 10px 20px; border-radius: 999px; background: var(--gold); color: rgb(var(--ink)); white-space: nowrap; font-size: 19px; font-weight: 800; letter-spacing: 2px; font-variant-numeric: tabular-nums; }

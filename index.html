@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800;900&family=Nunito:wght@600;700;800;900&display=swap">
-  <link rel="stylesheet" href="receiver.css?v=67">
+  <link rel="stylesheet" href="receiver.css?v=69">
   <script src="https://www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>
 </head>
 <body>
@@ -192,6 +192,8 @@
           <div id="hud-score" class="hud-scorebug">
             <strong id="hud-runs">0/0</strong>
             <span class="hud-overs"><small>OVERS</small><b id="hud-overs">0.0 of 2</b></span>
+            <!-- The level the innings plays at (receiver 69): BOWLING Easy, a friend's match's LEVEL. -->
+            <span id="hud-level" class="hud-overs hud-level" hidden><small id="hud-level-title">BOWLING</small><b id="hud-level-value"></b></span>
           </div>
           <div id="hud-check" class="hud-scorebug hud-check" hidden>
             <small id="hud-check-title">TIMING CHECK</small><strong id="hud-check-ball">Ball 1 of 6</strong>
@@ -265,15 +267,15 @@
     </div>
   </section>
   <!-- ?v= keeps a Chromecast from mixing cached files of two receiver versions. -->
-  <script src="receiver-core.js?v=67"></script>
-  <script src="receiver-card-core.js?v=67"></script>
-  <script src="receiver-video.js?v=67"></script>
-  <script src="receiver-scene-core.js?v=67"></script>
-  <script src="receiver-scene.js?v=67"></script>
-  <script src="receiver-welcome.js?v=67"></script>
-  <script src="receiver-celebration.js?v=67"></script>
-  <script src="receiver-music.js?v=67"></script>
-  <script src="receiver-shared.js?v=67"></script>
-  <script src="receiver.js?v=67"></script>
+  <script src="receiver-core.js?v=69"></script>
+  <script src="receiver-card-core.js?v=69"></script>
+  <script src="receiver-video.js?v=69"></script>
+  <script src="receiver-scene-core.js?v=69"></script>
+  <script src="receiver-scene.js?v=69"></script>
+  <script src="receiver-welcome.js?v=69"></script>
+  <script src="receiver-celebration.js?v=69"></script>
+  <script src="receiver-music.js?v=69"></script>
+  <script src="receiver-shared.js?v=69"></script>
+  <script src="receiver.js?v=69"></script>
 </body>
 </html>
