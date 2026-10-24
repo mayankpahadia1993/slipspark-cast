@@ -1,10 +1,10 @@
 {
   "environment": "production",
-  "commit": "facc81d649f80d688b37adc23fc31f923d865d2a",
-  "subject": "Build 218 / Android 21701 (2.9.1-android.45): fewer balls bowled again, the level on Today and in the scorebug",
-  "receiverTree": "0ac83d5a32caa471b8bc38a3272e188991375292",
-  "revision": 69,
-  "deployedAt": "2026-10-24T00:33:37Z",
+  "commit": "1ebb302787b394f2d4b34b788b62fadaaad4615b",
+  "subject": "Receiver 70: the stadium shows at its first whole frame (photo layers warmed), not held under the picture until steady; steadiness watched on the stadium itself; bench STEADY=1",
+  "receiverTree": "0f4d5eb983f2620e8783d39585a549ebf5dc5f99",
+  "revision": 70,
+  "deployedAt": "2026-10-24T02:07:52Z",
   "promotedFrom": "staging",
-  "stagedAt": "2026-10-23T21:15:57Z"
+  "stagedAt": "2026-10-24T01:48:21Z"
 }

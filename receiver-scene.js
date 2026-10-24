@@ -700,8 +700,7 @@
       send({ t: "whole" });
       // Receiver 65: from the first whole frame, how steadily it draws.
       if (!steadyWatch.started) steadyWatch.start(wholeAt);
-      // A phone that waits for steady waits up to its own cap from the stadium coming on.
-      if (phoneWaitsSteady && root.dataset.warming) coverUntil = Math.max(coverUntil, onAt + STEADY_COVER_MS);
+      // Receiver 70: the picture no longer stays up while a phone waits for steady (see frameStep).
     }
 
     // Receiver 65: the TV draws steadily (core.createSteadyWatch), once a
@@ -751,6 +750,8 @@
     let layerShownAt = 0;
     let framePhoto = false;
     function uncover() {
+      // Receiver 70: the page hears the stadium has drawn over the phone's picture (or gone off).
+      if (root.dataset.warming && options.onCover) options.onCover(false);
       if (root.dataset.warming) delete root.dataset.warming;
       if (warmingShown) { const node = document.getElementById("card-warming"); if (node) node.hidden = true; warmingShown = false; }
       settleLayers();
@@ -777,6 +778,12 @@
           return;
         }
       }
+    }
+    // Receiver 70: every photo layer loaded has been on screen (the cover now ends once they have, COVER_MS at most).
+    function layersWarm() {
+      if (layerWarming) return false;
+      for (const [key, entry] of backdropLayers) if (entry.ready && !entry.shown && key !== backdropKey) return false;
+      return true;
     }
     function settleLayers() {
       if (!layerWarming) return;
@@ -1878,9 +1885,14 @@
       const local = began;
       // Shown once whole with its photo on its layer for a frame, or at
       // COVER_MS whatever.
+      // Receiver 70 (the owner, Oct 23 2026: "getting the tv ready screen takes a long time and the circle keeps on
+      // restarting"): not held for steady. Under the picture, the stadium all but transparent over it, the Ultra drew
+      // ~20 a second, hitching every second or two, so the ring restarted and the steady verdict came at 20 (plateau)
+      // after 3-4 s or past the phone's 8 s cap; the stadium uncovered draws 28-30. Steadiness is now watched on the
+      // stadium itself while the phone holds its first ball (CastSceneStreamer.steadyLimit).
       if (root.dataset.warming && (local >= coverUntil
         || (wholeSent && (!framePhoto || (!photoPending && layerShownAt && local - layerShownAt >= 30))
-          && (!phoneWaitsSteady || steadyWatch.verdict)))) uncover();
+          && (document.body.dataset.card !== "picture" || layersWarm())))) uncover();
       if (root.dataset.warming) { warmLayers(local); showWarming(local); }
       if (lastLoop) counters.gaps.push(local - lastLoop);
       lastLoop = local;
@@ -2042,6 +2054,8 @@
         wholeSent = false;
         steadyWatch.reset();
         root.dataset.warming = "1";
+        // Receiver 70: the phone's picture covers the stadium until it is drawn (uncover).
+        if (options.onCover) options.onCover(true);
         onAt = performance.now();
         // Until its first whole frame as receiver 60; then, for a phone that
         // waits for steady, up to STEADY_COVER_MS (noteWhole).
