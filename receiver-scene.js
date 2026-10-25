@@ -1773,6 +1773,47 @@
     const VERDICT = {
       perfect: "perfect", littleEarly: "little", littleLate: "little", early: "far", late: "far", noSwing: "none"
     };
+    // Where the level can show (receiver 71): the scorebug, the Nets / timing check card, its own card.
+    const LEVEL_SLOTS = ["hud-level", "hud-check-level", "hud-level-card"];
+    // Up to this many chips and rings at full size in THIS OVER's card (6
+    // balls and two wides); more and they are drawn smaller (`is-many`).
+    const OVER_ROOM = 8;
+
+    // THIS OVER as chips (receiver 71, core.overStrip): only a chip that
+    // changed is written, so a ball bowled rewrites one chip (or a wide adds
+    // one at the end), not the strip.
+    function drawOverChips(row, items) {
+      if (!row) return;
+      if (row.dataset.strip !== "chips") {
+        row.dataset.strip = "chips";
+        row.classList.add("is-chips");
+        row.textContent = "";
+      }
+      row.classList.toggle("is-many", items.length > OVER_ROOM);
+      for (let index = 0; index < items.length; index += 1) {
+        let chip = row.children[index];
+        if (!chip) { chip = document.createElement("span"); row.appendChild(chip); }
+        const name = "hud-chip tone-" + items[index].tone;
+        if (chip.className !== name) chip.className = name;
+        if (chip.textContent !== items[index].glyph) chip.textContent = items[index].glyph;
+      }
+      while (row.children.length > items.length) row.removeChild(row.children[row.children.length - 1]);
+    }
+
+    // An older phone's six dots, gold for each ball of the over bowled. After
+    // a phone that sent chips, the six dots are put back first.
+    function drawOverDots(row, over) {
+      if (!row) return;
+      if (row.dataset.strip === "chips") {
+        row.dataset.strip = "";
+        row.classList.remove("is-chips");
+        row.classList.remove("is-many");
+        row.textContent = "";
+        for (let index = 0; index < 6; index += 1) row.appendChild(document.createElement("i"));
+      }
+      const dots = row.children;
+      for (let index = 0; index < dots.length; index += 1) dots[index].classList.toggle("is-bowled", index < over);
+    }
 
     function renderHUD(h) {
       // Scorebug: runs for wickets and overs, or the timing check's ball.
@@ -1782,13 +1823,20 @@
         setText("hud-runs", h.score.runs + "/" + h.score.wickets);
         setText("hud-overs", h.score.overs + " of " + h.score.of);
       }
-      // The level beside the overs (receiver 69, r7ak7c4w): BOWLING Easy, a
-      // friend's match's LEVEL. Older phones send none.
+      // The level (receiver 69, r7ak7c4w): BOWLING Easy, a friend's match's
+      // LEVEL, beside the overs. Receiver 71 (Oct 24 2026, the owner: "Let's
+      // show the level everywhere including innings, friends, nets, cups
+      // etc"): in every game, beside the ball in the Nets and a timing check,
+      // and on a card of its own where the scorebug would be in the boundary
+      // over (which sends the TV no scorebug; its line goes under the card).
+      // Older phones send none: none shows.
       const level = h.level && typeof h.level.title === "string" && typeof h.level.value === "string" ? h.level : null;
-      show("hud-level", !!level);
-      if (level) {
-        setText("hud-level-title", level.title);
-        setText("hud-level-value", level.value);
+      const levelSlot = !level ? null : h.score ? "hud-level" : h.check ? "hud-check-level" : "hud-level-card";
+      for (const slot of LEVEL_SLOTS) {
+        show(slot, slot === levelSlot);
+        if (slot !== levelSlot) continue;
+        setText(slot + "-title", level.title);
+        setText(slot + "-value", level.value);
       }
       if (h.check) setText("hud-check-ball", "Ball " + h.check.ball + " of " + h.check.of);
       setText("hud-check-title", h.check && h.check.title === "NETS PRACTICE" ? "NETS PRACTICE" : "TIMING CHECK");
@@ -1814,10 +1862,14 @@
           dot.className = "dot " + (verdict ? "verdict-" + (VERDICT[verdict] || "none") : "to-come");
           row.appendChild(dot);
         }
-      } else if (!h.check) {
-        const dots = el("hud-over-dots").children;
-        for (let index = 0; index < dots.length; index += 1) dots[index].classList.toggle("is-bowled", index < h.over);
       }
+      // Receiver 71: the over ball by ball from `overBalls`; an older phone's `over` as six dots. The card is a little
+      // tighter round the chips, so the speed gun under it still clears the replay's timing card.
+      const strip = h.check ? null : core.overStrip(h.overBalls, h.overLeft);
+      const card = el("hud-over-card");
+      if (card) card.classList.toggle("is-chips", !!strip);
+      if (strip) drawOverChips(el("hud-over-dots"), strip);
+      else if (!h.check) drawOverDots(el("hud-over-dots"), h.over);
       show("hud-speed", !!h.speed);
       setText("hud-speed", h.speed);
       // Commentary.

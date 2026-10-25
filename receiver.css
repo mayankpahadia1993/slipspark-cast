@@ -103,6 +103,8 @@ body[data-video="on"] #app { visibility: hidden; }
   --gold: #ffc252;
   --good: #61d67a;
   --off: #f56b54;
+  /* Receiver 71: a wicket in THIS OVER, the apps' danger red (iOS SparkTheme.danger, Android Danger). */
+  --wicket: #ff5c52;
   position: fixed;
   inset: 0;
   z-index: 12;
@@ -158,11 +160,15 @@ body[data-scene-weak="1"] .scene-hud *, body[data-scene-weak="1"] .scene-hud { a
 .hud-overs b { display: block; margin-top: 3px; font-size: 22px; font-weight: 700; }
 /* Receiver 68: the level, behind a hairline so it never reads as the overs (the phone's 1 pt at 18% ink). */
 .hud-level { padding-left: 17px; border-left: 2px solid rgba(var(--ink), .18); white-space: nowrap; }
-.hud-check { display: block; }
+/* Receiver 71: the Nets and a timing check say the level too, beside the ball, in the scorebug's column. */
+.hud-check-ball { display: block; }
 .hud-check strong { display: block; margin-top: 3px; font-size: 41px; font-weight: 900; line-height: 1.05; }
+/* Receiver 71: the boundary over's level, on a card of its own where the scorebug would be. */
+.hud-level-card { width: max-content; }
 .hud-friend { position: absolute; left: 0; top: 112px; padding: 10px 20px; border-radius: 999px; background: var(--gold); color: rgb(var(--ink)); white-space: nowrap; font-size: 19px; font-weight: 800; letter-spacing: 2px; font-variant-numeric: tabular-nums; }
-/* Boundary over sends no scorebug: its line takes the scorebug's place. */
-#hud-score[hidden] + #hud-check[hidden] + .hud-friend { position: static; }
+/* Boundary over sends no scorebug: its line takes the scorebug's place, or goes under the level's card. */
+#hud-score[hidden] + #hud-check[hidden] + #hud-level-card[hidden] + .hud-friend { position: static; }
+#hud-level-card:not([hidden]) + .hud-friend { position: static; width: max-content; margin-top: 14px; }
 .hud-status { max-width: 730px; display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 20px 31px; border-radius: 27px; background: rgba(var(--ink), .9); text-align: center; transition: opacity .2s ease; }
 .hud-status strong { font-size: 31px; font-weight: 900; line-height: 1.15; }
 .hud-status span { font-size: 20px; font-weight: 600; white-space: pre-line; }
@@ -171,6 +177,21 @@ body[data-scene-weak="1"] .scene-hud *, body[data-scene-weak="1"] .scene-hud { a
 .hud-dots { display: flex; justify-content: flex-end; gap: 8.5px; margin-top: 13px; }
 .hud-dots i { width: 10px; height: 10px; border-radius: 50%; background: rgba(252, 245, 222, .4); }
 .hud-dots i.is-bowled { background: var(--gold); }
+/* Receiver 71: THIS OVER ball by ball (shared/stadium/this-over.json): a chip per ball, 4 and 6 the boundary gold,
+   W the wicket red, a dot and a wide quiet, other runs cream, then a ring per legal ball to come. Eight fit at full
+   size (six balls and two wides); more are drawn smaller (`is-many`). */
+.hud-over-card.is-chips { padding: 20px 22px 18px; }
+.hud-dots.is-chips { align-items: center; gap: 6px; margin-top: 10px; }
+.hud-chip { display: flex; align-items: center; justify-content: center; min-width: 30px; height: 30px; padding: 0 7px; border-radius: 9px;
+  font-family: Nunito, "Varela Round", "Google Sans", sans-serif; font-size: 19px; font-weight: 900; line-height: 1; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.hud-chip.tone-plain { background: var(--cream); color: rgb(var(--ink)); }
+.hud-chip.tone-boundary { background: var(--gold); color: rgb(var(--ink)); }
+.hud-chip.tone-wicket { background: var(--wicket); color: var(--cream); }
+.hud-chip.tone-quiet { background: rgba(252, 245, 222, .16); color: rgba(252, 245, 222, .8); }
+.hud-chip.tone-ring { min-width: 0; width: 22px; height: 22px; padding: 0; border-radius: 50%; box-shadow: inset 0 0 0 2.5px rgba(252, 245, 222, .4); }
+.hud-dots.is-many { gap: 4px; }
+.hud-dots.is-many .hud-chip { min-width: 25px; height: 25px; padding: 0 5px; border-radius: 8px; font-size: 16px; }
+.hud-dots.is-many .hud-chip.tone-ring { min-width: 0; width: 18px; height: 18px; padding: 0; border-radius: 50%; }
 .hud-verdict-dots { gap: 10px; }
 .hud-verdict-dots i { width: 19px; height: 19px; }
 .hud-verdict-dots i.to-come { background: rgba(252, 245, 222, .28); }

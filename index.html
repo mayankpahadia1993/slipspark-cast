@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800;900&family=Nunito:wght@600;700;800;900&display=swap">
-  <link rel="stylesheet" href="receiver.css?v=70">
+  <link rel="stylesheet" href="receiver.css?v=71">
   <script src="https://www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>
 </head>
 <body>
@@ -196,7 +196,13 @@
             <span id="hud-level" class="hud-overs hud-level" hidden><small id="hud-level-title">BOWLING</small><b id="hud-level-value"></b></span>
           </div>
           <div id="hud-check" class="hud-scorebug hud-check" hidden>
-            <small id="hud-check-title">TIMING CHECK</small><strong id="hud-check-ball">Ball 1 of 6</strong>
+            <span class="hud-check-ball"><small id="hud-check-title">TIMING CHECK</small><strong id="hud-check-ball">Ball 1 of 6</strong></span>
+            <!-- Receiver 71: the level in the Nets (Easy) and a timing check (Medium), in the scorebug's column. -->
+            <span id="hud-check-level" class="hud-overs hud-level" hidden><small id="hud-check-level-title">BOWLING</small><b id="hud-check-level-value"></b></span>
+          </div>
+          <!-- Receiver 71: the boundary over sends no scorebug; the level gets a card of its own in its place. -->
+          <div id="hud-level-card" class="hud-scorebug hud-level-card" hidden>
+            <span class="hud-overs"><small id="hud-level-card-title">BOWLING</small><b id="hud-level-card-value"></b></span>
           </div>
           <div id="hud-friend" class="hud-friend" hidden></div>
         </div>
@@ -205,7 +211,7 @@
           <span id="hud-status-detail" hidden></span>
         </div>
         <div class="hud-right">
-          <div class="hud-over-card">
+          <div id="hud-over-card" class="hud-over-card">
             <div id="hud-over"><small>THIS OVER</small><div id="hud-over-dots" class="hud-dots"><i></i><i></i><i></i><i></i><i></i><i></i></div></div>
             <div id="hud-verdicts" hidden><small>YOUR TIMING</small><div id="hud-verdict-dots" class="hud-dots hud-verdict-dots"></div></div>
           </div>
@@ -267,15 +273,15 @@
     </div>
   </section>
   <!-- ?v= keeps a Chromecast from mixing cached files of two receiver versions. -->
-  <script src="receiver-core.js?v=70"></script>
-  <script src="receiver-card-core.js?v=70"></script>
-  <script src="receiver-video.js?v=70"></script>
-  <script src="receiver-scene-core.js?v=70"></script>
-  <script src="receiver-scene.js?v=70"></script>
-  <script src="receiver-welcome.js?v=70"></script>
-  <script src="receiver-celebration.js?v=70"></script>
-  <script src="receiver-music.js?v=70"></script>
-  <script src="receiver-shared.js?v=70"></script>
-  <script src="receiver.js?v=70"></script>
+  <script src="receiver-core.js?v=71"></script>
+  <script src="receiver-card-core.js?v=71"></script>
+  <script src="receiver-video.js?v=71"></script>
+  <script src="receiver-scene-core.js?v=71"></script>
+  <script src="receiver-scene.js?v=71"></script>
+  <script src="receiver-welcome.js?v=71"></script>
+  <script src="receiver-celebration.js?v=71"></script>
+  <script src="receiver-music.js?v=71"></script>
+  <script src="receiver-shared.js?v=71"></script>
+  <script src="receiver.js?v=71"></script>
 </body>
 </html>

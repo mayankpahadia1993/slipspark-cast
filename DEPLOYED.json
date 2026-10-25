@@ -1,10 +1,10 @@
 {
   "environment": "production",
-  "commit": "1ebb302787b394f2d4b34b788b62fadaaad4615b",
-  "subject": "Receiver 70: the stadium shows at its first whole frame (photo layers warmed), not held under the picture until steady; steadiness watched on the stadium itself; bench STEADY=1",
-  "receiverTree": "0f4d5eb983f2620e8783d39585a549ebf5dc5f99",
-  "revision": 70,
-  "deployedAt": "2026-10-24T02:07:52Z",
+  "commit": "d6e0a82b690c17964d7ff2f8d31f92d9042025a6",
+  "subject": "219 / 21801: build numbers",
+  "receiverTree": "31aa9d2eb88b3297f730527a9693c138f4de1ea1",
+  "revision": 71,
+  "deployedAt": "2026-10-25T03:19:50Z",
   "promotedFrom": "staging",
-  "stagedAt": "2026-10-24T01:48:21Z"
+  "stagedAt": "2026-10-24T21:51:07Z"
 }
