@@ -1,8 +1,8 @@
 {
   "environment": "staging",
-  "commit": "2a27c5d6a4b186dbcac5c624bd54e01f5ae1ef8a",
-  "subject": "223 / 22201: build numbers; Android draws only the update screen below the minimum build",
-  "receiverTree": "8cba30cba2851f8de7ce2babafd7e5d6b30d2912",
-  "revision": 72,
-  "deployedAt": "2026-10-25T11:59:24Z"
+  "commit": "a2c2ebd2fb193414dbffeba1c204171fa525e719",
+  "subject": "Receiver tests: version 73",
+  "receiverTree": "7f6f53920540e6b8aa501c6f52cde268c5763e6b",
+  "revision": 73,
+  "deployedAt": "2026-10-25T12:04:35Z"
 }
