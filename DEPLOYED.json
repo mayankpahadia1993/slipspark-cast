@@ -1,10 +1,10 @@
 {
   "environment": "production",
-  "commit": "0539a7e806619a706aa0daba08a65d9d47db91c1",
-  "subject": "Docs: parity row for the run-up's bowler, Android wides and the holding screen's level",
-  "receiverTree": "60a5fe49fca6104b48f0ddb3db6aa71eed09f0b5",
-  "revision": 72,
-  "deployedAt": "2026-10-25T07:38:14Z",
+  "commit": "a2c2ebd2fb193414dbffeba1c204171fa525e719",
+  "subject": "Receiver tests: version 73",
+  "receiverTree": "7f6f53920540e6b8aa501c6f52cde268c5763e6b",
+  "revision": 73,
+  "deployedAt": "2026-10-25T15:10:56Z",
   "promotedFrom": "staging",
-  "stagedAt": "2026-10-25T06:41:32Z"
+  "stagedAt": "2026-10-25T12:04:35Z"
 }

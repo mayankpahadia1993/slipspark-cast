@@ -19,7 +19,7 @@
   const DISCRETE = {
     f: [2, 3, 6, 7, 8],
     s: [2, 3, 9, 10],
-    i: [2, 3, 5, 6],
+    i: [2, 3, 5, 6, 7],
     t: [2, 3, 5, 6, 10],
     L: [2, 3, 4],
     l: [],
@@ -82,8 +82,66 @@
       x, y + h - r, x, y + r, x, y + r - r * k, x + r - r * k, y, x + r, y].map((v) => Math.round(v * 10))];
   }
 
+  // MARK: The batter's kit (receiver 73, Oct 25 2026)
+  //
+  // A command whose batter is dressed ends with his look (iOS
+  // BowlerEndKitArt.receiverLook, Android core BowlerKit.receiverLook):
+  // [fabric, trim, grip], each [r, g, b] in thousandths of sRGB or 0 for as
+  // photographed. Each batter frame is then drawn dyed (receiver-scene.js
+  // `dress`) through its masks (kit-masks-bowler-end-*: red the shirt and
+  // trousers, green the collar and the sleeves' hems, blue the black grip),
+  // as both phones dye their own: the colour multiplied in by each pixel's
+  // share of cloth, the grip laid over the rubber. Before, every TV drew him
+  // in the whites whoever was batting.
+  const GRIP_OPACITY = 0.88;
+  const GRIP_SHADE = [0.55, 0.9];
+
+  // The look as one string ("740,110,160|980,860,620|-"), or null.
+  function readLook(value) {
+    if (!isArray(value) || value.length !== 3) return null;
+    const colours = value.map((colour) => (isArray(colour) && colour.length === 3 && colour.every((v) => Number.isFinite(Number(v)))
+      ? colour.map((v) => Math.max(0, Math.min(1000, Math.round(Number(v))))) : null));
+    if (!colours.some(Boolean)) return null;
+    return colours.map((colour) => (colour ? colour.join(",") : "-")).join("|");
+  }
+
+  // [fabric, trim, grip] as 0-1 colours (null for as photographed).
+  function lookColours(look) {
+    return String(look).split("|").map((part) => (part === "-" ? null : part.split(",").map((v) => Number(v) / 1000)));
+  }
+
+  // Dyes `rgba` (a frame's pixels, straight alpha, as ImageData) through
+  // `mask` (the same size: red fabric, green trim, blue grip) in `look`.
+  function dyeFrame(rgba, mask, look) {
+    const [fabric, trim, grip] = lookColours(look);
+    for (let i = 0; i < rgba.length; i += 4) {
+      if (!rgba[i + 3]) continue;
+      const f = fabric ? mask[i] / 255 : 0, t = trim ? mask[i + 1] / 255 : 0, g = grip ? mask[i + 2] / 255 : 0;
+      if (!f && !t && !g) continue;
+      let r = rgba[i] / 255, gr = rgba[i + 1] / 255, b = rgba[i + 2] / 255;
+      if (f || t) {
+        const factor = [1, 1, 1];
+        for (let c = 0; c < 3; c += 1) {
+          if (f) factor[c] = factor[c] * (1 - f) + fabric[c] * f;
+          if (t) factor[c] = factor[c] * (1 - t) + trim[c] * t;
+        }
+        r *= factor[0]; gr *= factor[1]; b *= factor[2];
+      }
+      if (g) {
+        const light = GRIP_SHADE[0] + GRIP_SHADE[1] * (0.2126 * r + 0.7152 * gr + 0.0722 * b);
+        const m = g * GRIP_OPACITY;
+        r = r * (1 - m) + Math.min(1, grip[0] * light) * m;
+        gr = gr * (1 - m) + Math.min(1, grip[1] * light) * m;
+        b = b * (1 - m) + Math.min(1, grip[2] * light) * m;
+      }
+      rgba[i] = Math.round(r * 255); rgba[i + 1] = Math.round(gr * 255); rgba[i + 2] = Math.round(b * 255);
+    }
+    return rgba;
+  }
+
   function expandInset(op, out) {
     const rect = op[2], parts = op[4];
+    const look = readLook(op[5]);
     if (!isArray(rect) || rect.length < 4 || !isArray(parts)) return;
     const [x, y, w, h] = rect.map((v) => Number(v) / 10);
     if (!(w > 0) || !(h > 0) || ![x, y].every(Number.isFinite)) return;
@@ -98,7 +156,10 @@
     for (const part of parts) {
       if (!isArray(part)) continue;
       if (part[0] === "i" && typeof part[1] === "string" && isArray(part[2]) && part[2].length === 6) {
-        out.push(["i", A((part[3] == null ? 1000 : Number(part[3])) / 1000), "source-over", part[1], part[2], -1, -1]);
+        const drawn = ["i", A((part[3] == null ? 1000 : Number(part[3])) / 1000), "source-over", part[1], part[2], -1, -1];
+        // The batter in his kit: his frames carry the look.
+        if (look && /^bowler-end-batter-/.test(part[1])) drawn.push(look);
+        out.push(drawn);
       } else if (part[0] === "e" && isArray(part[1]) && part[1].length === 4 && isArray(part[2])) {
         const [cx, cy, rx, ry] = part[1].map((v) => Number(v) / 10);
         out.push(fill(insetEllipse(cx, cy, rx, ry), part[2]));
@@ -1116,6 +1177,6 @@
     isWeakDongle, drawsInset, storageNames, STAGE, MAX_BLEND_GAP, MAX_STEP, CANVAS, normalizeFrame, plainFrame, expandInset, shapeKey, opShape, viewOf, matchOps, blendMatched, blendMatchedInto,
     blendFrames, blendFramesInto, cloneFrame, createTimeline, createClock,
     percentile, tracePath, cssColor, pictureSize, canvasPlan, canvasWidth, createRateWatch, STEADY, createSteadyWatch, createLiveLayer, hasLiveSlot, poseAge, poseAhead,
-    filterParts, opBounds, layerEnd, clipsWholeStage, mergeRects, overStrip
+    filterParts, opBounds, layerEnd, clipsWholeStage, mergeRects, overStrip, readLook, lookColours, dyeFrame, GRIP_OPACITY, GRIP_SHADE
   };
 });
