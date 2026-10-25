@@ -122,6 +122,9 @@ body[data-scene="hold"] #stream { visibility: hidden; }
 .scene-chip[hidden] { display: none; }
 /* Play before the stadium's first frame: the branded holding screen. */
 .holding-score { margin-top: 2vh; color: var(--signal); font-size: clamp(18px, 1.8vw, 34px); font-weight: 900; letter-spacing: .08em; }
+/* Receiver 72: the level under the score, as the HUD says it ("BOWLING · Easy"). */
+.ready-screen .holding-level { margin-top: 1.6vh; padding: .8vh 1.4vw; border-radius: 999px; background: var(--stadium-ink, rgba(0,0,0,.42));
+  color: var(--paper); font-size: clamp(16px, 1.45vw, 28px); font-weight: 800; letter-spacing: .1em; white-space: nowrap; }
 /* Receiver 60: the phone's picture stays up over a stadium still loading
    its pictures, until a frame has them all and its photo is on its layer
    (receiver-scene.js, `warming`). Drawn all but transparent, not hidden, so
