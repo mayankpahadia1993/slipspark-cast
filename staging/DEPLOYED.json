@@ -1,8 +1,8 @@
 {
   "environment": "staging",
-  "commit": "d6e0a82b690c17964d7ff2f8d31f92d9042025a6",
-  "subject": "219 / 21801: build numbers",
-  "receiverTree": "31aa9d2eb88b3297f730527a9693c138f4de1ea1",
-  "revision": 71,
-  "deployedAt": "2026-10-24T21:51:07Z"
+  "commit": "0539a7e806619a706aa0daba08a65d9d47db91c1",
+  "subject": "Docs: parity row for the run-up's bowler, Android wides and the holding screen's level",
+  "receiverTree": "60a5fe49fca6104b48f0ddb3db6aa71eed09f0b5",
+  "revision": 72,
+  "deployedAt": "2026-10-25T06:41:32Z"
 }

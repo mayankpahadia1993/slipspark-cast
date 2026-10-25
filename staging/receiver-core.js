@@ -83,6 +83,20 @@
     return value == null ? null : boundedString(value, "", maximumLength);
   }
 
+  // Receiver 72 (Oct 24 2026): the level a phone's game state carries for the
+  // holding screen ({title, value}: "BOWLING" "Easy", a friend's match's
+  // "LEVEL"), as the HUD's `level`; null when it sends none (older phones).
+  function normalizeLevel(value) {
+    if (!value || typeof value !== "object" || typeof value.title !== "string" || typeof value.value !== "string") return null;
+    const title = boundedString(value.title, "", 24).trim(), level = boundedString(value.value, "", 24).trim();
+    return title && level ? { title, value: level } : null;
+  }
+
+  // The holding screen's line for it, as the phone's scorecard says it: "BOWLING · Easy".
+  function levelLine(level) {
+    return level ? level.title + " · " + level.value : "";
+  }
+
   function allowedString(value, allowed, fallback) {
     const candidate = boundedString(value, fallback, 40);
     return allowed.has(candidate) ? candidate : fallback;
@@ -199,7 +213,8 @@
         totalBalls: Math.floor(clamp(cricket.totalBalls, 1, 999)),
         runsNeeded: cricket.runsNeeded == null ? null : Math.floor(clamp(cricket.runsNeeded, 0, 99999)),
         ballsRemaining: Math.floor(clamp(cricket.ballsRemaining, 0, 999)),
-        playerAction: allowedString(cricket.playerAction, validActions, "neutral")
+        playerAction: allowedString(cricket.playerAction, validActions, "neutral"),
+        level: normalizeLevel(cricket.level)
       };
     }
 
@@ -378,7 +393,7 @@
   function sampleState(kind) {
     const base = { schemaVersion: 2, sequence: 10 };
     if (kind === "positioning") return normalizeState({ ...base, screen: "positioning", positioning: { isReady: true, instruction: "You’re ready.", eyebrow: "FIND YOUR CREASE", title: "You’re ready.", detail: "Return to your stance.\nRaise both hands and hold to start.", hand: "Right-handed batter", canHold: true, progress: 0.45 } });
-    if (kind === "cricket") return normalizeState({ ...base, screen: "cricket", cricket: { phase: "delivery", phaseValue: "FULL!", phaseDetail: "DRIVE", runs: 18, wicketsLost: 1, wicketLimit: 3, ballsFaced: 7, totalBalls: 12, ballsRemaining: 5, playerAction: "counterRight" } });
+    if (kind === "cricket") return normalizeState({ ...base, screen: "cricket", cricket: { phase: "delivery", phaseValue: "FULL!", phaseDetail: "DRIVE", runs: 18, wicketsLost: 1, wicketLimit: 3, ballsFaced: 7, totalBalls: 12, ballsRemaining: 5, playerAction: "counterRight", level: { title: "BOWLING", value: "Hard" } } });
     if (kind === "versusSetup") return normalizeState({ ...base, screen: "versusSetup", versusSetup: { isLeftReady: true, isRightReady: false, instruction: "RED CORNER SET — ONE MORE" } });
     if (kind === "versus") return normalizeState({ ...base, screen: "versus", versus: { phase: "defend", phaseValue: "leftHook", phaseDetail: "DUCK", timeRemaining: 41, currentAttack: "leftHook", calledDefense: "Duck", telegraphDuration: 1.3, left: { score: 1700, health: 82, combo: 1.5, action: "duck" }, right: { score: 1450, health: 70, combo: 1.25, action: "duck" } } });
     if (kind === "result") return normalizeState({ ...base, screen: "result", result: { mode: "QUICK FIGHT", headline: "You win", score: 4820, caption: "NEW PERSONAL BEST", isPersonalBest: true, stats: [{ label: "DEFENSE", value: "86%" }, { label: "REACTION", value: "312 MS" }, { label: "BEST COMBO", value: "×2.50" }] } });
@@ -477,6 +492,7 @@
     return null;
   }
 
-  return { clamp, formatTime, normalizeJoints, normalizeState, normalizeWelcome, normalizeCelebration, normalizeNextMatch, parseMessage, sampleState, resultHeadlineSize, estimateWidth,
+  return { clamp, formatTime, normalizeJoints, normalizeState, normalizeWelcome, normalizeCelebration, normalizeNextMatch, normalizeLevel, levelLine,
+    parseMessage, sampleState, resultHeadlineSize, estimateWidth,
     wrapLines, hideTarget, TARGET_REVEAL_MS };
 });

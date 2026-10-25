@@ -67,25 +67,30 @@
   }
 
   // The holding screen: play is on but the stadium isn't up (its first
-  // frame not yet drawn, the phone reconnecting, or a phone too old to send
-  // one). The score as it stands, never a call to watch a ball it can't show.
+  // frame not yet drawn, as each innings starts, the phone reconnecting, or
+  // a phone too old to send one). The score as it stands and, since
+  // receiver 72 (Oct 24 2026), the level the innings plays at, as the HUD
+  // says it in every game ("BOWLING · Easy", a friend's match's "LEVEL ·
+  // Medium"; none from a phone that sends none). Never a call to watch a
+  // ball it can't show.
   const PLAY_SCREENS = new Set(["cricket", "fight", "versus", "versusSetup"]);
   function holdingWords(state, reconnecting, drawsStadium) {
     if (state.screen !== "cricket") {
-      return { status: "ON YOUR PHONE", title: "Boxing is on<br>your phone", detail: "The TV shows the stadium for cricket.", score: "" };
+      return { status: "ON YOUR PHONE", title: "Boxing is on<br>your phone", detail: "The TV shows the stadium for cricket.", score: "", level: "" };
     }
     const cricket = state.cricket || {};
     const balls = Number(cricket.totalBalls) || 0;
     const ball = balls ? "BALL " + Math.min((Number(cricket.ballsFaced) || 0) + 1, balls) + " OF " + balls : "";
     const score = [cricket.runs != null ? cricket.runs + "/" + (cricket.wicketsLost || 0) : "", ball].filter(Boolean).join(" · ");
+    const level = core.levelLine(core.normalizeLevel(cricket.level));
     // A phone that never said hello on the stadium's channel (older than
     // build 121, 2026's App Store builds all draw it): play stays on it.
     if (!drawsStadium && !reconnecting) {
-      return { status: "ON YOUR PHONE", title: "Your innings is<br>on your phone", detail: "Update RallyCade to see the stadium on your TV.", score };
+      return { status: "ON YOUR PHONE", title: "Your innings is<br>on your phone", detail: "Update RallyCade to see the stadium on your TV.", score, level };
     }
     return reconnecting
-      ? { status: "RECONNECTING", title: "Reconnecting to<br>your phone", detail: "The innings carries on on your phone.", score }
-      : { status: "STADIUM LOADING", title: "Your stadium<br>is on its way", detail: "Keep playing on your phone.", score };
+      ? { status: "RECONNECTING", title: "Reconnecting to<br>your phone", detail: "The innings carries on on your phone.", score, level }
+      : { status: "STADIUM LOADING", title: "Your stadium<br>is on its way", detail: "Keep playing on your phone.", score, level };
   }
   let holdingShown = "";
   function renderHolding(state, reconnecting) {
@@ -99,6 +104,8 @@
     text("holding-detail", words.detail);
     text("holding-score", words.score);
     element("holding-score").hidden = !words.score;
+    text("holding-level", words.level);
+    element("holding-level").hidden = !words.level;
   }
   window.RallycadeHoldingWords = holdingWords;
 
