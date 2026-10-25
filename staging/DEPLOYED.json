@@ -1,8 +1,8 @@
 {
   "environment": "staging",
-  "commit": "0539a7e806619a706aa0daba08a65d9d47db91c1",
-  "subject": "Docs: parity row for the run-up's bowler, Android wides and the holding screen's level",
-  "receiverTree": "60a5fe49fca6104b48f0ddb3db6aa71eed09f0b5",
+  "commit": "2a27c5d6a4b186dbcac5c624bd54e01f5ae1ef8a",
+  "subject": "223 / 22201: build numbers; Android draws only the update screen below the minimum build",
+  "receiverTree": "8cba30cba2851f8de7ce2babafd7e5d6b30d2912",
   "revision": 72,
-  "deployedAt": "2026-10-25T06:41:32Z"
+  "deployedAt": "2026-10-25T11:59:24Z"
 }

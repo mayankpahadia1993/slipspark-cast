@@ -428,6 +428,8 @@
         sheet.bitmap = bitmap;
         addSprites(sheet);
         warmSheet(sheet);
+        // Its kit masks with it when the phone's hello named a dyed kit (receiver 73), before his first ball.
+        if (dressedKit()) maskSheet(id);
       }).catch((error) => {
         // Each of its pictures from its own file, as before the atlases.
         sheet.failed = true;
@@ -480,6 +482,8 @@
     }
     function preloadBundled(kit) {
       if (typeof kit === "string" && /^[a-z0-9-]{1,40}$/.test(kit)) preloadKit = kit;
+      // A dyed kit's batter on the inset: the atlases' kit masks now (receiver 73).
+      if (dressedKit() && !insetOff) sheets.forEach((sheet, id) => { if (sheet.image) maskSheet(id); });
       // This TV's own copies of pictures earlier casts sent too (receiver
       // 53): build 158's innings opened with 22–59 draws a second missing a
       // photo the TV had cached but not yet loaded.
@@ -920,6 +924,76 @@
       return canvasTint;
     }
 
+    // MARK: The batter's kit (receiver 73, Oct 25 2026)
+    //
+    // Whether the phone's hello named a dyed kit: the masks load before the
+    // first ball then; otherwise with the first look a command carries.
+    function dressedKit() { return !!preloadKit && preloadKit !== "starter-whites"; }
+    //
+    // The bowler's-end inset's batter in the batting player's kit and grip
+    // (core.readLook): each frame dyed once per look from its atlas and its
+    // masks (kit-masks-bowler-end-N, the picture atlas's twin: red the shirt
+    // and trousers, green the trim, blue the grip) by core.dyeFrame, as the
+    // phones dye theirs, and kept for the newest MAX_DRESSED frames. The
+    // masks load with the atlases when the hello names a dyed kit, else with
+    // the first look; until they are in (or if they won't load) the frame is
+    // drawn in the whites, as every receiver did before.
+    const dressed = new Map();
+    const MAX_DRESSED = 96;
+    const maskSheets = new Map();
+    function maskSheet(id) {
+      const known = maskSheets.get(id);
+      if (known) return known.image;
+      const sheet = sheets.get(id);
+      if (!sheet) return null;
+      const entry = { image: null, failed: false };
+      maskSheets.set(id, entry);
+      const file = sheet.file.replace(/^atlas-bowler-end-/, "kit-masks-bowler-end-");
+      loadImage("scene-images/" + file, false).then((image) => {
+        if ((image.naturalWidth || image.width) !== sheet.width || (image.naturalHeight || image.height) !== sheet.height) {
+          throw new Error("kit masks " + file + " are " + (image.naturalWidth || image.width) + "x" + (image.naturalHeight || image.height));
+        }
+        if (!released) entry.image = image;
+      }).catch((error) => { entry.failed = true; report("kit", error); });
+      return null;
+    }
+    function dress(drawn, look) {
+      const id = drawn.key + "|" + look;
+      let made = dressed.get(id);
+      if (made) {
+        dressed.delete(id);
+        dressed.set(id, made);
+        return { image: made, size: drawn.size, key: id };
+      }
+      const cut = drawn.cut, sheet = sheets.get(cut.atlas);
+      const mask = maskSheet(cut.atlas);
+      if (!mask || !sheet || !sheet.image) return null;
+      try {
+        made = document.createElement("canvas");
+        made.width = cut.width;
+        made.height = cut.height;
+        const c = made.getContext("2d");
+        c.drawImage(mask, cut.x, cut.y, cut.w, cut.h, cut.ox, cut.oy, cut.w, cut.h);
+        const shares = c.getImageData(0, 0, cut.width, cut.height).data;
+        c.clearRect(0, 0, cut.width, cut.height);
+        c.drawImage(sheet.image, cut.x, cut.y, cut.w, cut.h, cut.ox, cut.oy, cut.w, cut.h);
+        const pixels = c.getImageData(0, 0, cut.width, cut.height);
+        core.dyeFrame(pixels.data, shares, look);
+        c.putImageData(pixels, 0, 0);
+      } catch (error) {
+        report("kit", error);
+        return null;
+      }
+      dressed.set(id, made);
+      while (dressed.size > MAX_DRESSED) {
+        const oldest = dressed.keys().next().value;
+        const gone = dressed.get(oldest);
+        dressed.delete(oldest);
+        try { gone.width = 0; gone.height = 0; } catch (error) { /* gone */ }
+      }
+      return { image: made, size: drawn.size, key: id };
+    }
+
     // MARK: Drawing
 
     // Pictures with no see-through pixels (JPEGs).
@@ -1233,8 +1307,10 @@
         return;
       }
       if (kind === "i") {
-        const drawn = pictureFor(op[3]);
+        let drawn = pictureFor(op[3]);
         if (!drawn) return;
+        // The bowler's-end batter in his kit (receiver 73): his frame dyed once for the look.
+        if (op[7] && drawn.cut) drawn = dress(drawn, op[7]) || drawn;
         const multiply = o && o.multiply !== undefined ? o.multiply : filtersOf(frame, op[5]).multiply;
         begin(c, frame, alpha, blend, o && o.clipRef != null ? o.clipRef : op[6], scale);
         if (multiply) c.globalAlpha *= Math.max(0, Math.min(1, multiply[3] / 1000));
@@ -2409,6 +2485,9 @@
       scratches.clear();
       tinted.forEach(empty);
       tinted.clear();
+      dressed.forEach(empty);
+      dressed.clear();
+      maskSheets.clear();
       images.forEach(empty);
       images.clear();
       backdropLayers.forEach((entry) => { try { entry.element.removeAttribute("src"); } catch (error) { /* gone */ } });
