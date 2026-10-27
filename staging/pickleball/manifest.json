@@ -1,0 +1,370 @@
+{
+  "plate" : {
+    "size" : [
+      1672,
+      941
+    ]
+  },
+  "sheets" : {
+    "PickleballBackhand" : {
+      "look" : "man",
+      "scale" : 0.75,
+      "size" : [
+        1254,
+        706
+      ],
+      "source" : [
+        1672,
+        941
+      ]
+    },
+    "PickleballBackhandFemale" : {
+      "look" : "woman",
+      "scale" : 0.75,
+      "size" : [
+        1254,
+        706
+      ],
+      "source" : [
+        1672,
+        941
+      ]
+    },
+    "PickleballDink" : {
+      "look" : "man",
+      "scale" : 0.75,
+      "size" : [
+        1254,
+        706
+      ],
+      "source" : [
+        1672,
+        941
+      ]
+    },
+    "PickleballDinkFemale" : {
+      "look" : "woman",
+      "scale" : 0.75,
+      "size" : [
+        1254,
+        706
+      ],
+      "source" : [
+        1672,
+        941
+      ]
+    },
+    "PickleballForehand" : {
+      "look" : "man",
+      "scale" : 0.75,
+      "size" : [
+        1254,
+        706
+      ],
+      "source" : [
+        1672,
+        941
+      ]
+    },
+    "PickleballForehandFemale" : {
+      "look" : "woman",
+      "scale" : 0.75,
+      "size" : [
+        1254,
+        706
+      ],
+      "source" : [
+        1672,
+        941
+      ]
+    },
+    "PickleballOpponentBackhand" : {
+      "look" : "man",
+      "scale" : 0.40000000000000002,
+      "size" : [
+        669,
+        376
+      ],
+      "source" : [
+        1672,
+        941
+      ]
+    },
+    "PickleballOpponentBackhandFemale" : {
+      "look" : "woman",
+      "scale" : 0.40000000000000002,
+      "size" : [
+        669,
+        376
+      ],
+      "source" : [
+        1672,
+        941
+      ]
+    },
+    "PickleballOpponentDink" : {
+      "look" : "man",
+      "scale" : 0.40000000000000002,
+      "size" : [
+        669,
+        376
+      ],
+      "source" : [
+        1672,
+        941
+      ]
+    },
+    "PickleballOpponentDinkFemale" : {
+      "look" : "woman",
+      "scale" : 0.40000000000000002,
+      "size" : [
+        669,
+        376
+      ],
+      "source" : [
+        1672,
+        941
+      ]
+    },
+    "PickleballOpponentForehand" : {
+      "look" : "man",
+      "scale" : 0.40000000000000002,
+      "size" : [
+        669,
+        376
+      ],
+      "source" : [
+        1672,
+        941
+      ]
+    },
+    "PickleballOpponentForehandFemale" : {
+      "look" : "woman",
+      "scale" : 0.40000000000000002,
+      "size" : [
+        669,
+        376
+      ],
+      "source" : [
+        1672,
+        941
+      ]
+    },
+    "PickleballOpponentMove" : {
+      "look" : "man",
+      "scale" : 0.40000000000000002,
+      "size" : [
+        669,
+        376
+      ],
+      "source" : [
+        1672,
+        941
+      ]
+    },
+    "PickleballOpponentMoveFemale" : {
+      "look" : "woman",
+      "scale" : 0.40000000000000002,
+      "size" : [
+        669,
+        376
+      ],
+      "source" : [
+        1672,
+        941
+      ]
+    },
+    "PickleballOpponentOverhead" : {
+      "look" : "man",
+      "scale" : 0.40000000000000002,
+      "size" : [
+        669,
+        376
+      ],
+      "source" : [
+        1672,
+        941
+      ]
+    },
+    "PickleballOpponentOverheadFemale" : {
+      "look" : "woman",
+      "scale" : 0.40000000000000002,
+      "size" : [
+        669,
+        376
+      ],
+      "source" : [
+        1672,
+        941
+      ]
+    },
+    "PickleballOpponentServe" : {
+      "look" : "man",
+      "scale" : 0.40000000000000002,
+      "size" : [
+        669,
+        376
+      ],
+      "source" : [
+        1672,
+        941
+      ]
+    },
+    "PickleballOpponentServeFemale" : {
+      "look" : "woman",
+      "scale" : 0.40000000000000002,
+      "size" : [
+        669,
+        376
+      ],
+      "source" : [
+        1672,
+        941
+      ]
+    },
+    "PickleballOpponentShuffle" : {
+      "look" : "man",
+      "scale" : 0.40000000000000002,
+      "size" : [
+        614,
+        410
+      ],
+      "source" : [
+        1536,
+        1024
+      ]
+    },
+    "PickleballOpponentShuffleFemale" : {
+      "look" : "woman",
+      "scale" : 0.40000000000000002,
+      "size" : [
+        614,
+        410
+      ],
+      "source" : [
+        1536,
+        1024
+      ]
+    },
+    "PickleballOpponentVolley" : {
+      "look" : "man",
+      "scale" : 0.40000000000000002,
+      "size" : [
+        669,
+        376
+      ],
+      "source" : [
+        1672,
+        941
+      ]
+    },
+    "PickleballOpponentVolleyFemale" : {
+      "look" : "woman",
+      "scale" : 0.40000000000000002,
+      "size" : [
+        669,
+        376
+      ],
+      "source" : [
+        1672,
+        941
+      ]
+    },
+    "PickleballOverhead" : {
+      "look" : "man",
+      "scale" : 0.75,
+      "size" : [
+        1254,
+        706
+      ],
+      "source" : [
+        1672,
+        941
+      ]
+    },
+    "PickleballOverheadFemale" : {
+      "look" : "woman",
+      "scale" : 0.75,
+      "size" : [
+        1254,
+        706
+      ],
+      "source" : [
+        1672,
+        941
+      ]
+    },
+    "PickleballServe" : {
+      "look" : "man",
+      "scale" : 0.75,
+      "size" : [
+        1254,
+        706
+      ],
+      "source" : [
+        1672,
+        941
+      ]
+    },
+    "PickleballServeFemale" : {
+      "look" : "woman",
+      "scale" : 0.75,
+      "size" : [
+        1254,
+        706
+      ],
+      "source" : [
+        1672,
+        941
+      ]
+    },
+    "PickleballShuffle" : {
+      "look" : "man",
+      "scale" : 0.75,
+      "size" : [
+        1152,
+        768
+      ],
+      "source" : [
+        1536,
+        1024
+      ]
+    },
+    "PickleballShuffleFemale" : {
+      "look" : "woman",
+      "scale" : 0.75,
+      "size" : [
+        1152,
+        768
+      ],
+      "source" : [
+        1536,
+        1024
+      ]
+    },
+    "PickleballVolley" : {
+      "look" : "man",
+      "scale" : 0.75,
+      "size" : [
+        1254,
+        706
+      ],
+      "source" : [
+        1672,
+        941
+      ]
+    },
+    "PickleballVolleyFemale" : {
+      "look" : "woman",
+      "scale" : 0.75,
+      "size" : [
+        1254,
+        706
+      ],
+      "source" : [
+        1672,
+        941
+      ]
+    }
+  }
+}

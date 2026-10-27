@@ -1,8 +1,8 @@
 {
   "environment": "staging",
-  "commit": "a2c2ebd2fb193414dbffeba1c204171fa525e719",
-  "subject": "Receiver tests: version 73",
-  "receiverTree": "7f6f53920540e6b8aa501c6f52cde268c5763e6b",
-  "revision": 73,
-  "deployedAt": "2026-10-25T12:04:35Z"
+  "commit": "7855681361369f9af5055273ce3d6d5e06dd31d3",
+  "subject": "Pickleball on Chromecast (receiver 74): the TV draws the match",
+  "receiverTree": "aef21f1a2c21073128030046f4b3fcb1a7c2887d",
+  "revision": 74,
+  "deployedAt": "2026-10-27T22:55:55Z"
 }

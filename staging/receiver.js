@@ -443,7 +443,31 @@
     scene.playRecordingAt(query.get("scene"), Number(query.get("at") || -1));
   }
 
-  if (!preview && !query.get("scene") && window.cast && window.cast.framework) {
+  // Receiver 74: pickleball (beta) on its own channel (receiver-pickleball.js).
+  const pickleballModule = window.RallycadePickleball;
+  let filmClock = null;
+  const pickleball = pickleballModule && document.getElementById("pickleball") && pickleballModule.createPickleball({
+    root: document.getElementById("pickleball"), stage: document.getElementById("pk-stage"), court: document.getElementById("pk-court"),
+    plate: document.getElementById("pk-plate"), canvas: document.getElementById("pk-canvas"), hud: document.getElementById("pk-hud"),
+    ready: document.getElementById("pk-ready"), result: document.getElementById("pk-result"), chip: document.getElementById("pk-chip"),
+    send: (message) => sendPickleball(message),
+    now: () => (filmClock !== null ? filmClock : performance.now()),
+    manualClock: query.get("film") === "1",
+    canvasWidth: Number(query.get("canvas")) || undefined
+  });
+  let sendPickleball = () => {};
+  window.__rallycadePickleball = pickleball;
+  // ?pickleball=<recording.json>: a phone's recorded pickleball messages
+  // ({messages: [{at, m}]}, `at` on the phone's clock in ms), played in real
+  // time, or with &film=1 drawn moment by moment by window.__pickleballFilm(ms)
+  // (scripts/pickleball/cast/film.mjs).
+  if (pickleball && query.get("pickleball")) {
+    pickleballModule.playRecording(pickleball, query.get("pickleball"), {
+      film: query.get("film") === "1", delay: Number(query.get("delay") || 100), setClock: (ms) => { filmClock = ms; }
+    });
+  }
+
+  if (!preview && !query.get("scene") && !query.get("pickleball") && window.cast && window.cast.framework) {
     const context = window.cast.framework.CastReceiverContext.getInstance();
     let reportFailure = () => {};
     // Receiver 63: one phone owns the TV when a room shares it (receiver-shared.js).
@@ -556,6 +580,23 @@
       context.addEventListener(window.cast.framework.system.EventType.SHUTDOWN, () => music.stop());
       window.addEventListener("pagehide", () => music.stop());
       window.addEventListener("unload", () => music.stop());
+    }
+    if (pickleball) {
+      let pickleballSender = null, pickleballGone = 0;
+      sendPickleball = (message) => { if (pickleballSender) context.sendCustomMessage(pickleballModule.NAMESPACE, pickleballSender, message); };
+      options.customNamespaces[pickleballModule.NAMESPACE] = window.cast.framework.system.MessageType.JSON;
+      context.addCustomMessageListener(pickleballModule.NAMESPACE, (event) => {
+        pickleballSender = event.senderId;
+        window.clearTimeout(pickleballGone);
+        try { pickleball.handle(event.data); } catch (error) { pickleball.report("handle", error); }
+      });
+      context.addEventListener(window.cast.framework.system.EventType.SENDER_DISCONNECTED, (event) => {
+        if (event.senderId !== pickleballSender) return;
+        pickleballSender = null;
+        pickleballGone = pickleball.senderLeft(SCENE_GRACE_MS);
+      });
+      window.addEventListener("error", (event) => pickleball.report("script", event.message + " @" + event.lineno));
+      context.addEventListener(window.cast.framework.system.EventType.SHUTDOWN, () => pickleball.release());
     }
     options.disableIdleTimeout = true;
     options.skipPlayersLoad = true;

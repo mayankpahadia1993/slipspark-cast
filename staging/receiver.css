@@ -439,3 +439,69 @@ body[data-card="picture"] #app, body[data-card="waiting"] #app { visibility: hid
 /* A cup's next match on the HTML result (receiver 66). */
 .result-next { display: flex; flex-direction: column; align-items: center; gap: .6vh; margin-top: 2.2vh; padding: 1.6vh 2.4vw; border: 3px solid rgba(255, 194, 82, .85); border-radius: 22px; background: rgba(18, 43, 38, .82); }
 .result-next strong { font: 900 clamp(26px, 2.6vw, 52px)/1.1 Nunito, sans-serif; color: #fcf5de; }
+
+/* Receiver 74: pickleball (beta). The court is drawn on a 1280 x 720 stage
+   (the photograph on its own layer, the moving parts on the canvas, both
+   pushed together toward a good contact); the HUD is the phone's own, at an
+   AirPlay TV's 1920 x 1080 points, scaled to the stage. */
+.pickleball {
+  --cream: #fcf5de;
+  --ink: 18, 43, 38;
+  --gold: #ffc252;
+  position: fixed; inset: 0; z-index: 14; overflow: hidden; background: #000;
+}
+.pk-stage { position: absolute; left: 50%; top: 50%; width: min(100vw, 177.7778vh); height: min(56.25vw, 100vh); transform: translate(-50%, -50%); overflow: hidden; background: #0c1a17; }
+.pk-court { position: absolute; inset: 0; will-change: transform; }
+.pk-plate { position: absolute; left: 0; top: 0; width: 100%; height: 100%; max-width: none; will-change: transform; }
+.pk-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.pk-hud { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; transform-origin: 0 0; pointer-events: none;
+  font-family: Inter, "Google Sans", system-ui, sans-serif; color: var(--cream); }
+/* Cricket's cream score bug in pickleball's terms (PickleballHUD.scoreBug): edge 20, top 10. */
+.pk-scorebug { position: absolute; left: 20px; top: 10px; border-radius: 16px; background: var(--cream); overflow: hidden;
+  box-shadow: 0 3px 8px rgba(0,0,0,.25); color: rgb(var(--ink)); }
+.pk-rows { padding: 7px 14px 5px; display: flex; flex-direction: column; gap: 1px; }
+.pk-row { display: flex; align-items: center; gap: 8px; }
+.pk-serve { width: 8px; height: 8px; border-radius: 50%; box-sizing: border-box; border: 1px solid rgba(var(--ink), .15); }
+.pk-serve.on { background: var(--gold); border-color: rgba(var(--ink), .35); }
+.pk-name { width: 80px; font-size: 11px; font-weight: 900; letter-spacing: 1.4px; color: rgba(var(--ink), .7); white-space: nowrap; }
+.pk-row b { min-width: 28px; text-align: right; font: 900 22px/1.15 Nunito, "Varela Round", sans-serif; font-variant-numeric: tabular-nums; }
+.pk-band { display: flex; gap: 6px; padding: 5px 14px; background: rgba(var(--ink), .08); font-size: 10px; font-weight: 900; letter-spacing: 1.4px; white-space: nowrap; }
+.pk-band span { color: rgba(var(--ink), .6); }
+/* The banner where the phone's layout put it (PickleballHUDLayout on the TV's 1920 x 1080). */
+.pk-banner { position: absolute; display: flex; align-items: stretch; gap: 8px; padding: 8px 12px 8px 10px; box-sizing: border-box;
+  border-radius: 16px; background: rgba(var(--ink), .9); border: 1px solid rgba(252,245,222,.1); --tone: var(--cream); }
+.pk-banner.pk-in { animation: pk-fade .2s ease-out; }
+.pk-bar { flex: none; width: 3px; margin: 2px 0; border-radius: 2px; background: var(--tone); }
+.pk-banner span { color: var(--tone); font: 900 16px/1.2 Nunito, "Varela Round", sans-serif; overflow-wrap: anywhere; }
+@keyframes pk-fade { from { opacity: 0; } to { opacity: 1; } }
+/* The shot just played, bottom corner away from the player (PickleballShotCallout). */
+.pk-callout { position: absolute; right: 20px; bottom: 18px; display: flex; flex-direction: column; align-items: flex-end; gap: 3px;
+  padding: 10px 14px; border-radius: 14px; background: rgba(var(--ink), .9); border: 1px solid rgba(252,245,222,.3); white-space: nowrap; }
+.pk-callout.leading { right: auto; left: 20px; align-items: flex-start; }
+.pk-callout.good { border-color: rgba(255,194,82,.3); }
+.pk-callout strong { font: 900 17px/1.2 Nunito, "Varela Round", sans-serif; color: var(--cream); }
+.pk-callout span { font-size: 11px; font-weight: 900; letter-spacing: 1.6px; color: rgba(252,245,222,.75); }
+.pk-callout.good span { color: var(--gold); }
+/* The ready and result cards over the court photograph, shaded. */
+.pk-cover { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(90deg, rgba(var(--ink), .92), rgba(var(--ink), .7) 55%, rgba(var(--ink), .55)); }
+.pk-card { max-width: 72%; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 2.2vh; }
+.pk-brand { font-size: clamp(20px, 2vw, 40px); }
+.pk-eyebrow { color: var(--gold); font-size: clamp(14px, 1.3vw, 26px); font-weight: 900; letter-spacing: .18em; }
+.pk-card h1 { margin: 0; font: 900 clamp(44px, 5.4vw, 104px)/.95 Nunito, "Varela Round", sans-serif; letter-spacing: -.02em; color: var(--cream); }
+.pk-card p { margin: 0; max-width: 46em; color: rgba(252,245,222,.82); font-size: clamp(18px, 1.7vw, 34px); font-weight: 650; }
+.pk-line { padding: .8vh 1.4vw; border-radius: 999px; background: rgba(0,0,0,.35); border: 1px solid rgba(255,194,82,.3); color: var(--cream);
+  font-size: clamp(14px, 1.3vw, 26px); font-weight: 800; letter-spacing: .1em; }
+.pk-final { display: flex; align-items: center; gap: 2.4vw; margin-top: 1vh; }
+.pk-side { display: flex; flex-direction: column; align-items: center; min-width: 12vw; }
+.pk-side strong { font: 900 clamp(72px, 9vw, 176px)/.9 Nunito, "Varela Round", sans-serif; color: rgba(252,245,222,.7); font-variant-numeric: tabular-nums; }
+.pk-side.won strong { color: var(--gold); }
+.pk-side span { margin-top: .6vh; font-size: clamp(13px, 1.1vw, 22px); font-weight: 900; letter-spacing: .16em; color: rgba(252,245,222,.7); }
+.pk-dash { font-style: normal; font: 900 clamp(48px, 5vw, 96px)/1 Nunito, sans-serif; color: rgba(252,245,222,.4); }
+.pk-stats { display: grid; grid-template-columns: repeat(3, minmax(12vw, auto)); gap: 1.2vh 1.4vw; margin-top: 1vh; }
+.pk-stat { padding: 1.4vh 1.4vw; border-radius: 1vw; background: rgba(252,245,222,.07); border: 1px solid rgba(252,245,222,.1); }
+.pk-stat strong { display: block; font: 900 clamp(22px, 2.2vw, 44px)/1.1 Nunito, sans-serif; color: var(--cream); }
+.pk-stat span { display: block; margin-top: .5vh; font-size: clamp(11px, .9vw, 18px); font-weight: 900; letter-spacing: .1em; color: rgba(252,245,222,.62); }
+.pk-story { font-size: clamp(15px, 1.3vw, 26px) !important; color: rgba(252,245,222,.62) !important; }
+.pk-coaching { color: var(--gold) !important; font-weight: 800 !important; }
+.pk-chip { z-index: 5; }
