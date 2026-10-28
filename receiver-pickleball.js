@@ -11,7 +11,7 @@
   // f {s, o, h?, k?}.  TV -> phone: ready {pickleball, version, looks}, pong {i, r}, loaded {look, ms, missing},
   // stats {fps, gap, frames, drawMs, queue, stale, delay, late, missing}, error {where, message}.
   const NAMESPACE = "urn:x-cast:com.slipspark.pickleball";
-  const RECEIVER_VERSION = 75;
+  const RECEIVER_VERSION = 76;
   const core = window.RallycadePickleballCore;
   const sceneCore = window.RallycadeSceneCore;
 

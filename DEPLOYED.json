@@ -1,10 +1,10 @@
 {
   "environment": "production",
-  "commit": "62182e243aeb4a5de966296f4ed596af1c6f8d13",
-  "subject": "Pickleball on Chromecast: the HUD at the phone's share of the screen (receiver 75)",
-  "receiverTree": "5d83e0dee0bb09037ac81ca2213377d138df80f8",
-  "revision": 75,
-  "deployedAt": "2026-10-28T14:54:17Z",
+  "commit": "c7e8b0b45cb3c4ac1e2fa6e9c33feed5b883e1e0",
+  "subject": "Pickleball: the near backhand redrawn as a two-handed drive (receiver 76)",
+  "receiverTree": "65c78978a9b564c544e2ca84926602ed6aa8eafe",
+  "revision": 76,
+  "deployedAt": "2026-10-28T20:59:58Z",
   "promotedFrom": "staging",
-  "stagedAt": "2026-10-28T10:21:28Z"
+  "stagedAt": "2026-10-28T15:15:48Z"
 }
