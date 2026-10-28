@@ -442,8 +442,8 @@ body[data-card="picture"] #app, body[data-card="waiting"] #app { visibility: hid
 
 /* Receiver 74: pickleball (beta). The court is drawn on a 1280 x 720 stage
    (the photograph on its own layer, the moving parts on the canvas, both
-   pushed together toward a good contact); the HUD is the phone's own, at an
-   AirPlay TV's 1920 x 1080 points, scaled to the stage. */
+   pushed together toward a good contact); the HUD is the phone's own, laid
+   out on a phone-height stage (782.22 x 440 points) and scaled to the TV. */
 .pickleball {
   --cream: #fcf5de;
   --ink: 18, 43, 38;
@@ -454,7 +454,7 @@ body[data-card="picture"] #app, body[data-card="waiting"] #app { visibility: hid
 .pk-court { position: absolute; inset: 0; will-change: transform; }
 .pk-plate { position: absolute; left: 0; top: 0; width: 100%; height: 100%; max-width: none; will-change: transform; }
 .pk-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
-.pk-hud { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; transform-origin: 0 0; pointer-events: none;
+.pk-hud { position: absolute; left: 0; top: 0; width: 782.222px; height: 440px; transform-origin: 0 0; pointer-events: none;
   font-family: Inter, "Google Sans", system-ui, sans-serif; color: var(--cream); }
 /* Cricket's cream score bug in pickleball's terms (PickleballHUD.scoreBug): edge 20, top 10. */
 .pk-scorebug { position: absolute; left: 20px; top: 10px; border-radius: 16px; background: var(--cream); overflow: hidden;

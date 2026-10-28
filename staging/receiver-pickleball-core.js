@@ -26,9 +26,12 @@
   //   ["F", cx, cy, r, a, blur]                 the contact flash (a glow)
   //   ["R", x, y, w, h, a, lw]                  the contact ring (ellipse, white)
   const STAGE = { width: 1280, height: 720 };
-  // The HUD's stage: an AirPlay TV's 1920 x 1080 points, where the phone's
-  // HUD is drawn at its own sizes (TVPickleballView).
-  const HUD_STAGE = { width: 1920, height: 1080 };
+  // The HUD's stage (receiver 75; the owner on 238: "Why is the scoreboard so
+  // small now?"): phone height, 440 points tall and the TV's 16:9 wide, where
+  // the phone's HUD keeps its sizes, scaled up to the TV, so the score bug,
+  // banner and callout take the share of the screen they take on the phone
+  // (as TVPickleballView's hudScale on an AirPlay TV).
+  const HUD_STAGE = { width: 440 * 16 / 9, height: 440 };
   const VERSION = 1;
   const BALL = { light: [245, 255, 140], body: [219, 240, 51], dark: [153, 173, 20] };
   const FLASH = [255, 245, 199];

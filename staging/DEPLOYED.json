@@ -1,8 +1,8 @@
 {
   "environment": "staging",
-  "commit": "7855681361369f9af5055273ce3d6d5e06dd31d3",
-  "subject": "Pickleball on Chromecast (receiver 74): the TV draws the match",
-  "receiverTree": "aef21f1a2c21073128030046f4b3fcb1a7c2887d",
-  "revision": 74,
-  "deployedAt": "2026-10-27T22:55:55Z"
+  "commit": "62182e243aeb4a5de966296f4ed596af1c6f8d13",
+  "subject": "Pickleball on Chromecast: the HUD at the phone's share of the screen (receiver 75)",
+  "receiverTree": "5d83e0dee0bb09037ac81ca2213377d138df80f8",
+  "revision": 75,
+  "deployedAt": "2026-10-28T10:21:28Z"
 }

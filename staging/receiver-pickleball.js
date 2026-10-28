@@ -11,7 +11,7 @@
   // f {s, o, h?, k?}.  TV -> phone: ready {pickleball, version, looks}, pong {i, r}, loaded {look, ms, missing},
   // stats {fps, gap, frames, drawMs, queue, stale, delay, late, missing}, error {where, message}.
   const NAMESPACE = "urn:x-cast:com.slipspark.pickleball";
-  const RECEIVER_VERSION = 74;
+  const RECEIVER_VERSION = 75;
   const core = window.RallycadePickleballCore;
   const sceneCore = window.RallycadeSceneCore;
 
@@ -105,8 +105,8 @@
         canvas.height = Math.round(width * 9 / 16);
         lastDrawn = null;
       }
-      // The HUD's 1920 x 1080 points scaled onto the stage.
-      if (hud) hud.style.transform = "scale(" + ((box.width || 1920) / core.HUD_STAGE.width) + ")";
+      // The HUD's phone-height stage scaled onto the TV's.
+      if (hud) hud.style.transform = "scale(" + ((box.width || 1280) / core.HUD_STAGE.width) + ")";
     }
 
     function union(boxes) {
