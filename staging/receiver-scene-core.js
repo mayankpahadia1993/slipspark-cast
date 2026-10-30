@@ -773,7 +773,8 @@
   // always had.
   function storageNames(pathname) {
     const suffix = /\/staging\/[^/]*$/.test(String(pathname || "")) ? "-staging" : "";
-    return { canvas: "rallycade-scene-canvas" + suffix, pictures: "rallycade-scene" + suffix };
+    // Receiver 77: `kept`, the receiver's own pictures kept on the TV (receiver-scene.js keptURL).
+    return { canvas: "rallycade-scene-canvas" + suffix, pictures: "rallycade-scene" + suffix, kept: "rallycade-receiver-pictures" + suffix };
   }
 
   // The 32-bit Cast dongles (Chromecast 2nd and 3rd generation: "Linux
