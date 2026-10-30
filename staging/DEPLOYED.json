@@ -1,8 +1,8 @@
 {
   "environment": "staging",
-  "commit": "8a2eec531a4e211e02032e5b10bd50c64cf27376",
-  "subject": "Receiver 77: the stadium warm from its first frame on Chromecast",
-  "receiverTree": "f8ad91a4e67415ca981f0bb0f8f82c75fe2cd402",
-  "revision": 77,
-  "deployedAt": "2026-10-30T06:04:17Z"
+  "commit": "d42fd905f0ea0d5ead5aced55c260cdad9472e1f",
+  "subject": "Pickleball play with friends: same phone, online rooms, TV, stats, kits",
+  "receiverTree": "79ca28ee6a417b29917c96c5515e5ddf5643bd6d",
+  "revision": 78,
+  "deployedAt": "2026-10-30T23:00:34Z"
 }

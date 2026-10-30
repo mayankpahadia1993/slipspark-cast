@@ -7,16 +7,21 @@
   // stadium (receiver-scene.js) is untouched. Docs: docs/design/CAST_SCENE.md,
   // "Pickleball on the TV".
   //
-  // Phone -> TV: hello {v, look, debug?}, ping {i}, sync {o}, view {v: off|ready|match|result, ready?, result?},
-  // f {s, o, h?, k?}.  TV -> phone: ready {pickleball, version, looks}, pong {i, r}, loaded {look, ms, missing},
-  // stats {fps, gap, frames, drawMs, queue, stale, delay, late, missing}, error {where, message}.
+  // Phone -> TV: hello {v, look, sheets?, debug?}, ping {i}, sync {o}, view {v: off|ready|match|result, ready?, result?,
+  // sheets?}, f {s, o, h?, k?}.  TV -> phone: ready {pickleball, version, looks, friends?}, pong {i, r},
+  // loaded {look, ms, missing}, stats {fps, gap, frames, drawMs, queue, stale, delay, late, missing}, error {where, message}.
+  // Receiver 78 (play with friends, docs/design/PICKLEBALL_FRIENDS.md): `sheets` names the pictures beyond the look's own
+  // (a friend's look, each player's kit); the HUD's `nm` names the score's rows, `sp` a same-phone split screen with
+  // `ban2`/`call2` for its right half; a frame's "V" ops split the court in two; `friends: 1` says this TV draws them.
   const NAMESPACE = "urn:x-cast:com.slipspark.pickleball";
-  const RECEIVER_VERSION = 77;
+  const RECEIVER_VERSION = 78;
   const core = window.RallycadePickleballCore;
   const sceneCore = window.RallycadeSceneCore;
 
   function createPickleball(options) {
     const root = options.root, stage = options.stage, court = options.court, plateImg = options.plate, canvas = options.canvas;
+    // A same-phone split screen's right half's photograph (the left half's is `plateImg`).
+    const plateImg2 = options.plate2 || null;
     const hud = options.hud, readyCard = options.ready, resultCard = options.result, chip = options.chip;
     const send = options.send || (() => {});
     const now = options.now || (() => performance.now());
@@ -27,6 +32,7 @@
     const pictures = new Map(); // sheet -> {image, scale, loaded}
     let plate = null, plateLoaded = false;
     let look = "man", lookLoadedAt = null, helloAt = null, debug = false;
+    let named = [];
     let view = "off", readyWords = null, resultWords = null;
     let drawn = false, raf = 0, running = false;
     let canvasPx = 1280;
@@ -77,10 +83,11 @@
       });
     }
 
-    function preload(nextLook) {
+    function preload(nextLook, sheets) {
       look = nextLook === "woman" ? "woman" : "man";
+      if (Array.isArray(sheets)) named = sheets.filter((s) => typeof s === "string").slice(0, 64);
       const started = now();
-      return loadManifest().then(() => Promise.all([loadPlate()].concat(core.sheetsFor(manifest, look).map(loadSheet)))).then((loaded) => {
+      return loadManifest().then(() => Promise.all([loadPlate()].concat(core.sheetsFor(manifest, look, named).map(loadSheet)))).then((loaded) => {
         lookLoadedAt = now();
         const missing = loaded.filter((x) => !x).length;
         send({ t: "loaded", look, ms: Math.round(lookLoadedAt - started), missing });
@@ -115,13 +122,30 @@
       return x0 === Infinity ? null : { x: x0 - 3, y: y0 - 3, w: x1 - x0 + 6, h: y1 - y0 + 6 };
     }
 
-    function placePlate(op) {
-      if (!op) return;
-      const key = [op.x, op.y, op.w, op.h].map((v) => v.toFixed(1)).join(",");
-      if (plateImg.dataset.rect === key) return;
-      plateImg.dataset.rect = key;
+    // A photograph layer where its op puts it, clipped to its half of a split screen (`clip`: that half's "V").
+    function placePlate(op, image, clip) {
+      image = image || plateImg;
+      if (!op || !image) return;
+      const key = [op.x, op.y, op.w, op.h].concat(clip ? [clip.x, clip.y, clip.w, clip.h] : []).map((v) => v.toFixed(1)).join(",");
+      if (image.dataset.rect === key) return;
+      image.dataset.rect = key;
       const W = core.STAGE.width, H = core.STAGE.height;
-      Object.assign(plateImg.style, { left: (op.x / W * 100) + "%", top: (op.y / H * 100) + "%", width: (op.w / W * 100) + "%", height: (op.h / H * 100) + "%" });
+      Object.assign(image.style, { left: (op.x / W * 100) + "%", top: (op.y / H * 100) + "%", width: (op.w / W * 100) + "%", height: (op.h / H * 100) + "%" });
+      // The half's rectangle in the photograph's own box.
+      image.style.clipPath = clip ? "inset(" + [Math.max(0, clip.y - op.y) / op.h * 100, Math.max(0, op.x + op.w - clip.x - clip.w) / op.w * 100,
+        Math.max(0, op.y + op.h - clip.y - clip.h) / op.h * 100, Math.max(0, clip.x - op.x) / op.w * 100].map((v) => v.toFixed(3) + "%").join(" ") + ")" : "";
+    }
+
+    let splitShown = null;
+    function showSplit(split) {
+      if (splitShown === split) return;
+      splitShown = split;
+      root.classList.toggle("pk-split", split);
+      if (plateImg2) {
+        plateImg2.hidden = !split;
+        if (split && !plateImg2.src && plateImg.src) plateImg2.src = plateImg.src;
+      }
+      if (!split) { plateImg.style.clipPath = ""; delete plateImg.dataset.rect; }
     }
 
     function applyPush(push) {
@@ -141,9 +165,14 @@
       if (!shown) return false;
       const started = now();
       const ops = shown.ops.map(core.decodeOp).filter(Boolean);
-      const plateOp = ops.find((op) => op.kind === "P");
-      placePlate(plateOp);
-      applyPush(shown.push);
+      const halves = core.halves(ops);
+      showSplit(!!halves);
+      if (halves) {
+        halves.forEach((half, i) => placePlate(half.ops.find((op) => op.kind === "P"), i === 0 ? plateImg : plateImg2, half.rect));
+      } else {
+        placePlate(ops.find((op) => op.kind === "P"));
+      }
+      applyPush(halves ? null : shown.push);
       const k = canvas.width / core.STAGE.width;
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       // Clear only where the last frame drew (the photograph is its own layer).
@@ -152,7 +181,7 @@
       else ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.setTransform(k, 0, 0, k, 0, 0);
       const missing = core.drawOps(ctx, ops, picture, plate, false);
-      lastDrawn = union(ops.filter((op) => op.kind !== "P").map((op) => core.opBounds(op)));
+      lastDrawn = union(ops.filter((op) => op.kind !== "P" && op.kind !== "V").map((op) => core.opBounds(op)));
       stats.missing += missing;
       renderHUD(core.hudView(shown.hud, shown.moment));
       stats.drawMs.push(now() - started);
@@ -173,34 +202,44 @@
       const set = (key, value, apply) => { if (hudShown[key] !== value) { hudShown[key] = value; apply(value); } };
       set("you", h.you, (v) => setText(el("pk-you"), v));
       set("cpu", h.cpu, (v) => setText(el("pk-cpu"), v));
+      set("names", h.names.join("|"), () => { setText(el("pk-you-name"), h.names[0]); setText(el("pk-cpu-name"), h.names[1]); });
+      set("split", h.split, (v) => { if (hud) hud.classList.toggle("pk-split", v); });
       set("srv", h.serving, (v) => { el("pk-you-serve").classList.toggle("on", v === "you"); el("pk-cpu-serve").classList.toggle("on", v === "cpu"); });
       set("band", h.band.join("|"), () => { setText(el("pk-band-title"), h.band[0]); setText(el("pk-band-value"), h.band[1]); });
-      const banner = el("pk-banner");
-      set("banner", h.banner ? JSON.stringify(h.banner) : "", () => {
-        banner.hidden = !h.banner;
-        if (!h.banner) return;
-        Object.assign(banner.style, { left: h.banner.x + "px", top: h.banner.y + "px", width: h.banner.width + "px", "--tone": h.banner.color });
-        banner.style.setProperty("--tone", h.banner.color);
-        const words = el("pk-banner-text");
-        words.style.fontSize = h.banner.fontSize + "px";
-        setText(words, h.banner.text);
-        // A new line fades in (the phone's .transition(.opacity)).
-        banner.classList.remove("pk-in"); void banner.offsetWidth; banner.classList.add("pk-in");
-      });
-      const callout = el("pk-callout");
-      const c = h.callout;
-      callout.hidden = !c;
-      if (c) {
-        set("callout", c.title + "|" + c.grade + "|" + c.leading, () => {
-          setText(el("pk-callout-title"), c.title);
-          const grade = el("pk-callout-grade");
-          setText(grade, c.grade.toUpperCase()); grade.hidden = !c.grade;
-          callout.classList.toggle("good", c.good);
-          callout.classList.toggle("leading", c.leading);
+      // The banner and the shot callout; a split screen's right half has its own pair (`2`).
+      for (const [suffix, b] of [["", h.banner], ["2", h.banner2]]) {
+        const banner = el("pk-banner" + suffix);
+        if (!banner) continue;
+        set("banner" + suffix, b ? JSON.stringify(b) : "", () => {
+          banner.hidden = !b;
+          if (!b) return;
+          Object.assign(banner.style, { left: b.x + "px", top: b.y + "px", width: b.width + "px" });
+          banner.style.setProperty("--tone", b.color);
+          const words = el("pk-banner" + suffix + "-text");
+          words.style.fontSize = b.fontSize + "px";
+          setText(words, b.text);
+          // A new line fades in (the phone's .transition(.opacity)).
+          banner.classList.remove("pk-in"); void banner.offsetWidth; banner.classList.add("pk-in");
         });
-        callout.style.opacity = c.alpha.toFixed(3);
-        callout.style.transform = "translateY(" + c.lift.toFixed(1) + "px)";
-      } else hudShown.callout = "";
+      }
+      for (const [suffix, c, leading] of [["", h.callout, null], ["2", h.callout2, false]]) {
+        const callout = el("pk-callout" + suffix);
+        if (!callout) continue;
+        callout.hidden = !c;
+        if (c) {
+          // In a split screen the left half's callout takes the left corner, the right half's the right.
+          const lead = h.split ? suffix === "" : (leading === null ? c.leading : leading);
+          set("callout" + suffix, c.title + "|" + c.grade + "|" + lead, () => {
+            setText(el("pk-callout" + suffix + "-title"), c.title);
+            const grade = el("pk-callout" + suffix + "-grade");
+            setText(grade, c.grade.toUpperCase()); grade.hidden = !c.grade;
+            callout.classList.toggle("good", c.good);
+            callout.classList.toggle("leading", lead);
+          });
+          callout.style.opacity = c.alpha.toFixed(3);
+          callout.style.transform = "translateY(" + c.lift.toFixed(1) + "px)";
+        } else hudShown["callout" + suffix] = "";
+      }
     }
 
     // MARK: Views
@@ -220,6 +259,8 @@
       setText(el("pk-result-headline"), r.headline);
       setText(el("pk-result-you"), r.you);
       setText(el("pk-result-cpu"), r.cpu);
+      setText(el("pk-result-you-name"), r.names[0]);
+      setText(el("pk-result-cpu-name"), r.names[1]);
       el("pk-result-you-side").classList.toggle("won", r.won);
       el("pk-result-cpu-side").classList.toggle("won", !r.won && r.cpu > r.you);
       const list = el("pk-result-stats");
@@ -308,8 +349,8 @@
           helloAt = now();
           debug = message.debug === 1;
           if (chip) chip.hidden = !debug;
-          preload(message.look);
-          send({ t: "ready", pickleball: core.VERSION, version: RECEIVER_VERSION, looks: ["man", "woman"] });
+          preload(message.look, message.sheets);
+          send({ t: "ready", pickleball: core.VERSION, version: RECEIVER_VERSION, looks: ["man", "woman"], friends: 1 });
           break;
         case "ping":
           send({ t: "pong", i: message.i, r: now() });
@@ -319,7 +360,9 @@
           break;
         case "view":
           setView(message);
-          if (message.look && message.look !== look) preload(message.look);
+          if ((message.look && message.look !== look) || (Array.isArray(message.sheets) && message.sheets.join() !== named.join())) {
+            preload(message.look || look, message.sheets);
+          }
           break;
         case "f": {
           const local = now();

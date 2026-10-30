@@ -25,6 +25,9 @@
   //   ["N", a, x, y, w, h, x0, y0, x1, y1, ...] the photograph's net over a far ball: the plate's rect, the band
   //   ["F", cx, cy, r, a, blur]                 the contact flash (a glow)
   //   ["R", x, y, w, h, a, lw]                  the contact ring (ellipse, white)
+  //   ["V", x, y, w, h]                         (receiver 78) a same-phone split screen's half: the ops after it, up
+  //                                             to the next "V", are that half's, clipped to its rectangle; its "P" is
+  //                                             that half's photograph
   const STAGE = { width: 1280, height: 720 };
   // The HUD's stage (receiver 75; the owner on 238: "Why is the scoreboard so
   // small now?"): phone height, 440 points tall and the TV's 16:9 wide, where
@@ -32,7 +35,8 @@
   // banner and callout take the share of the screen they take on the phone
   // (as TVPickleballView's hudScale on an AirPlay TV).
   const HUD_STAGE = { width: 440 * 16 / 9, height: 440 };
-  const VERSION = 1;
+  // 2 (receiver 78): play with friends: the players' names, sheets in each player's kit, and the split screen.
+  const VERSION = 2;
   const BALL = { light: [245, 255, 140], body: [219, 240, 51], dark: [153, 173, 20] };
   const FLASH = [255, 245, 199];
   // Frames further apart than this are never blended (a pause, a redraw).
@@ -41,7 +45,7 @@
   // (the trip and its jitter) and the next to blend toward.
   const DELAY = { start: 100, least: 60, most: 220, margin: 12, window: 90 };
 
-  const KINDS = new Set(["P", "S", "p", "B", "N", "F", "R"]);
+  const KINDS = new Set(["P", "S", "p", "B", "N", "F", "R", "V"]);
   const n = (v) => Number(v) / 10;
 
   // A wire op as drawing values (stage points, 0–1 opacities).
@@ -61,8 +65,21 @@
       }
       case "F": return { kind: "F", cx: n(op[1]), cy: n(op[2]), r: n(op[3]), a: op[4] / 1000, blur: n(op[5]) };
       case "R": return { kind: "R", x: n(op[1]), y: n(op[2]), w: n(op[3]), h: n(op[4]), a: op[5] / 1000, lw: n(op[6]) };
+      case "V": return { kind: "V", x: n(op[1]), y: n(op[2]), w: n(op[3]), h: n(op[4]) };
     }
     return null;
+  }
+
+  // A split screen's halves (each "V" and the ops after it), or null for one court.
+  function halves(ops) {
+    if (!ops.some((op) => op && op.kind === "V")) return null;
+    const out = [];
+    for (const op of ops) {
+      if (!op) continue;
+      if (op.kind === "V") out.push({ rect: op, ops: [] });
+      else if (out.length) out[out.length - 1].ops.push(op);
+    }
+    return out;
   }
 
   // What must be equal for two ops to blend number by number: the kind, and a
@@ -218,6 +235,7 @@
   function opBounds(op, plateRect) {
     switch (op.kind) {
       case "P": return { x: op.x, y: op.y, w: op.w, h: op.h };
+      case "V": return null;
       case "S": case "R": {
         const pad = op.kind === "R" ? op.lw : 0;
         return { x: op.x - pad, y: op.y - pad, w: op.w + pad * 2, h: op.h + pad * 2 };
@@ -249,9 +267,17 @@
   // Returns how many sprites it could not draw (pictures not loaded).
   function drawOps(ctx, ops, picture, plate, withPlate) {
     let missing = 0;
+    let clipped = false;
     for (const op of ops) {
       if (!op) continue;
       switch (op.kind) {
+        case "V":
+          // A split screen's half: what follows stays inside it.
+          if (clipped) ctx.restore();
+          ctx.save();
+          ctx.beginPath(); ctx.rect(op.x, op.y, op.w, op.h); ctx.clip();
+          clipped = true;
+          break;
         case "P":
           if (withPlate) {
             if (plate) ctx.drawImage(plate, op.x, op.y, op.w, op.h);
@@ -321,6 +347,7 @@
           break;
       }
     }
+    if (clipped) ctx.restore();
     return missing;
   }
 
@@ -331,25 +358,38 @@
 
   // What the HUD shows at phone moment `t` (ms) from the phone's `h`:
   // { you, cpu, serving: "you"|"cpu", band: [title, value], banner?, callout? }.
+  function bannerView(b) {
+    if (!b || !b.tx) return undefined;
+    return { text: String(b.tx), tone: TONES[b.tone] ? b.tone : "neutral", color: TONES[b.tone] || TONES.neutral,
+      x: Number(b.x) || 0, y: Number(b.y) || 0, width: Number(b.w) || 340, fontSize: Number(b.f) || 16 };
+  }
+
+  function calloutView(c, t) {
+    if (!c || !c.tx || !Number.isFinite(Number(c.at))) return undefined;
+    const age = (t - Number(c.at)) / 1000;
+    if (age < 0 || age >= CALLOUT_SECONDS) return undefined;
+    const parts = String(c.tx).split(" · ");
+    const grade = parts.slice(1).join(" · ");
+    return { title: parts[0], grade, good: grade === "Perfect" || grade === "Good", leading: c.l === 1,
+      alpha: Math.max(0, Math.min(1, age / 0.12, (CALLOUT_SECONDS - age) / 0.35)), lift: -8 * Math.min(1, age / 0.2) };
+  }
+
+  // A score row's name: the phone's (a friend's, "PLAYER 1"), or the computer match's own.
+  const rowName = (names, i, fallback) => Array.isArray(names) && typeof names[i] === "string" && names[i] ? names[i].slice(0, 16) : fallback;
+
   function hudView(h, t) {
     if (!h) return null;
     const view = {
       you: Number(h.you) || 0, cpu: Number(h.cpu) || 0, serving: h.srv === "c" ? "cpu" : "you",
-      band: [String(h.lt || "LEVEL"), String(h.lv || "")]
+      band: [String(h.lt || "LEVEL"), String(h.lv || "")],
+      names: [rowName(h.nm, 0, "YOU"), rowName(h.nm, 1, "COMPUTER")], split: h.sp === 1
     };
-    if (h.ban && h.ban.tx) {
-      view.banner = { text: String(h.ban.tx), tone: TONES[h.ban.tone] ? h.ban.tone : "neutral", color: TONES[h.ban.tone] || TONES.neutral,
-        x: Number(h.ban.x) || 0, y: Number(h.ban.y) || 0, width: Number(h.ban.w) || 340, fontSize: Number(h.ban.f) || 16 };
-    }
-    if (h.call && h.call.tx && Number.isFinite(Number(h.call.at))) {
-      const age = (t - Number(h.call.at)) / 1000;
-      if (age >= 0 && age < CALLOUT_SECONDS) {
-        const parts = String(h.call.tx).split(" · ");
-        const grade = parts.slice(1).join(" · ");
-        view.callout = { title: parts[0], grade, good: grade === "Perfect" || grade === "Good", leading: h.call.l === 1,
-          alpha: Math.max(0, Math.min(1, age / 0.12, (CALLOUT_SECONDS - age) / 0.35)), lift: -8 * Math.min(1, age / 0.2) };
-      }
-    }
+    const banner = bannerView(h.ban), banner2 = bannerView(h.ban2);
+    if (banner) view.banner = banner;
+    if (banner2) view.banner2 = banner2;
+    const callout = calloutView(h.call, t), callout2 = calloutView(h.call2, t);
+    if (callout) view.callout = callout;
+    if (callout2) view.callout2 = callout2;
     return view;
   }
 
@@ -373,6 +413,7 @@
     return {
       eyebrow: String(r.eyebrow || ""), headline: String(r.headline || "Match over"),
       you: Number(r.you) || 0, cpu: Number(r.cpu) || 0, won: r.won === 1,
+      names: [rowName(r.names, 0, "YOU"), rowName(r.names, 1, "COMPUTER")],
       story: String(r.story || ""), coaching: String(r.coaching || ""), stats
     };
   }
@@ -380,13 +421,17 @@
   // MARK: Pictures
 
   // The pictures a look needs (manifest.json `sheets`, each with its `look`).
-  function sheetsFor(manifest, look) {
+  // Receiver 78: and the sheets the phone names (`sheets`: a friend's look, each player's kit), those the TV has.
+  function sheetsFor(manifest, look, named) {
     const sheets = (manifest && manifest.sheets) || {};
-    return Object.keys(sheets).filter((name) => sheets[name].look === (look === "woman" ? "woman" : "man")).sort();
+    const want = new Set(Object.keys(sheets).filter((name) => sheets[name].look === (look === "woman" ? "woman" : "man") && !sheets[name].kit));
+    if (Array.isArray(named)) for (const name of named) if (typeof name === "string" && sheets[name]) want.add(name);
+    return [...want].sort();
   }
 
   return {
     STAGE, HUD_STAGE, VERSION, DELAY, MAX_BLEND_GAP, CALLOUT_SECONDS, BALL,
-    decodeOp, opShape, blendOps, blendPush, percentile, createPlayout, plateLayout, opBounds, drawOps, hudView, readyView, resultView, sheetsFor
+    decodeOp, halves, opShape, blendOps, blendPush, percentile, createPlayout, plateLayout, opBounds, drawOps, hudView, readyView, resultView,
+    sheetsFor
   };
 });

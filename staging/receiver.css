@@ -505,3 +505,8 @@ body[data-card="picture"] #app, body[data-card="waiting"] #app { visibility: hid
 .pk-story { font-size: clamp(15px, 1.3vw, 26px) !important; color: rgba(252,245,222,.62) !important; }
 .pk-coaching { color: var(--gold) !important; font-weight: 800 !important; }
 .pk-chip { z-index: 5; }
+/* Receiver 78: a same-phone split screen. Each half keeps its whole near court, so the stands' dark fills the band above
+   it; the score bug sits across the middle. */
+.pk-split .pk-court { background: linear-gradient(#060e0c, #0c1a17 55%); }
+.pk-hud.pk-split .pk-scorebug { left: 50%; transform: translateX(-50%); }
+.pk-hud.pk-split .pk-band { display: none; }
