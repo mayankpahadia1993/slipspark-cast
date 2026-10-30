@@ -1,10 +1,10 @@
 {
   "environment": "production",
-  "commit": "c7e8b0b45cb3c4ac1e2fa6e9c33feed5b883e1e0",
-  "subject": "Pickleball: the near backhand redrawn as a two-handed drive (receiver 76)",
-  "receiverTree": "65c78978a9b564c544e2ca84926602ed6aa8eafe",
-  "revision": 76,
-  "deployedAt": "2026-10-28T20:59:58Z",
+  "commit": "8a2eec531a4e211e02032e5b10bd50c64cf27376",
+  "subject": "Receiver 77: the stadium warm from its first frame on Chromecast",
+  "receiverTree": "f8ad91a4e67415ca981f0bb0f8f82c75fe2cd402",
+  "revision": 77,
+  "deployedAt": "2026-10-30T06:45:34Z",
   "promotedFrom": "staging",
-  "stagedAt": "2026-10-28T15:15:48Z"
+  "stagedAt": "2026-10-30T06:04:17Z"
 }

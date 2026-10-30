@@ -418,7 +418,8 @@
       if (sheet.promise) return sheet.promise;
       const waiting = sheet.keys.filter((key) => !images.has(key));
       waiting.forEach((key) => loading.add(key));
-      sheet.promise = decodePicture(id, "scene-images/" + sheet.file).then(({ image, bitmap }) => {
+      // Receiver 77: from the TV's own copy when it has one.
+      sheet.promise = keptURL("scene-images/" + sheet.file).then((url) => decodePicture(id, url)).then(({ image, bitmap }) => {
         // A file that isn't the size the manifest says is out of date.
         if ((image.naturalWidth || image.width) !== sheet.width || (image.naturalHeight || image.height) !== sheet.height) {
           throw new Error("atlas " + sheet.file + " is " + (image.naturalWidth || image.width) + "x" + (image.naturalHeight || image.height));
@@ -459,6 +460,10 @@
     let preloadQueue = [];
     let preloading = 0;
     let preloadKit = null;
+    // Receiver 77: when the preload last ran dry (stats `preloadMs`, from the
+    // hello), and how many of the start's pictures are on their way.
+    let preloadDoneAt = null;
+    let startLoading = 0;
     // Receiver 68: no bowler's-end view on any Chromecast dongle (core.drawsInset).
     const insetOff = !core.drawsInset(navigator.userAgent);
     function preloadRank(key) {
@@ -477,9 +482,20 @@
       if (/^fielder-[A-Za-z]+-idle-/.test(key)) return 4;
       if (/^field-outfield-/.test(key)) return 5;
       if (/^fielder-/.test(key)) return 6;
+      // A hello that names no kit (Android): any kit's cached pieces may be the batter's.
       if (/^kit-/.test(key) && !preloadKit) return 6;
       return 7;
     }
+    // Receiver 77 (d6ne64t0): the start's pictures, every one the stadium
+    // and the rehearsal draw (ranks 0-6: the stadium, the batter and his
+    // kit, the inset's atlases, the bowlers, the fielders, the outfield).
+    // The rest (the practice lane, and pictures earlier casts left in the
+    // TV's cache: other kits' pieces) waits while the rehearsal draws and
+    // while the stadium is on (`restWaits`: loaded during play on the
+    // Ultra, they took its fourth to sixth seconds from 30 draws a second to
+    // 8-17); a frame that wants one has it at once (`ensure`).
+    const START_RANK = 6;
+    function isStart(key) { return preloadRank(key) <= START_RANK; }
     function preloadBundled(kit) {
       if (typeof kit === "string" && /^[a-z0-9-]{1,40}$/.test(kit)) preloadKit = kit;
       // A dyed kit's batter on the inset: the atlases' kit masks now (receiver 73).
@@ -501,20 +517,36 @@
         return true;
       };
       preloadQueue = Array.from(bundled.keys()).concat(extra).filter(wanted).sort(byRank).filter(once);
-      while (preloading < 3 && pumpPreload()) { /* three at a time */ }
+      preloadDoneAt = null;
+      pumpSome();
+    }
+    // The next picture the preload would load (those already here or on
+    // their way dropped), or null.
+    function nextPreload() {
+      while (preloadQueue.length && (images.has(preloadQueue[0]) || loading.has(preloadQueue[0]))) preloadQueue.shift();
+      return preloadQueue.length ? preloadQueue[0] : null;
     }
     function pumpPreload() {
-      while (preloadQueue.length && (images.has(preloadQueue[0]) || loading.has(preloadQueue[0]))) preloadQueue.shift();
-      if (!preloadQueue.length) return false;
+      const next = nextPreload();
+      if (next === null) {
+        if (!preloading && preloadDoneAt === null) { preloadDoneAt = performance.now(); pruneKept(); }
+        return false;
+      }
+      // Receiver 77: the rest waits while a rehearsal is due and while the stadium is on.
+      if (!isStart(next) && restWaits()) return false;
+      preloadDoneAt = null;
       const key = preloadQueue.shift();
+      const start = isStart(key);
       preloading += 1;
+      if (start) startLoading += 1;
+      const done = () => { preloading -= 1; if (start) startLoading -= 1; window.setTimeout(pumpPreload, 20); };
       const cut = cutOf(key);
       if (cut) {
-        loadSheet(cut.atlas).then(() => { preloading -= 1; window.setTimeout(pumpPreload, 20); });
+        loadSheet(cut.atlas).then(done);
         return true;
       }
       loading.add(key);
-      const source = bundled.has(key) ? Promise.resolve("scene-images/" + bundled.get(key))
+      const source = bundled.has(key) ? keptURL("scene-images/" + bundled.get(key))
         : database ? loadCached(key) : Promise.reject(new Error("no cache"));
       source.then((url) => loadPicture(key, url))
         .then(() => {
@@ -526,8 +558,15 @@
           if (/^(stadium-(ground|backdrop)|field-outfield)-/.test(key) && opaque.has(key)) backdropLayer(key);
           warmDecode(key);
         }, () => loading.delete(key))
-        .then(() => { preloading -= 1; window.setTimeout(pumpPreload, 20); });
+        .then(done, done);
       return true;
+    }
+    function pumpSome() { while (preloading < 3 && pumpPreload()) { /* three at a time */ } }
+    // The start's pictures are all in (or wouldn't load): none queued, none on its way.
+    function startPicturesIn() {
+      if (startLoading) return false;
+      const next = nextPreload();
+      return next === null || !isStart(next);
     }
 
     // Warm-up v2: each preloaded picture is drawn once, while the stadium is
@@ -590,7 +629,27 @@
     // animation frame, blended as play is, `REHEARSAL_DRAWS` times. It stops
     // the moment the stadium comes on. `stats.rehearsed` counts its draws and
     // `rehearseMs` says how long its first and last ten took.
+    //
+    // Receiver 77 (d6ne64t0, Oct 29 2026, the owner on an onn 4K: "it lagged a
+    // bit when I started the game with chromecast, became better
+    // afterwards"): the stadium's first draw took 801 ms and the TV drew ~19 a
+    // second for 5 s, steady only then; innings 2, its drawing warm from
+    // innings 1, was steady in 2.1 s. The rehearsal had drawn 6 of its 200:
+    // it waited for every picture the preload had queued, the inset's, every
+    // fielder's pose and up to 48 pictures earlier casts left in the TV's
+    // cache, and on a real TV that outlasts a setup (the owner's Ultra logs
+    // of Oct 23 say `rehearsed 0` in every innings; the bench, its cache
+    // empty, rehearsed all 200). Now it starts once the start's pictures are
+    // in (`startPicturesIn`; REHEARSAL_WAIT after the hello at the latest)
+    // and draws alone: the rest of the preload waits for it (drawing beside
+    // the preload, the Ultra's preload ran into the stadium's first second).
+    // Before the page's first stadium it draws into the stadium's own canvas
+    // (hidden, nothing on it to keep), so the stadium's first frame is not
+    // that canvas's first draw either; once a stadium has been shown, off
+    // screen as before. `stats.rehearseAt` says when it began, `preloadMs`
+    // when the preload ran dry (ms from the hello).
     const REHEARSAL_DRAWS = 200;
+    const REHEARSAL_WAIT = 6000;
     // A weak dongle (each draw costs it ~30 ms of its page's thread) draws
     // fewer, about every third animation frame, so its setup screen stays
     // smooth meanwhile.
@@ -599,7 +658,8 @@
     let rehearsing = false;
     // A frame older than this when drawn is a pause's held frame, not a stale picture (stats `stale`).
     const STALE_FLOWING = 250;
-    const rehearsal = { data: null, wanted: false, timeline: null, canvas: null, ctx: null, moment: 0, end: 0, draws: 0, ms: [], firstMs: 0, lastAt: -Infinity };
+    const rehearsal = { data: null, wanted: false, timeline: null, canvas: null, ctx: null, moment: 0, end: 0, draws: 0, ms: [], firstMs: 0, lastAt: -Infinity,
+      askedAt: 0, startedAt: 0, own: false };
 
     function loadRehearsal() {
       return fetch("rehearsal.json").then((response) => (response && response.ok && typeof response.json === "function" ? response.json() : null))
@@ -607,19 +667,35 @@
           if (!data || !Array.isArray(data.frames) || !data.frames.length) return;
           rehearsal.data = data;
           // A hello that came first.
-          if (rehearsal.asked && !on) wantRehearsal();
+          if (rehearsal.asked && !on) wantRehearsal(rehearsal.askedAt);
         }).catch(() => {});
     }
 
     // Due after each hello (the phone's innings is coming) once the
     // pictures are in; the weak plan's own canvas and tune with it.
-    function wantRehearsal() {
+    function wantRehearsal(askedAt) {
       rehearsal.asked = true;
+      rehearsal.askedAt = askedAt == null ? performance.now() : askedAt;
       if (!rehearsal.data || options.noRehearsal) return;
       rehearsal.wanted = true;
       rehearsal.draws = 0;
       rehearsal.ms = [];
       rehearsal.firstMs = 0;
+      rehearsal.startedAt = 0;
+    }
+
+    // Receiver 77: due once the start's pictures are in, or REHEARSAL_WAIT
+    // after the hello whatever is in (a load that never ends waits on no
+    // rehearsal). `x.early: 0`: once the whole preload is done, as before.
+    function rehearsalReady(local) {
+      if (!tune.early) return !preloadQueue.length && !preloading;
+      return startPicturesIn() || local - rehearsal.askedAt >= REHEARSAL_WAIT;
+    }
+
+    // The rest of the preload waits while a rehearsal is due and while the stadium is on.
+    function restWaits() {
+      if (!tune.early) return false;
+      return on || (rehearsal.wanted && !released);
     }
 
     function startRehearsalPass() {
@@ -636,14 +712,20 @@
     }
 
     function rehearse(local) {
-      if (!rehearsal.wanted || on || released || preloadQueue.length || preloading) return;
+      if (!rehearsal.wanted || on || released || !rehearsalReady(local)) return;
       if (plan.weak && local - rehearsal.lastAt < WEAK_REHEARSAL_GAP) return;
-      if (!rehearsal.canvas || rehearsal.canvas.width !== canvas.width || rehearsal.canvas.height !== canvas.height) {
+      // Receiver 77: the stadium's own canvas while no stadium has been shown
+      // on this page (hidden: nothing on it to keep, no held frame); else one
+      // of its size off screen, so a held frame is never drawn over.
+      const own = !!tune.own && !shownFrame && !!root.hidden;
+      if (!own && (!rehearsal.canvas || rehearsal.canvas.width !== canvas.width || rehearsal.canvas.height !== canvas.height)) {
         rehearsal.canvas = document.createElement("canvas");
         rehearsal.canvas.width = canvas.width;
         rehearsal.canvas.height = canvas.height;
         rehearsal.ctx = rehearsal.canvas.getContext("2d", { alpha: !opaqueCanvas });
       }
+      if (own) rehearsal.own = true;
+      if (!rehearsal.startedAt) rehearsal.startedAt = local;
       if (!rehearsal.timeline || rehearsal.moment > rehearsal.end) startRehearsalPass();
       const result = rehearsal.timeline.at(rehearsal.moment);
       const batter = rehearsal.live[Math.min(rehearsal.live.length - 1, Math.floor(rehearsal.moment / rehearsal.step))];
@@ -655,8 +737,10 @@
       const savedCtx = ctx, savedCanvas = canvas;
       // The static layer's counts are the stadium's (stats `cached`, `rebuilt`).
       const counts = { built: staticLayer.built, hits: staticLayer.hits, ops: staticLayer.ops, draws: staticLayer.draws };
-      ctx = rehearsal.ctx;
-      canvas = rehearsal.canvas;
+      if (!own) {
+        ctx = rehearsal.ctx;
+        canvas = rehearsal.canvas;
+      }
       rehearsing = true;
       const began = performance.now();
       try {
@@ -679,13 +763,26 @@
     }
 
     // Done, or the stadium came on: the canvas let go, and the static layer
-    // starts afresh from the first real frame.
+    // starts afresh from the first real frame. Receiver 77: the stadium's own
+    // canvas, if it rehearsed there, is cleared (its first frame clears it
+    // whole too: nothing it drew is known).
     function endRehearsal() {
       rehearsal.wanted = false;
       rehearsal.timeline = null;
       if (rehearsal.canvas) { try { rehearsal.canvas.width = 0; rehearsal.canvas.height = 0; } catch (error) { /* gone */ } }
       rehearsal.canvas = null;
       rehearsal.ctx = null;
+      const own = rehearsal.own;
+      rehearsal.own = false;
+      if (own && !released) {
+        try {
+          ctx.setTransform(1, 0, 0, 1, 0, 0);
+          ctx.globalAlpha = 1;
+          ctx.globalCompositeOperation = "source-over";
+          if (opaqueCanvas) { ctx.fillStyle = "#0c1a17"; ctx.fillRect(0, 0, canvas.width, canvas.height); } else ctx.clearRect(0, 0, canvas.width, canvas.height);
+        } catch (error) { /* gone */ }
+        canvasDrawn = null;
+      }
       staticLayer.key = null;
       staticLayer.keys = null;
       staticLayer.rects = null;
@@ -812,7 +909,98 @@
         .then(readAtlases).catch(() => {});
       // Receiver 65: the rehearsal's recorded ball (~26 KB on the wire), never in the hello's way.
       loadRehearsal();
-      return Promise.all([pictures, atlases]);
+      return Promise.all([pictures, atlases, openKept()]);
+    }
+
+    // MARK: The receiver's own pictures kept on the TV (receiver 77)
+    //
+    // d6ne64t0 (Oct 29 2026): a Chromecast keeps no HTTP cache from one cast
+    // to the next. The Living Room TV's Ultra downloaded all 63 of the
+    // pictures it preloads again three minutes after its last cast (resource
+    // timing: each transfer the file's whole size), so every cast fetched
+    // the stadium's ~12 MB of pictures anew, three at a time, while the
+    // phone's home and setup screens showed; the owner's onn spent most of
+    // the 7.7 s from its hello to the stadium on that, and its rehearsal drew
+    // 6 of its 200 draws. Each file is now kept in IndexedDB
+    // (`stored.kept`) the first time it comes, under the deploy's receiver
+    // tree (`DEPLOYED.json`, scripts/deploy-cast-receiver.sh: any change to
+    // the receiver's files is a new tree), and read from there by later
+    // casts; files of any other tree are dropped once the preload is done.
+    // Served without a DEPLOYED.json (a preview, a test) nothing is kept.
+    // `stats.kept` and `stats.fetched` say how many files came from the TV and from the network.
+    let keptDb = null;
+    let keptTree = null;
+    const keptFiles = new Set();
+    const keptCounts = { read: 0, fetched: 0 };
+    function openKept() {
+      if (!window.indexedDB || options.noKept) return Promise.resolve();
+      const tree = fetch("DEPLOYED.json").then((response) => (response && response.ok && typeof response.json === "function" ? response.json() : null))
+        .then((deployed) => (deployed && typeof deployed.receiverTree === "string" && /^[0-9a-f]{7,64}$/.test(deployed.receiverTree) ? deployed.receiverTree : null))
+        .catch(() => null);
+      return tree.then((found) => new Promise((resolve) => {
+        if (!found) { resolve(); return; }
+        let request;
+        try { request = window.indexedDB.open(stored.kept, 1); } catch (error) { resolve(); return; }
+        request.onupgradeneeded = () => request.result.createObjectStore("files");
+        request.onerror = () => resolve();
+        request.onsuccess = () => {
+          const db = request.result;
+          try {
+            const keys = db.transaction("files", "readonly").objectStore("files").getAllKeys();
+            keys.onsuccess = () => {
+              (keys.result || []).forEach((key) => { const text = String(key); if (text.indexOf(found + "/") === 0) keptFiles.add(text.slice(found.length + 1)); });
+              keptDb = db;
+              keptTree = found;
+              resolve();
+            };
+            keys.onerror = () => resolve();
+          } catch (error) { resolve(); }
+        };
+      }));
+    }
+
+    // Where the receiver's file `path` loads from: the TV's own copy, or the
+    // network (then kept); the plain path whenever either fails.
+    function keptURL(path) {
+      if (!keptDb) return Promise.resolve(path);
+      const key = keptTree + "/" + path;
+      const fetched = () => fetch(path).then((response) => {
+        if (!response.ok) throw new Error("fetch " + path);
+        return response.blob();
+      }).then((blob) => {
+        keptCounts.fetched += 1;
+        try {
+          const write = keptDb.transaction("files", "readwrite");
+          write.objectStore("files").put(blob, key);
+          write.oncomplete = () => keptFiles.add(path);
+        } catch (error) { /* full: fetched again next time */ }
+        return URL.createObjectURL(blob);
+      }).catch(() => path);
+      if (!keptFiles.has(path)) return fetched();
+      return new Promise((resolve) => {
+        try {
+          const read = keptDb.transaction("files", "readonly").objectStore("files").get(key);
+          read.onsuccess = () => {
+            if (!read.result) { keptFiles.delete(path); resolve(fetched()); return; }
+            keptCounts.read += 1;
+            resolve(URL.createObjectURL(read.result));
+          };
+          read.onerror = () => resolve(fetched());
+        } catch (error) { resolve(fetched()); }
+      });
+    }
+
+    // Once the preload is done: files kept by any other tree go.
+    let keptPruned = false;
+    function pruneKept() {
+      if (!keptDb || keptPruned) return;
+      keptPruned = true;
+      try {
+        const write = keptDb.transaction("files", "readwrite");
+        const store = write.objectStore("files");
+        const keys = store.getAllKeys();
+        keys.onsuccess = () => (keys.result || []).forEach((key) => { if (String(key).indexOf(keptTree + "/") !== 0) store.delete(key); });
+      } catch (error) { /* next time */ }
     }
 
     let database = null;
@@ -865,7 +1053,7 @@
       const ask = () => { loading.delete(key); cached.delete(key); bundled.delete(key); wanted.add(key); };
       if (bundled.has(key)) {
         loading.add(key);
-        loadPicture(key, "scene-images/" + bundled.get(key)).catch(ask);
+        keptURL("scene-images/" + bundled.get(key)).then((url) => loadPicture(key, url)).catch(ask);
       } else if (cached.has(key) && database) {
         loading.add(key);
         loadCached(key).then((url) => loadPicture(key, url)).catch(ask);
@@ -896,6 +1084,10 @@
         const url = URL.createObjectURL(blob);
         return loadPicture(key, url, blob).then(() => {
           cacheImage(key, blob);
+          // Receiver 77: a picture the phone sends during the setup (a dyed
+          // kit's piece) is warmed as the receiver's own are, not decoded at
+          // the stadium's first frame.
+          warmDecode(key);
           send({ t: "got", k: key });
         });
       }).catch((error) => report("image", error));
@@ -949,7 +1141,7 @@
       const entry = { image: null, failed: false };
       maskSheets.set(id, entry);
       const file = sheet.file.replace(/^atlas-bowler-end-/, "kit-masks-bowler-end-");
-      loadImage("scene-images/" + file, false).then((image) => {
+      keptURL("scene-images/" + file).then((url) => loadImage(url, false)).then((image) => {
         if ((image.naturalWidth || image.width) !== sheet.width || (image.naturalHeight || image.height) !== sheet.height) {
           throw new Error("kit masks " + file + " are " + (image.naturalWidth || image.width) + "x" + (image.naturalHeight || image.height));
         }
@@ -1120,8 +1312,10 @@
     // `match` 0 blends only frames of the same shapes, as before receiver 65.
     // `dirty` 0 clears the whole canvas and copies the whole static layer each
     // draw, as before receiver 67 (build 215).
+    // Receiver 77: `early` 0 rehearses only once the whole preload is done and
+    // `own` 0 always rehearses off screen, as receivers 65-76 did.
     const TUNED = Object.freeze({ blur: "shadow", layers: "bounded", cover: "clip", bitmaps: 0, shade: "thirds", blend: 1, cache: 1, photo: "layer", opaque: 0,
-      match: 1, dirty: 1 });
+      match: 1, dirty: 1, early: 1, own: 1 });
     // A weak dongle (core.isWeakDongle): no redraw only to blend between
     // frames (each draw costs it ~30 ms of its page's thread) and glows
     // drawn plain, never blurred.
@@ -2003,7 +2197,12 @@
 
     function frameLoop() {
       window.requestAnimationFrame(frameLoop);
-      if (!on) { if (rehearsal.wanted) rehearse(performance.now()); return; }
+      if (!on) {
+        if (rehearsal.wanted) rehearse(performance.now());
+        // Receiver 77: the rest of the preload once the rehearsal is done.
+        else if (preloadQueue.length && preloading < 3) pumpSome();
+        return;
+      }
       const began = performance.now();
       frameStep(began);
       counters.js += performance.now() - began;
@@ -2066,6 +2265,8 @@
     }
 
     function housekeeping(local) {
+      // Receiver 77: the start's pictures still to come (the rest waits, restWaits).
+      if (preloadQueue.length && preloading < 3) pumpSome();
       if (local - lastAck >= 250) {
         lastAck = local;
         send({ t: "ack", s: lastStamp, q: timeline.length });
@@ -2105,6 +2306,12 @@
           rehearsed: rehearsal.draws
         };
         if (rehearsal.ms.length >= 20) stats.rehearseMs = [rehearsal.firstMs, Number(core.percentile(rehearsal.ms.slice(-10), 0.5).toFixed(1))];
+        // Receiver 77: when the rehearsal began and the preload ran dry, ms from the hello.
+        if (rehearsal.startedAt) stats.rehearseAt = Math.round(rehearsal.startedAt - rehearsal.askedAt);
+        if (preloadDoneAt !== null && rehearsal.asked) stats.preloadMs = Math.max(0, Math.round(preloadDoneAt - rehearsal.askedAt));
+        // The receiver's own files read from the TV and fetched this page (receiver 77, keptURL);
+        // numbers, not a list: a phone's log writes each field on one line.
+        if (keptDb) { stats.kept = keptCounts.read; stats.fetched = keptCounts.fetched; }
         if (steadyWatch.verdict) stats.steady = steadyWatch.verdict.fps;
         if (counters.pose.length) {
           stats.pose = Math.round(core.percentile(counters.pose, 0.5));
@@ -2499,7 +2706,10 @@
     }
 
     return { NAMESPACE, handle, report, setOn, renderHUD, drawFrame, playRecording, playRecordingAt, snapshot, timeline, clock, live, images, bitmaps, release,
-      pictures, counters, tune, setTune, warmed, staticLayer, holdLast, get holding() { return holding; }, get hasFrame() { return !!shownFrame; } };
+      pictures, counters, tune, setTune, warmed, staticLayer, holdLast, get holding() { return holding; }, get hasFrame() { return !!shownFrame; },
+      // Receiver 77: how the rehearsal and the preload stand (tests and the bench's probe).
+      get rehearsal() { return { draws: rehearsal.draws, wanted: rehearsal.wanted, own: rehearsal.own, startedAt: rehearsal.startedAt, askedAt: rehearsal.askedAt }; },
+      get preload() { return { left: preloadQueue.length, loading: preloading, doneAt: preloadDoneAt }; } };
   }
 
   window.RallycadeReceiverScene = { NAMESPACE, createScene };
