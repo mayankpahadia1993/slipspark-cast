@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800;900&family=Nunito:wght@600;700;800;900&display=swap">
-  <link rel="stylesheet" href="receiver.css?v=77">
+  <link rel="stylesheet" href="receiver.css?v=78">
   <script src="https://www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>
 </head>
 <body>
@@ -281,18 +281,21 @@
     <div id="pk-stage" class="pk-stage">
       <div id="pk-court" class="pk-court">
         <img id="pk-plate" class="pk-plate" alt="">
+        <img id="pk-plate2" class="pk-plate" alt="" hidden>
         <canvas id="pk-canvas" class="pk-canvas" width="1280" height="720"></canvas>
       </div>
       <div id="pk-hud" class="pk-hud" hidden>
         <div class="pk-scorebug">
           <div class="pk-rows">
-            <div class="pk-row"><i id="pk-you-serve" class="pk-serve"></i><span class="pk-name">YOU</span><b id="pk-you">0</b></div>
-            <div class="pk-row"><i id="pk-cpu-serve" class="pk-serve"></i><span class="pk-name">COMPUTER</span><b id="pk-cpu">0</b></div>
+            <div class="pk-row"><i id="pk-you-serve" class="pk-serve"></i><span id="pk-you-name" class="pk-name">YOU</span><b id="pk-you">0</b></div>
+            <div class="pk-row"><i id="pk-cpu-serve" class="pk-serve"></i><span id="pk-cpu-name" class="pk-name">COMPUTER</span><b id="pk-cpu">0</b></div>
           </div>
           <div class="pk-band"><span id="pk-band-title">LEVEL</span><b id="pk-band-value"></b></div>
         </div>
         <div id="pk-banner" class="pk-banner" hidden><i class="pk-bar"></i><span id="pk-banner-text"></span></div>
+        <div id="pk-banner2" class="pk-banner" hidden><i class="pk-bar"></i><span id="pk-banner2-text"></span></div>
         <div id="pk-callout" class="pk-callout" hidden><strong id="pk-callout-title"></strong><span id="pk-callout-grade"></span></div>
+        <div id="pk-callout2" class="pk-callout" hidden><strong id="pk-callout2-title"></strong><span id="pk-callout2-grade"></span></div>
       </div>
       <div id="pk-ready" class="pk-cover" hidden>
         <div class="pk-card">
@@ -308,9 +311,9 @@
           <span id="pk-result-eyebrow" class="pk-eyebrow"></span>
           <h1 id="pk-result-headline">You win</h1>
           <div class="pk-final">
-            <div id="pk-result-you-side" class="pk-side"><strong id="pk-result-you">0</strong><span>YOU</span></div>
+            <div id="pk-result-you-side" class="pk-side"><strong id="pk-result-you">0</strong><span id="pk-result-you-name">YOU</span></div>
             <i class="pk-dash">–</i>
-            <div id="pk-result-cpu-side" class="pk-side"><strong id="pk-result-cpu">0</strong><span>COMPUTER</span></div>
+            <div id="pk-result-cpu-side" class="pk-side"><strong id="pk-result-cpu">0</strong><span id="pk-result-cpu-name">COMPUTER</span></div>
           </div>
           <div id="pk-result-stats" class="pk-stats"></div>
           <p id="pk-result-story" class="pk-story"></p>
@@ -321,17 +324,17 @@
     </div>
   </section>
   <!-- ?v= keeps a Chromecast from mixing cached files of two receiver versions. -->
-  <script src="receiver-core.js?v=77"></script>
-  <script src="receiver-card-core.js?v=77"></script>
-  <script src="receiver-video.js?v=77"></script>
-  <script src="receiver-scene-core.js?v=77"></script>
-  <script src="receiver-scene.js?v=77"></script>
-  <script src="receiver-welcome.js?v=77"></script>
-  <script src="receiver-celebration.js?v=77"></script>
-  <script src="receiver-music.js?v=77"></script>
-  <script src="receiver-pickleball-core.js?v=77"></script>
-  <script src="receiver-pickleball.js?v=77"></script>
-  <script src="receiver-shared.js?v=77"></script>
-  <script src="receiver.js?v=77"></script>
+  <script src="receiver-core.js?v=78"></script>
+  <script src="receiver-card-core.js?v=78"></script>
+  <script src="receiver-video.js?v=78"></script>
+  <script src="receiver-scene-core.js?v=78"></script>
+  <script src="receiver-scene.js?v=78"></script>
+  <script src="receiver-welcome.js?v=78"></script>
+  <script src="receiver-celebration.js?v=78"></script>
+  <script src="receiver-music.js?v=78"></script>
+  <script src="receiver-pickleball-core.js?v=78"></script>
+  <script src="receiver-pickleball.js?v=78"></script>
+  <script src="receiver-shared.js?v=78"></script>
+  <script src="receiver.js?v=78"></script>
 </body>
 </html>
