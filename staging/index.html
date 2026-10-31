@@ -12,12 +12,6 @@
 </head>
 <body>
   <main id="app" data-screen="ready" data-phase="ready" aria-live="polite">
-    <div class="ambient ambient-one"></div>
-    <div class="ambient ambient-two"></div>
-    <div class="arena-lines" aria-hidden="true">
-      <i></i><i></i><i></i>
-    </div>
-
     <section id="ready-screen" class="screen ready-screen">
       <div class="brand-mark" aria-label="RallyCade">
         <img class="brand-icon" src="rallycade-icon.png" alt="">
@@ -80,17 +74,6 @@
         <strong id="result-next-title"></strong>
       </div>
       <p id="result-hint">Raise both hands to go again · Results saved on your phone</p>
-    </section>
-
-    <section id="versus-result-screen" class="screen scorecard-screen" hidden>
-      <span class="eyebrow">1V1 FIGHT</span>
-      <h1 id="versus-result-headline">DRAW</h1>
-      <span id="versus-result-detail" class="score-caption">RUN IT BACK</span>
-      <div class="versus-result-grid">
-        <div id="versus-result-left" class="result-corner red"><span>RED CORNER</span><strong id="versus-result-left-score">0</strong><small id="versus-result-left-stats"></small></div>
-        <div id="versus-result-right" class="result-corner blue"><span>BLUE CORNER</span><strong id="versus-result-right-score">0</strong><small id="versus-result-right-stats"></small></div>
-      </div>
-      <p>Raise both hands for a rematch</p>
     </section>
 
     <section id="duel-handoff-screen" class="screen scorecard-screen" hidden>

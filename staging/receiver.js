@@ -11,13 +11,9 @@
     positioning: document.getElementById("positioning-screen"),
     // Play has no HTML board (Oct 18 2026): cricket is the stadium, and
     // until its first frame (or on a phone that can't draw it) the holding
-    // screen. Boxing (flagged off) gets the holding screen too.
-    fight: document.getElementById("holding-screen"),
+    // screen.
     cricket: document.getElementById("holding-screen"),
-    versusSetup: document.getElementById("holding-screen"),
-    versus: document.getElementById("holding-screen"),
     result: document.getElementById("result-screen"),
-    versusResult: document.getElementById("versus-result-screen"),
     cricketDuelHandoff: document.getElementById("duel-handoff-screen"),
     cricketDuelResult: document.getElementById("duel-result-screen"),
     timingCheck: document.getElementById("timing-check-screen")
@@ -73,11 +69,8 @@
   // says it in every game ("BOWLING · Easy", a friend's match's "LEVEL ·
   // Medium"; none from a phone that sends none). Never a call to watch a
   // ball it can't show.
-  const PLAY_SCREENS = new Set(["cricket", "fight", "versus", "versusSetup"]);
+  const PLAY_SCREENS = new Set(["cricket"]);
   function holdingWords(state, reconnecting, drawsStadium) {
-    if (state.screen !== "cricket") {
-      return { status: "ON YOUR PHONE", title: "Boxing is on<br>your phone", detail: "The TV shows the stadium for cricket.", score: "", level: "" };
-    }
     const cricket = state.cricket || {};
     const balls = Number(cricket.totalBalls) || 0;
     const ball = balls ? "BALL " + Math.min((Number(cricket.ballsFaced) || 0) + 1, balls) + " OF " + balls : "";
@@ -158,17 +151,6 @@
       card.append(value, label);
       return card;
     }));
-  }
-
-  function renderVersusResult(result) {
-    text("versus-result-headline", result.headline);
-    text("versus-result-detail", result.detail);
-    text("versus-result-left-score", result.leftScore.toLocaleString("en-US"));
-    text("versus-result-right-score", result.rightScore.toLocaleString("en-US"));
-    text("versus-result-left-stats", `${result.leftDefense}% DEFENSE · ${result.leftCounters} COUNTERS`);
-    text("versus-result-right-stats", `${result.rightDefense}% DEFENSE · ${result.rightCounters} COUNTERS`);
-    element("versus-result-left").classList.toggle("is-winner", result.winner === "left");
-    element("versus-result-right").classList.toggle("is-winner", result.winner === "right");
   }
 
   function renderDuelHandoff(handoff) {
@@ -335,7 +317,7 @@
     window.__slipsparkReceiverState = state;
     app.dataset.screen = state.screen;
     app.dataset.sequence = String(state.sequence);
-    app.dataset.phase = state.fight?.phase || state.cricket?.phase || state.versus?.phase || state.screen;
+    app.dataset.phase = state.cricket?.phase || state.screen;
     const shown = screens[state.screen];
     new Set(Object.values(screens)).forEach((screen) => setVisible(screen, screen === shown));
     if (state.positioning) renderPositioning(state.positioning);
@@ -344,7 +326,6 @@
     if (PLAY_SCREENS.has(state.screen)) renderHolding(state, sceneLost);
     updateHold();
     if (state.result) renderResult(state.result);
-    if (state.versusResult) renderVersusResult(state.versusResult);
     if (state.cricketDuelHandoff) renderDuelHandoff(state.cricketDuelHandoff);
     if (state.cricketDuelResult) renderDuelResult(state.cricketDuelResult);
     if (state.timingCheck) renderTimingCheck(state.timingCheck);

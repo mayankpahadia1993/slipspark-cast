@@ -5,30 +5,18 @@
 })(typeof globalThis !== "undefined" ? globalThis : this, function () {
   "use strict";
 
+  // Boxing's screens (fight, versusSetup, versus, versusResult) went with
+  // boxing (Oct 31 2026): an older tester build's fight state shows ready.
   const validScreens = new Set([
-    "ready", "positioning", "fight", "cricket", "versusSetup", "versus",
-    "result", "versusResult", "cricketDuelHandoff", "cricketDuelResult", "timingCheck"
+    "ready", "positioning", "cricket", "result", "cricketDuelHandoff", "cricketDuelResult", "timingCheck"
   ]);
   const verdicts = new Set(["early", "littleEarly", "perfect", "littleLate", "late", "noSwing"]);
-  const fightPhases = new Set([
-    "ready", "countdown", "telegraph", "defend", "counter", "opening",
-    "feedback", "trackingPaused", "roundBreak", "finished"
-  ]);
   const cricketPhases = new Set([
     "ready", "countdown", "runUp", "delivery", "feedback", "trackingPaused", "finished"
-  ]);
-  const versusPhases = new Set([
-    "ready", "countdown", "telegraph", "defend", "counter", "opening",
-    "feedback", "knockout", "trackingPaused", "finished"
   ]);
   const validActions = new Set([
     "neutral", "slipLeft", "slipRight", "duck", "highBlock", "bodyBlock",
     "counterLeft", "counterRight"
-  ]);
-  const validStyles = new Set(["aggressor", "bodyHunter", "trickster"]);
-  const validAttacks = new Set([
-    "straight", "leftHook", "rightHook", "body", "doubleStraight", "highLow",
-    "lowHigh", "delayed", "feint"
   ]);
   const jointNames = [
     "nose", "neck", "leftShoulder", "rightShoulder", "leftElbow", "rightElbow",
@@ -116,28 +104,12 @@
     }, {});
   }
 
-  function normalizePlayer(value) {
-    const player = value && typeof value === "object" ? value : {};
-    return {
-      score: Math.floor(clamp(player.score, 0, 999999999)),
-      health: clamp(player.health, 0, 100),
-      combo: clamp(player.combo, 1, 99),
-      action: allowedString(player.action, validActions, "neutral"),
-      feedback: optionalString(player.feedback, 48)
-    };
-  }
-
   function normalizeStats(value) {
     if (!Array.isArray(value)) return [];
     return value.slice(0, 4).map((stat) => ({
       label: boundedString(stat && stat.label, "STAT", 32),
       value: boundedString(stat && stat.value, "0", 32)
     }));
-  }
-
-  function formatTime(seconds) {
-    const safe = Math.max(0, Math.floor(number(seconds, 0)));
-    return `${Math.floor(safe / 60)}:${String(safe % 60).padStart(2, "0")}`;
   }
 
   function normalizeState(input) {
@@ -148,12 +120,8 @@
       sequence: Math.max(0, Math.floor(number(value.sequence, 0))),
       screen,
       positioning: null,
-      fight: null,
       cricket: null,
-      versusSetup: null,
-      versus: null,
       result: null,
-      versusResult: null,
       cricketDuelHandoff: null,
       cricketDuelResult: null,
       timingCheck: null
@@ -175,31 +143,6 @@
       };
     }
 
-    if (screen === "fight") {
-      const fight = value.fight && typeof value.fight === "object" ? value.fight : {};
-      normalized.fight = {
-        phase: allowedString(fight.phase, fightPhases, "ready"),
-        phaseValue: optionalString(fight.phaseValue, 80),
-        phaseDetail: optionalString(fight.phaseDetail, 160),
-        score: Math.floor(clamp(fight.score, 0, 999999999)),
-        combo: clamp(fight.combo, 1, 99),
-        timeRemaining: Math.floor(clamp(fight.timeRemaining, 0, 3600)),
-        playerHealth: clamp(fight.playerHealth, 0, 100),
-        opponentHealth: clamp(fight.opponentHealth, 0, 100),
-        playerAction: allowedString(fight.playerAction, validActions, "neutral"),
-        opponentStyle: allowedString(fight.opponentStyle, validStyles, "aggressor"),
-        opponentName: boundedString(fight.opponentName, "Opponent", 48),
-        currentAttack: allowedString(fight.currentAttack, validAttacks, "straight"),
-        calledDefense: boundedString(fight.calledDefense, "Slip left", 80),
-        currentRound: Math.floor(clamp(fight.currentRound, 1, 5)),
-        attackCommitted: fight.attackCommitted === true,
-        opponentHit: fight.opponentHit === true,
-        comboStep: fight.comboStep == null ? null : Math.floor(clamp(fight.comboStep, 1, 99)),
-        comboTotal: fight.comboTotal == null ? null : Math.floor(clamp(fight.comboTotal, 1, 99)),
-        telegraphDuration: clamp(fight.telegraphDuration, 0.1, 10)
-      };
-    }
-
     if (screen === "cricket") {
       const cricket = value.cricket && typeof value.cricket === "object" ? value.cricket : {};
       normalized.cricket = {
@@ -218,38 +161,11 @@
       };
     }
 
-    if (screen === "versusSetup") {
-      const setup = value.versusSetup && typeof value.versusSetup === "object" ? value.versusSetup : {};
-      normalized.versusSetup = {
-        isLeftReady: setup.isLeftReady === true,
-        isRightReady: setup.isRightReady === true,
-        isReady: setup.isReady === true,
-        instruction: boundedString(setup.instruction, "Stand side by side", 160)
-      };
-    }
-
-    if (screen === "versus") {
-      const versus = value.versus && typeof value.versus === "object" ? value.versus : {};
-      normalized.versus = {
-        phase: allowedString(versus.phase, versusPhases, "ready"),
-        phaseValue: optionalString(versus.phaseValue, 80),
-        phaseDetail: optionalString(versus.phaseDetail, 160),
-        timeRemaining: Math.floor(clamp(versus.timeRemaining, 0, 3600)),
-        currentAttack: allowedString(versus.currentAttack, validAttacks, "straight"),
-        calledDefense: boundedString(versus.calledDefense, "Slip left", 80),
-        comboStep: versus.comboStep == null ? null : Math.floor(clamp(versus.comboStep, 1, 99)),
-        comboTotal: versus.comboTotal == null ? null : Math.floor(clamp(versus.comboTotal, 1, 99)),
-        telegraphDuration: clamp(versus.telegraphDuration, 0.1, 10),
-        left: normalizePlayer(versus.left),
-        right: normalizePlayer(versus.right)
-      };
-    }
-
     if (screen === "result") {
       const result = value.result && typeof value.result === "object" ? value.result : {};
       normalized.result = {
-        mode: boundedString(result.mode, "FIGHT", 48),
-        headline: boundedString(result.headline, "Fight complete", 80),
+        mode: boundedString(result.mode, "INNINGS", 48),
+        headline: boundedString(result.headline, "Innings complete", 80),
         score: Math.floor(clamp(result.score, 0, 999999999)),
         caption: boundedString(result.caption, "FINAL SCORE", 48),
         isPersonalBest: result.isPersonalBest === true,
@@ -272,22 +188,6 @@
         // celebration, and a cup's next match.
         celebration: normalizeCelebration(result.celebration),
         nextMatch: normalizeNextMatch(result.nextMatch)
-      };
-    }
-
-    if (screen === "versusResult") {
-      const result = value.versusResult && typeof value.versusResult === "object" ? value.versusResult : {};
-      const winner = result.winner === "left" || result.winner === "right" ? result.winner : null;
-      normalized.versusResult = {
-        headline: boundedString(result.headline, "DRAW", 80),
-        detail: boundedString(result.detail, "RUN IT BACK", 120),
-        winner,
-        leftScore: Math.floor(clamp(result.leftScore, 0, 999999999)),
-        rightScore: Math.floor(clamp(result.rightScore, 0, 999999999)),
-        leftDefense: Math.floor(clamp(result.leftDefense, 0, 100)),
-        rightDefense: Math.floor(clamp(result.rightDefense, 0, 100)),
-        leftCounters: Math.floor(clamp(result.leftCounters, 0, 9999)),
-        rightCounters: Math.floor(clamp(result.rightCounters, 0, 9999))
       };
     }
 
@@ -338,7 +238,7 @@
     // core.js) and the raise-hand ring drawn live over it. Build 158
     // (receiver 52): the stadium setup's picture too, its hold ring drawn
     // live from `positioning.progress`.
-    const resultScreen = ["result", "versusResult", "cricketDuelResult", "timingCheck"].includes(screen);
+    const resultScreen = ["result", "cricketDuelResult", "timingCheck"].includes(screen);
     const pictureScreen = resultScreen || screen === "positioning";
     normalized.card = pictureScreen && typeof value.card === "string" && /^[0-9a-z]{1,32}\.[0-9a-z]{1,32}$/.test(value.card) ? value.card : null;
     normalized.hold = resultScreen && Number(value.hold) > 0 ? Math.min(1, Number(value.hold)) : null;
@@ -370,33 +270,11 @@
     return normalizeState(data);
   }
 
-  function fightSample(kind) {
-    const phaseMap = {
-      fight: ["telegraph", "leftHook", "DUCK"],
-      tracking: ["trackingPaused", "TRACKING PAUSED", "Keep your head and shoulders in the frame"],
-      opening: ["opening", "LEFT HOOK!", "LEFT HAND"],
-      feedback: ["feedback", "perfect", "RIGHT ON THE CUE"]
-    };
-    const phase = phaseMap[kind] || phaseMap.fight;
-    return {
-      phase: phase[0], phaseValue: phase[1], phaseDetail: phase[2],
-      score: 2840, combo: 1.75, timeRemaining: 42,
-      playerHealth: 82, opponentHealth: 54, playerAction: "slipLeft",
-      opponentStyle: "aggressor", opponentName: "Aggressor",
-      currentAttack: "leftHook", calledDefense: "Duck", currentRound: 1,
-      attackCommitted: kind === "fight", opponentHit: kind === "feedback",
-      comboStep: kind === "opening" ? 2 : null, comboTotal: kind === "opening" ? 3 : null,
-      telegraphDuration: 1.3
-    };
-  }
-
   function sampleState(kind) {
     const base = { schemaVersion: 2, sequence: 10 };
     if (kind === "positioning") return normalizeState({ ...base, screen: "positioning", positioning: { isReady: true, instruction: "You’re ready.", eyebrow: "FIND YOUR CREASE", title: "You’re ready.", detail: "Return to your stance.\nRaise both hands and hold to start.", hand: "Right-handed batter", canHold: true, progress: 0.45 } });
     if (kind === "cricket") return normalizeState({ ...base, screen: "cricket", cricket: { phase: "delivery", phaseValue: "FULL!", phaseDetail: "DRIVE", runs: 18, wicketsLost: 1, wicketLimit: 3, ballsFaced: 7, totalBalls: 12, ballsRemaining: 5, playerAction: "counterRight", level: { title: "BOWLING", value: "Hard" } } });
-    if (kind === "versusSetup") return normalizeState({ ...base, screen: "versusSetup", versusSetup: { isLeftReady: true, isRightReady: false, instruction: "RED CORNER SET — ONE MORE" } });
-    if (kind === "versus") return normalizeState({ ...base, screen: "versus", versus: { phase: "defend", phaseValue: "leftHook", phaseDetail: "DUCK", timeRemaining: 41, currentAttack: "leftHook", calledDefense: "Duck", telegraphDuration: 1.3, left: { score: 1700, health: 82, combo: 1.5, action: "duck" }, right: { score: 1450, health: 70, combo: 1.25, action: "duck" } } });
-    if (kind === "result") return normalizeState({ ...base, screen: "result", result: { mode: "QUICK FIGHT", headline: "You win", score: 4820, caption: "NEW PERSONAL BEST", isPersonalBest: true, stats: [{ label: "DEFENSE", value: "86%" }, { label: "REACTION", value: "312 MS" }, { label: "BEST COMBO", value: "×2.50" }] } });
+    if (kind === "result") return normalizeState({ ...base, screen: "result", result: { mode: "STADIUM INNINGS", headline: "Innings complete", score: 48, scoreText: "48/2", caption: "NEW PERSONAL BEST", isPersonalBest: true, stats: [{ label: "OVERS", value: "2.0" }, { label: "SCORING SHOTS", value: "9" }, { label: "WICKETS LOST", value: "2" }], hint: "Raise a hand to bat again" } });
     // The build 152 Chromecast photo's screen, with a level-up and milestones
     // too: the fullest result screen there is.
     if (kind === "cricketResultLong") return normalizeState({ ...base, screen: "result", result: { mode: "RALLYCADE WORLD CUP · INDIA · GROUP 3/3 vs IRELAND", headline: "Fell short. Lost by 17 runs.", score: 18, scoreText: "18/3", caption: "RUNS", isPersonalBest: false, stats: [{ label: "TARGET", value: "36" }, { label: "OVERS", value: "2.1" }, { label: "RUN RATE", value: "8.3" }, { label: "GROUP", value: "3RD · 2 PTS" }], hint: "Raise a hand for the next match", reward: { title: "YOU EARNED", xp: 92, coins: 23, detail: "Out of the RallyCade World Cup. Pick a country and try again.", levelUp: "LEVEL UP · Level 13 · +65 coins", milestones: ["Milestone: 25 innings · +40 XP · +20 coins"] } } });
@@ -404,7 +282,6 @@
     // before/after pictures of the phone's scorecard.
     if (kind === "chaseWon") return normalizeState({ ...base, screen: "result", result: { mode: "STADIUM INNINGS", headline: "Chased it down! Won with 12 balls to spare.", score: 37, scoreText: "37/1", caption: "NEW PERSONAL BEST", isPersonalBest: true, stats: [{ label: "TARGET", value: "35" }, { label: "OVERS", value: "2.0" }, { label: "RUN RATE", value: "18.5" }], hint: "Raise a hand for another chase", reward: { title: "CHASE WON", xp: 160, coins: 39, detail: "Target beaten. Bonus included." } } });
     if (kind === "nets") return normalizeState({ ...base, screen: "result", result: { mode: "STADIUM INNINGS", headline: "Nets complete", score: 42, scoreText: "42", caption: "RUNS", isPersonalBest: false, stats: [{ label: "BALLS", value: "12" }, { label: "SCORING SHOTS", value: "10" }], hint: "Raise a hand for more Nets" } });
-    if (kind === "versusResult") return normalizeState({ ...base, screen: "versusResult", versusResult: { headline: "RED CORNER WINS", detail: "ON POINTS", winner: "left", leftScore: 4200, rightScore: 3700, leftDefense: 88, rightDefense: 76, leftCounters: 5, rightCounters: 3 } });
     if (kind === "cricketDuelHandoff") return normalizeState({ ...base, screen: "cricketDuelHandoff", cricketDuelHandoff: { target: 32, balls: 12, wickets: 3 } });
     if (kind === "cricketDuelResult") return normalizeState({ ...base, screen: "cricketDuelResult", cricketDuelResult: { headline: "PLAYER 2 WINS", margin: "BY 2 WICKETS · 1 BALL TO SPARE", winner: "second", firstRuns: 31, firstWickets: 3, secondRuns: 32, secondWickets: 1 } });
     if (kind === "timingCheck") return normalizeState({ ...base, screen: "timingCheck", timingCheck: { headline: "Mostly early", detail: "Your swings met the ball about a quarter of a second before it reached you.", verdicts: ["early", "littleEarly", "perfect", "early", "littleEarly", "noSwing"], lines: ["Balls 1 and 4 were early.", "Balls 2 and 5 were a little early.", "Ball 3 was perfect.", "Ball 6 had no swing.", "Wait for the ball to reach the crease before you swing."], note: "Raise both hands to play your innings" } });
@@ -442,7 +319,7 @@
               { text: "Four days in a row. Keep the streak going!", at: 4800, duration: 2600 }] }
         : { id: "preview2", kind: "short", reduced: false, elapsed: 0, end: 2050, lines: [{ text: "Back at the crease!", at: 300, duration: 1300 }] } });
     }
-    return normalizeState({ ...base, screen: "fight", fight: fightSample(kind) });
+    return normalizeState({ ...base, sequence: 1, screen: "ready" });
   }
 
   // Build 153, a Chromecast: "the text is way too large" — "FELL SHORT. LOST
@@ -492,7 +369,7 @@
     return null;
   }
 
-  return { clamp, formatTime, normalizeJoints, normalizeState, normalizeWelcome, normalizeCelebration, normalizeNextMatch, normalizeLevel, levelLine,
+  return { clamp, normalizeJoints, normalizeState, normalizeWelcome, normalizeCelebration, normalizeNextMatch, normalizeLevel, levelLine,
     parseMessage, sampleState, resultHeadlineSize, estimateWidth,
     wrapLines, hideTarget, TARGET_REVEAL_MS };
 });
