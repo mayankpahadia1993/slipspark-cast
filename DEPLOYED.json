@@ -1,10 +1,10 @@
 {
   "environment": "production",
-  "commit": "d42fd905f0ea0d5ead5aced55c260cdad9472e1f",
-  "subject": "Pickleball play with friends: same phone, online rooms, TV, stats, kits",
-  "receiverTree": "79ca28ee6a417b29917c96c5515e5ddf5643bd6d",
+  "commit": "2a6708915a63904737fd576729779e90d6d2c744",
+  "subject": "Merge pull request #150 from mayankpahadia1993/claude/handheld-wider",
+  "receiverTree": "3f5847afd45af1979bd171cd1f99599255d73d1f",
   "revision": 78,
-  "deployedAt": "2026-10-31T00:46:12Z",
+  "deployedAt": "2026-11-01T00:00:21Z",
   "promotedFrom": "staging",
-  "stagedAt": "2026-10-30T23:00:34Z"
+  "stagedAt": "2026-10-31T23:59:06Z"
 }

@@ -40,7 +40,7 @@
   // setup too (the user, on the receiver's own setup screen: "very different
   // ui than the rest of the screens"), to receivers that say `setup: 1`
   // (receiver 52).
-  const CARD_SCREENS = new Set(["result", "versusResult", "cricketDuelResult", "timingCheck", "positioning"]);
+  const CARD_SCREENS = new Set(["result", "cricketDuelResult", "timingCheck", "positioning"]);
 
   // The setup's hold ring on its picture (`ring`: [x, y, diameter], the
   // centre as fractions of the picture's width and height, the diameter as

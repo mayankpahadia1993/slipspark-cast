@@ -27,12 +27,6 @@ body { font-family: Inter, "Google Sans", system-ui, sans-serif; color: var(--pa
     linear-gradient(135deg, #111614 0%, #070909 56%, #020303 100%);
 }
 
-.ambient { position: absolute; width: 42vw; height: 42vw; border-radius: 50%; filter: blur(80px); opacity: .16; }
-.ambient-one { left: -18vw; top: 20vh; background: var(--signal); }
-.ambient-two { right: -20vw; top: -18vh; background: var(--amber); }
-.arena-lines { position: absolute; inset: auto 0 9vh; height: 30vh; perspective: 600px; opacity: .22; }
-.arena-lines i { display: block; height: 2px; margin-top: 8vh; background: linear-gradient(90deg, transparent, rgba(255,255,255,.55), transparent); transform: rotateX(60deg); }
-
 .screen { position: absolute; inset: 0; }
 
 .ready-screen { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 7vh 8vw; }
@@ -45,8 +39,6 @@ body { font-family: Inter, "Google Sans", system-ui, sans-serif; color: var(--pa
 
 .eyebrow { color: var(--signal); font-size: clamp(14px, 1.2vw, 24px); font-weight: 900; letter-spacing: .16em; }
 
-.result-corner.red > span { color: var(--danger); }
-.result-corner.blue > span { color: #45d8e8; }
 
 .scorecard-screen { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 5vh 7vw; text-align: center; }
 .scorecard-screen h1 { margin: 1.6vh 0 0; font-size: clamp(52px, 7vw, 132px); line-height: .9; }
@@ -257,13 +249,6 @@ body[data-scene-weak="1"] .scene-hud *, body[data-scene-weak="1"] .scene-hud { a
     url("scene-images/stadium-ground-1672x941.jpg") center / cover no-repeat,
     #0c1a17;
 }
-#app[data-screen="fight"], #app[data-screen="versus"], #app[data-screen="versusSetup"], #app[data-screen="versusResult"] {
-  background:
-    radial-gradient(circle at 14% 55%, rgba(214,255,56,.10), transparent 30%),
-    linear-gradient(135deg, #111614 0%, #070909 56%, #020303 100%);
-}
-#app:not([data-screen="fight"]):not([data-screen="versus"]):not([data-screen="versusSetup"]):not([data-screen="versusResult"]) .ambient,
-#app:not([data-screen="fight"]):not([data-screen="versus"]):not([data-screen="versusSetup"]):not([data-screen="versusResult"]) .arena-lines { display: none; }
 #app h1, .hero-score, .brand-mark, .result-stat strong, .result-corner strong {
   font-family: Nunito, "Varela Round", "Google Sans", sans-serif;
   font-weight: 900;
