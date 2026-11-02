@@ -69,20 +69,20 @@
       });
     }
 
-    // Every loaded sheet drawn whole, once, into the match's canvas at the match's size while it is hidden (the ready
-    // card is up), and the drawing finished there (a one-pixel read), so the match's first frames draw pictures the
-    // canvas already holds (receiver 79). `stats.warmed` counts them, `warmMs` how long it took.
+    // Every loaded sheet and the court drawn once, small, into the match's canvas while it is hidden (the ready card is
+    // up), so the match's first frames draw pictures the canvas has drawn before (receiver 79). `stats.warmed` counts
+    // them. Never read back from the canvas: on the owner's Ultra a one-pixel getImageData after drawing the sheets whole
+    // left the match at ~15 frames a second throughout (the canvas drawn in software from then on).
     function warm() {
       if (view === "match") return;
       const started = now();
-      sizeCanvas();
       let count = 0;
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       for (const entry of pictures.values()) {
         if (!entry.image) continue;
-        try { ctx.drawImage(entry.image, 0, 0); count += 1; } catch (error) { /* a picture the canvas can't draw */ }
+        try { ctx.drawImage(entry.image, 0, 0, 2, 2); count += 1; } catch (error) { /* a picture the canvas can't draw */ }
       }
-      try { ctx.getImageData(0, 0, 1, 1); } catch (error) { /* a tainted canvas: drawn all the same */ }
+      if (plate) { try { ctx.drawImage(plate, 0, 0, 2, 2); count += 1; } catch (error) { /* as above */ } }
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       stats.warmed = count;
       stats.warmMs = Math.round(now() - started);

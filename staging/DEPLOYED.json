@@ -1,8 +1,8 @@
 {
   "environment": "staging",
-  "commit": "d91fe89d765202cd5e8216fbd271cdc614b81c96",
-  "subject": "Receiver 79: warm the sheets whole at the match canvas's size and finish the drawing; the bench prints what loaded",
-  "receiverTree": "8ab5fef082fbbbac7553eef6c057e3004dfe78aa",
+  "commit": "4ed21ccfc498436c12bca68a61c2ccef3d8c2a8b",
+  "subject": "Receiver 79: back to warming the sheets small, never reading the canvas back (a readback left the Ultra drawing pickleball at ~15 fps)",
+  "receiverTree": "3b9fb153cf6ee25b737447167721db85e0a5ffe4",
   "revision": 79,
-  "deployedAt": "2026-11-02T21:02:20Z"
+  "deployedAt": "2026-11-02T21:05:58Z"
 }
