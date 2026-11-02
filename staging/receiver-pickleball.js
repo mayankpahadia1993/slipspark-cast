@@ -75,13 +75,13 @@
     // it (the player's ~0.62 of the sheet, the opponent's ~0.17; scripts' recorded match), over `WARM_FRAMES` animation
     // frames, the canvas cleared only on the last: a draw cleared away in the same frame is dropped unrun, as a 2 x 2
     // draw is decoded at 2 x 2. Never read back (a one-pixel getImageData left the Ultra at ~15 fps all match).
-    // `warmMode` (the hello's `warm`, for benches): "hud" (default: the canvas shown under the ready card and drawn at 2%
-    // alpha, the HUD shown at 1% and the court photograph placed where the match puts it), "visible" (the canvas only),
-    // "frames" (drawn in the hidden canvas), "none". The owner's Ultra, its first 2 s of a match: frames 8 fps (as
-    // without), hud 12 and 30 by ~4 s (78: ~10 s).
+    // `warmMode` (the hello's `warm`, for benches): "frames" (default: drawn in the hidden canvas), "visible" (the canvas
+    // shown under the ready card, drawn at 2% alpha, the court photograph placed where the match puts it), "hud" (as
+    // "visible", the HUD shown at 1% too), "none". The owner's Ultra, a recorded match after a 10 s setup, its first 2 s:
+    // none 17 fps, frames 21, hud 20; all three at 30 by 2–4 s, the delay ~65 ms by 4 s (78 in dznf8p20: ~20 s to settle).
     const WARM_FRAMES = 4;
     const NEAR_SCALE = 0.62, FAR_SCALE = 0.17;
-    let warmMode = "hud", warmLeft = 0, warmRaf = 0, warmStarted = 0;
+    let warmMode = "frames", warmLeft = 0, warmRaf = 0, warmStarted = 0;
     function warm() {
       if (view === "match" || warmMode === "none") return;
       warmLeft = WARM_FRAMES;
