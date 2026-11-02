@@ -1,8 +1,8 @@
 {
   "environment": "staging",
-  "commit": "9a8f253192cd09394e799398d1a3ac1d2688837f",
-  "subject": "Receiver 79: warm the match's sheets at the sizes it draws them, over four frames, the canvas cleared only on the last (bench-selectable modes)",
-  "receiverTree": "1d5f5e90e8030b6ae93b53c80141cad5ee000417",
+  "commit": "fd87a1ba9ec3a5a1b56dc77dbc9abd251f48fe61",
+  "subject": "Receiver 79: warm with the canvas and HUD shown faintly under the ready card and the court photograph placed where the match puts it",
+  "receiverTree": "977a6486715bbeda6ceb9c30266a94194d08c797",
   "revision": 79,
-  "deployedAt": "2026-11-02T21:25:56Z"
+  "deployedAt": "2026-11-02T21:42:06Z"
 }

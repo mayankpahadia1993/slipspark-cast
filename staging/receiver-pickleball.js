@@ -75,11 +75,13 @@
     // it (the player's ~0.62 of the sheet, the opponent's ~0.17; scripts' recorded match), over `WARM_FRAMES` animation
     // frames, the canvas cleared only on the last: a draw cleared away in the same frame is dropped unrun, as a 2 x 2
     // draw is decoded at 2 x 2. Never read back (a one-pixel getImageData left the Ultra at ~15 fps all match).
-    // `warmMode` (the hello's `warm`, for benches): "frames" (default), "visible" (the canvas shown under the ready card,
-    // drawn at 2% alpha), "hud" ("visible", and the HUD shown at 1% under the card too), "none".
+    // `warmMode` (the hello's `warm`, for benches): "hud" (default: the canvas shown under the ready card and drawn at 2%
+    // alpha, the HUD shown at 1% and the court photograph placed where the match puts it), "visible" (the canvas only),
+    // "frames" (drawn in the hidden canvas), "none". The owner's Ultra, its first 2 s of a match: frames 8 fps (as
+    // without), hud 12 and 30 by ~4 s (78: ~10 s).
     const WARM_FRAMES = 4;
     const NEAR_SCALE = 0.62, FAR_SCALE = 0.17;
-    let warmMode = "frames", warmLeft = 0, warmRaf = 0, warmStarted = 0;
+    let warmMode = "hud", warmLeft = 0, warmRaf = 0, warmStarted = 0;
     function warm() {
       if (view === "match" || warmMode === "none") return;
       warmLeft = WARM_FRAMES;
@@ -94,6 +96,9 @@
       const shown = warmMode === "visible" || warmMode === "hud";
       if (shown) canvas.style.visibility = "visible";
       if (warmMode === "hud" && hud) { hud.hidden = false; hud.style.visibility = "visible"; hud.style.opacity = "0.01"; }
+      // The court photograph where a match puts it (the phone's "P" op is its aspect fill, as `plateLayout`): moved there
+      // on the match's first frame, it was drawn again at its new size then.
+      if (shown && plate && plate.naturalWidth) placePlate(core.plateLayout([plate.naturalWidth, plate.naturalHeight], core.STAGE.width, core.STAGE.height));
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       if (warmLeft > 1) {
