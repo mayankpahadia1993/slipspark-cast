@@ -1,10 +1,10 @@
 {
   "environment": "production",
-  "commit": "4ed21ccfc498436c12bca68a61c2ccef3d8c2a8b",
-  "subject": "Receiver 79: back to warming the sheets small, never reading the canvas back (a readback left the Ultra drawing pickleball at ~15 fps)",
-  "receiverTree": "3b9fb153cf6ee25b737447167721db85e0a5ffe4",
+  "commit": "0367c59e90cd34602d7b05cdc818f369eb804a81",
+  "subject": "Receiver 79: warm the match's sheets in the hidden canvas by default (benched against none and hud after a 10 s setup)",
+  "receiverTree": "c4c8d143251147b9901c186ed1a1f988ed58841b",
   "revision": 79,
-  "deployedAt": "2026-11-02T21:11:38Z",
+  "deployedAt": "2026-11-02T22:10:14Z",
   "promotedFrom": "staging",
-  "stagedAt": "2026-11-02T21:05:58Z"
+  "stagedAt": "2026-11-02T21:57:02Z"
 }

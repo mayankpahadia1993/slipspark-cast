@@ -69,23 +69,62 @@
       });
     }
 
-    // Every loaded sheet and the court drawn once, small, into the match's canvas while it is hidden (the ready card is
-    // up), so the match's first frames draw pictures the canvas has drawn before (receiver 79). `stats.warmed` counts
-    // them. Never read back from the canvas: on the owner's Ultra a one-pixel getImageData after drawing the sheets whole
-    // left the match at ~15 frames a second throughout (the canvas drawn in software from then on).
+    // The match's pictures warmed while the ready card is up, so its first frames draw nothing for the first time
+    // (receiver 79). On the owner's Ultra the match drew 7–10 frames a second for its first ~2 s: a sheet first drawn at
+    // a size makes its decode at that size there and then. Each loaded sheet is drawn whole at the size the match draws
+    // it (the player's ~0.62 of the sheet, the opponent's ~0.17; scripts' recorded match), over `WARM_FRAMES` animation
+    // frames, the canvas cleared only on the last: a draw cleared away in the same frame is dropped unrun, as a 2 x 2
+    // draw is decoded at 2 x 2. Never read back (a one-pixel getImageData left the Ultra at ~15 fps all match).
+    // `warmMode` (the hello's `warm`, for benches): "frames" (default: drawn in the hidden canvas), "visible" (the canvas
+    // shown under the ready card, drawn at 2% alpha, the court photograph placed where the match puts it), "hud" (as
+    // "visible", the HUD shown at 1% too), "none". The owner's Ultra, a recorded match after a 10 s setup, its first 2 s:
+    // none 17 fps, frames 21, hud 20; all three at 30 by 2–4 s, the delay ~65 ms by 4 s (78 in dznf8p20: ~20 s to settle).
+    const WARM_FRAMES = 4;
+    const NEAR_SCALE = 0.62, FAR_SCALE = 0.17;
+    let warmMode = "frames", warmLeft = 0, warmRaf = 0, warmStarted = 0;
     function warm() {
-      if (view === "match") return;
-      const started = now();
-      let count = 0;
+      if (view === "match" || warmMode === "none") return;
+      warmLeft = WARM_FRAMES;
+      warmStarted = now();
+      if (!warmRaf && !options.manualClock) warmRaf = requestAnimationFrame(warmFrame);
+    }
+    function warmFrame() {
+      warmRaf = 0;
+      if (view === "match" || warmLeft <= 0) { endWarm(); return; }
+      sizeCanvas();
+      const k = canvas.width / core.STAGE.width;
+      const shown = warmMode === "visible" || warmMode === "hud";
+      if (shown) canvas.style.visibility = "visible";
+      if (warmMode === "hud" && hud) { hud.hidden = false; hud.style.visibility = "visible"; hud.style.opacity = "0.01"; }
+      // The court photograph where a match puts it (the phone's "P" op is its aspect fill, as `plateLayout`): moved there
+      // on the match's first frame, it was drawn again at its new size then.
+      if (shown && plate && plate.naturalWidth) placePlate(core.plateLayout([plate.naturalWidth, plate.naturalHeight], core.STAGE.width, core.STAGE.height));
       ctx.setTransform(1, 0, 0, 1, 0, 0);
-      for (const entry of pictures.values()) {
-        if (!entry.image) continue;
-        try { ctx.drawImage(entry.image, 0, 0, 2, 2); count += 1; } catch (error) { /* a picture the canvas can't draw */ }
-      }
-      if (plate) { try { ctx.drawImage(plate, 0, 0, 2, 2); count += 1; } catch (error) { /* as above */ } }
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      stats.warmed = count;
-      stats.warmMs = Math.round(now() - started);
+      if (warmLeft > 1) {
+        ctx.setTransform(k, 0, 0, k, 0, 0);
+        ctx.globalAlpha = shown ? 0.02 : 1;
+        let count = 0;
+        for (const [name, entry] of pictures) {
+          if (!entry.image) continue;
+          const scale = (/Opponent/.test(name) ? FAR_SCALE : NEAR_SCALE) / (entry.scale || 1);
+          try { ctx.drawImage(entry.image, 0, 0, entry.image.width * scale, entry.image.height * scale); count += 1; } catch (error) { /* a picture the canvas can't draw */ }
+        }
+        ctx.globalAlpha = 1;
+        stats.warmed = count;
+      }
+      warmLeft -= 1;
+      warmRaf = requestAnimationFrame(warmFrame);
+    }
+    function endWarm() {
+      if (warmRaf) cancelAnimationFrame(warmRaf);
+      warmRaf = 0;
+      warmLeft = 0;
+      if (hud) hud.style.opacity = "";
+      stats.warmMs = Math.round(now() - warmStarted);
+      // The canvas and HUD as the view has them (a match's first frame clears the canvas itself).
+      if (view !== "match") { ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, canvas.width, canvas.height); }
+      applyView();
     }
 
     function loadSheet(name) {
@@ -116,7 +155,7 @@
         lookLoadedAt = now();
         const missing = loaded.filter((x) => !x).length;
         warm();
-        send({ t: "loaded", look, ms: Math.round(lookLoadedAt - started), missing, warmed: stats.warmed || 0, warmMs: stats.warmMs || 0 });
+        send({ t: "loaded", look, ms: Math.round(lookLoadedAt - started), missing, warm: warmMode });
       });
     }
 
@@ -360,7 +399,8 @@
         t: "stats", fps: Math.round(stats.draws.length / seconds * 10) / 10,
         gap: Math.round(core.percentile(stats.draws, 0.9)), frames: stats.frames,
         drawMs: Math.round(core.percentile(stats.drawMs, 0.5) * 10) / 10, queue: stats.queue || 0,
-        stale: Math.round(stats.stale || 0), delay: Math.round(playout.delay), late: playout.counts.late, missing: stats.missing
+        stale: Math.round(stats.stale || 0), delay: Math.round(playout.delay), late: playout.counts.late, missing: stats.missing,
+        warmed: stats.warmed || 0, warmMs: stats.warmMs || 0
       };
       if (view === "match") send(message);
       stats.draws = []; stats.drawMs = []; stats.frames = 0; stats.missing = 0; stats.since = t;
@@ -381,6 +421,7 @@
         case "hello":
           helloAt = now();
           debug = message.debug === 1;
+          if (["frames", "visible", "hud", "none"].includes(message.warm)) warmMode = message.warm;
           if (chip) chip.hidden = !debug;
           preload(message.look, message.sheets);
           send({ t: "ready", pickleball: core.VERSION, version: RECEIVER_VERSION, looks: ["man", "woman"], friends: 1 });
