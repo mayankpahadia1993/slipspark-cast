@@ -14,7 +14,7 @@
   // (a friend's look, each player's kit); the HUD's `nm` names the score's rows, `sp` a same-phone split screen with
   // `ban2`/`call2` for its right half; a frame's "V" ops split the court in two; `friends: 1` says this TV draws them.
   const NAMESPACE = "urn:x-cast:com.slipspark.pickleball";
-  const RECEIVER_VERSION = 78;
+  const RECEIVER_VERSION = 79;
   const core = window.RallycadePickleballCore;
   const sceneCore = window.RallycadeSceneCore;
 
@@ -53,14 +53,37 @@
       return manifestWait;
     }
 
+    // Decoded before it is first drawn (receiver 79): a sheet decoded on the
+    // spot stalled the match's first frames (fps 10 for its first 2 s on the
+    // owner's Ultra), as cricket's stadium did before receiver 57.
     function loadImage(src) {
       return new Promise((resolve) => {
         const image = new Image();
         image.decoding = "async";
-        image.onload = () => resolve(image);
+        image.onload = () => {
+          if (image.decode) image.decode().then(() => resolve(image), () => resolve(image));
+          else resolve(image);
+        };
         image.onerror = () => resolve(null);
         image.src = src;
       });
+    }
+
+    // Every loaded sheet and the court drawn once into the match's canvas while it is hidden (the ready card is up),
+    // so the match's first frames draw pictures the canvas has drawn before (receiver 79). `stats.warmed` counts them.
+    function warm() {
+      if (view === "match") return;
+      const started = now();
+      let count = 0;
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      for (const entry of pictures.values()) {
+        if (!entry.image) continue;
+        try { ctx.drawImage(entry.image, 0, 0, 2, 2); count += 1; } catch (error) { /* a picture the canvas can't draw */ }
+      }
+      if (plate) { try { ctx.drawImage(plate, 0, 0, 2, 2); count += 1; } catch (error) { /* as above */ } }
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      stats.warmed = count;
+      stats.warmMs = Math.round(now() - started);
     }
 
     function loadSheet(name) {
@@ -90,7 +113,8 @@
       return loadManifest().then(() => Promise.all([loadPlate()].concat(core.sheetsFor(manifest, look, named).map(loadSheet)))).then((loaded) => {
         lookLoadedAt = now();
         const missing = loaded.filter((x) => !x).length;
-        send({ t: "loaded", look, ms: Math.round(lookLoadedAt - started), missing });
+        warm();
+        send({ t: "loaded", look, ms: Math.round(lookLoadedAt - started), missing, warmed: stats.warmed || 0, warmMs: stats.warmMs || 0 });
       });
     }
 
@@ -297,20 +321,27 @@
       if (next === "match" && view !== "match") { playout.reset(); if (clockOffset !== null) playout.setOffset(clockOffset); drawn = false; lastDrawn = null; ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, canvas.width, canvas.height); }
       view = next;
       if (view !== "off") { loadPlate(); }
+      // Each setup warms the pictures again: a Chromecast lets decoded pictures go (receiver 79).
+      if (view === "ready") warm();
       applyView();
     }
 
     // MARK: Loop and stats
 
+    // When the last animation frame ran: an arrival handled long after it was held up by the page, not the trip.
+    let lastTick = null;
+    const STALLED_MS = 60;
     function frame() {
       raf = 0;
       if (!running) return;
-      if (view === "match") drawAt(now());
-      playout.settle(playout.target(averageGap()));
+      const t = now();
+      if (view === "match") drawAt(t);
+      playout.settle(playout.target(averageGap()), lastTick === null ? 33 : t - lastTick);
+      lastTick = t;
       maybeReport();
       raf = requestAnimationFrame(frame);
     }
-    function start() { if (running) return; running = true; sizeCanvas(); if (!options.manualClock) raf = requestAnimationFrame(frame); }
+    function start() { if (running) return; running = true; lastTick = null; sizeCanvas(); if (!options.manualClock) raf = requestAnimationFrame(frame); }
     function stop() { running = false; if (raf) cancelAnimationFrame(raf); raf = 0; }
 
     let arrivals = [];
@@ -366,7 +397,8 @@
           break;
         case "f": {
           const local = now();
-          if (playout.add(message, local)) {
+          const stalled = running && lastTick !== null && local - lastTick > STALLED_MS;
+          if (playout.add(message, local, stalled)) {
             stats.frames += 1;
             arrivals.push(local); if (arrivals.length > 20) arrivals.shift();
           }
