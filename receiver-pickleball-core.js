@@ -43,7 +43,16 @@
   const MAX_BLEND_GAP = 160;
   // How far behind the phone the TV draws: enough for a frame to arrive
   // (the trip and its jitter) and the next to blend toward.
-  const DELAY = { start: 100, least: 60, most: 220, margin: 12, window: 90 };
+  // Receiver 79 (dznf8p20, the owner on 274: "lagged a bit when it started
+  // in chromecast, and then became better. Same for pickleball"): the TV's
+  // own first-draw stalls counted as late arrivals and took the delay to
+  // ~205 ms, and it came down 0.5 ms an animation frame (~15 ms a second),
+  // so the picture sat ~300 ms behind the phone for the match's first ~20 s
+  // (the bench on the owner's Ultra: 204 ms, 14 s to 70). Now it settles by
+  // time, `up` and `down` ms a second; arrivals handled after the TV's page
+  // had stalled (`stalled`), or in the match's first `warmup` ms, ask for
+  // nothing; and its window is ~2 s of frames.
+  const DELAY = { start: 100, least: 60, most: 220, margin: 12, window: 60, up: 120, down: 40, warmup: 500 };
 
   const KINDS = new Set(["P", "S", "p", "B", "N", "F", "R", "V"]);
   const n = (v) => Number(v) / 10;
@@ -135,6 +144,8 @@
     let delay = DELAY.start;
     let late = [];
     let lateCount = 0, received = 0;
+    // The match's first arrival (`DELAY.warmup`).
+    let firstLocal = null;
     function phoneTime(local) {
       const o = offset !== null ? offset : provisional;
       return o === null ? null : local - o;
@@ -146,12 +157,15 @@
       get counts() { return { received, late: lateCount }; },
       setOffset(value) { if (Number.isFinite(Number(value))) offset = Number(value); },
       phoneTime,
-      add(frame, local) {
+      // `stalled`: handled after the TV's page had stalled (its lateness is the
+      // TV's own, not the trip's).
+      add(frame, local, stalled) {
         if (!frame || !Number.isFinite(Number(frame.s)) || !Array.isArray(frame.o)) return false;
         received += 1;
         if (offset === null && provisional === null) provisional = local - frame.s;
+        if (firstLocal === null) firstLocal = local;
         const arrived = phoneTime(local);
-        if (arrived !== null) {
+        if (arrived !== null && !stalled && local - firstLocal >= DELAY.warmup) {
           const lateness = arrived - frame.s;
           late.push(lateness);
           if (late.length > DELAY.window) late.shift();
@@ -181,11 +195,13 @@
         const want = percentile(late, 0.9) + (frameGap || 33) + DELAY.margin;
         return Math.max(DELAY.least, Math.min(DELAY.most, want));
       },
-      // Moves the delay toward `target` a little each drawn frame: up quickly
-      // (late frames freeze the picture), down slowly (each step is a skip).
-      settle(target) {
-        if (target > delay) delay = Math.min(target, delay + 4);
-        else if (target < delay) delay = Math.max(target, delay - 0.5);
+      // Moves the delay toward `target`, `dt` ms after the last time (one
+      // animation frame unless given): up quickly (late frames freeze the
+      // picture), down more gently (each step is a skip).
+      settle(target, dt) {
+        const ms = Math.max(0, Math.min(100, Number.isFinite(dt) ? dt : 33));
+        if (target > delay) delay = Math.min(target, delay + DELAY.up * ms / 1000);
+        else if (target < delay) delay = Math.max(target, delay - DELAY.down * ms / 1000);
         return delay;
       },
       setDelay(value) { delay = value; },
@@ -209,7 +225,7 @@
         const shown = index >= 0 ? (b ? t : a.s) : a.s;
         return { moment: t, frame: a, ops, push, hud, stale: now - shown, ahead: frames.filter((f) => f.s > t).length };
       },
-      reset() { frames = []; huds = []; offset = null; provisional = null; delay = DELAY.start; late = []; lateCount = 0; received = 0; }
+      reset() { frames = []; huds = []; offset = null; provisional = null; delay = DELAY.start; late = []; lateCount = 0; received = 0; firstLocal = null; }
     };
   }
 

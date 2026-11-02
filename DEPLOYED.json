@@ -1,10 +1,10 @@
 {
   "environment": "production",
-  "commit": "2a6708915a63904737fd576729779e90d6d2c744",
-  "subject": "Merge pull request #150 from mayankpahadia1993/claude/handheld-wider",
-  "receiverTree": "3f5847afd45af1979bd171cd1f99599255d73d1f",
-  "revision": 78,
-  "deployedAt": "2026-11-01T00:00:21Z",
+  "commit": "4ed21ccfc498436c12bca68a61c2ccef3d8c2a8b",
+  "subject": "Receiver 79: back to warming the sheets small, never reading the canvas back (a readback left the Ultra drawing pickleball at ~15 fps)",
+  "receiverTree": "3b9fb153cf6ee25b737447167721db85e0a5ffe4",
+  "revision": 79,
+  "deployedAt": "2026-11-02T21:11:38Z",
   "promotedFrom": "staging",
-  "stagedAt": "2026-10-31T23:59:06Z"
+  "stagedAt": "2026-11-02T21:05:58Z"
 }
