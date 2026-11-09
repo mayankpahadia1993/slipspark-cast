@@ -14,7 +14,7 @@
   // (a friend's look, each player's kit); the HUD's `nm` names the score's rows, `sp` a same-phone split screen with
   // `ban2`/`call2` for its right half; a frame's "V" ops split the court in two; `friends: 1` says this TV draws them.
   const NAMESPACE = "urn:x-cast:com.slipspark.pickleball";
-  const RECEIVER_VERSION = 79;
+  const RECEIVER_VERSION = 81;
   const core = window.RallycadePickleballCore;
   const sceneCore = window.RallycadeSceneCore;
 
@@ -409,7 +409,8 @@
     }
 
     function report(where, error) {
-      send({ t: "error", where, message: String((error && error.message) || error) });
+      const receiverCore = typeof globalThis !== "undefined" ? globalThis.SlipSparkReceiverCore : null;
+      send(Object.assign({ t: "error", where, message: String((error && error.message) || error) }, receiverCore ? receiverCore.failureReport(where, error) : {}));
     }
 
     // MARK: Messages

@@ -1149,28 +1149,57 @@
       }).catch((error) => { entry.failed = true; report("kit", error); });
       return null;
     }
-    function dress(drawn, look) {
-      const id = drawn.key + "|" + look;
+    // The gear's masks (receiver 81): gear-masks-bowler-end-N, loaded as the kit's are, the first time a frame wears gear.
+    const gearSheets = new Map();
+    function gearSheet(id) {
+      const known = gearSheets.get(id);
+      if (known) return known.image;
+      const sheet = sheets.get(id);
+      if (!sheet) return null;
+      const entry = { image: null, failed: false };
+      gearSheets.set(id, entry);
+      const file = sheet.file.replace(/^atlas-bowler-end-/, "gear-masks-bowler-end-");
+      keptURL("scene-images/" + file).then((url) => loadImage(url, false)).then((image) => {
+        if ((image.naturalWidth || image.width) !== sheet.width || (image.naturalHeight || image.height) !== sheet.height) {
+          throw new Error("gear masks " + file + " are " + (image.naturalWidth || image.width) + "x" + (image.naturalHeight || image.height));
+        }
+        if (!released) entry.image = image;
+      }).catch((error) => { entry.failed = true; report("gear", error); });
+      return null;
+    }
+    function dress(drawn, wantedLook, wantedGear) {
+      // What can be worn now: the look once its masks are in, the gear once its are (each drawn as soon as it can be).
+      const cut = drawn.cut, sheet = sheets.get(cut.atlas);
+      const mask = wantedLook ? maskSheet(cut.atlas) : null;
+      const gearMask = wantedGear ? gearSheet(cut.atlas) : null;
+      const look = mask ? wantedLook : "", gear = gearMask ? wantedGear : "";
+      if ((!look && !gear) || !sheet || !sheet.image) return null;
+      const id = drawn.key + "|" + look + (gear ? "|" + gear : "");
       let made = dressed.get(id);
       if (made) {
         dressed.delete(id);
         dressed.set(id, made);
         return { image: made, size: drawn.size, key: id };
       }
-      const cut = drawn.cut, sheet = sheets.get(cut.atlas);
-      const mask = maskSheet(cut.atlas);
-      if (!mask || !sheet || !sheet.image) return null;
       try {
         made = document.createElement("canvas");
         made.width = cut.width;
         made.height = cut.height;
         const c = made.getContext("2d");
-        c.drawImage(mask, cut.x, cut.y, cut.w, cut.h, cut.ox, cut.oy, cut.w, cut.h);
-        const shares = c.getImageData(0, 0, cut.width, cut.height).data;
-        c.clearRect(0, 0, cut.width, cut.height);
+        let shares = null, gearShares = null;
+        if (mask) {
+          c.drawImage(mask, cut.x, cut.y, cut.w, cut.h, cut.ox, cut.oy, cut.w, cut.h);
+          shares = c.getImageData(0, 0, cut.width, cut.height).data;
+          c.clearRect(0, 0, cut.width, cut.height);
+        }
+        if (gearMask) {
+          c.drawImage(gearMask, cut.x, cut.y, cut.w, cut.h, cut.ox, cut.oy, cut.w, cut.h);
+          gearShares = c.getImageData(0, 0, cut.width, cut.height).data;
+          c.clearRect(0, 0, cut.width, cut.height);
+        }
         c.drawImage(sheet.image, cut.x, cut.y, cut.w, cut.h, cut.ox, cut.oy, cut.w, cut.h);
         const pixels = c.getImageData(0, 0, cut.width, cut.height);
-        core.dyeFrame(pixels.data, shares, look);
+        core.dyeFrame(pixels.data, shares, look || null, gearShares, gearShares ? gear : null);
         c.putImageData(pixels, 0, 0);
       } catch (error) {
         report("kit", error);
@@ -1504,7 +1533,7 @@
         let drawn = pictureFor(op[3]);
         if (!drawn) return;
         // The bowler's-end batter in his kit (receiver 73): his frame dyed once for the look.
-        if (op[7] && drawn.cut) drawn = dress(drawn, op[7]) || drawn;
+        if ((op[7] || op[8]) && drawn.cut) drawn = dress(drawn, op[7] || "", op[8] || "") || drawn;
         const multiply = o && o.multiply !== undefined ? o.multiply : filtersOf(frame, op[5]).multiply;
         begin(c, frame, alpha, blend, o && o.clipRef != null ? o.clipRef : op[6], scale);
         if (multiply) c.globalAlpha *= Math.max(0, Math.min(1, multiply[3] / 1000));
@@ -2443,7 +2472,8 @@
     }
 
     function report(where, error) {
-      send({ t: "error", where, message: String((error && error.message) || error).slice(0, 300) });
+      const receiverCore = typeof globalThis !== "undefined" ? globalThis.SlipSparkReceiverCore : null;
+      send(Object.assign({ t: "error", where, message: String((error && error.message) || error).slice(0, 300) }, receiverCore ? receiverCore.failureReport(where, error) : {}));
     }
 
     function snapshot(quality, reply) {

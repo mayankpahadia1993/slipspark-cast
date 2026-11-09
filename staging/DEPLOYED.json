@@ -1,8 +1,8 @@
 {
   "environment": "staging",
-  "commit": "0367c59e90cd34602d7b05cdc818f369eb804a81",
-  "subject": "Receiver 79: warm the match's sheets in the hidden canvas by default (benched against none and hud after a 10 s setup)",
-  "receiverTree": "c4c8d143251147b9901c186ed1a1f988ed58841b",
-  "revision": 79,
-  "deployedAt": "2026-11-02T21:57:02Z"
+  "commit": "cc9a17bf02f91371bdae9316e2ed1b207807526d",
+  "subject": "Receiver 81: the batter's gear at the bowler's end; derived exports for shopVersion 4",
+  "receiverTree": "e5c8745d016ad966ebe1b4cc1b2c7068c1fe173b",
+  "revision": 81,
+  "deployedAt": "2026-11-09T02:30:31Z"
 }

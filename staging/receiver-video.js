@@ -158,7 +158,8 @@
       lastError = where + " " + message;
       if (Date.now() - lastErrorSentAt < 500) return;
       lastErrorSentAt = Date.now();
-      send({ t: "error", where, message: message.slice(0, 200) });
+      const receiverCore = typeof globalThis !== "undefined" ? globalThis.SlipSparkReceiverCore : null;
+      send(Object.assign({ t: "error", where, message: message.slice(0, 200) }, receiverCore ? receiverCore.failureReport(where, error) : {}));
     }
 
     function snapshot() {

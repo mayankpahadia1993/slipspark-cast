@@ -110,22 +110,73 @@
     return String(look).split("|").map((part) => (part === "-" ? null : part.split(",").map((v) => Number(v) / 1000)));
   }
 
+  // MARK: The batter's gear (receiver 81, shopVersion 4, Nov 2026)
+  //
+  // The inset command's gear after its look (iOS BowlerEndKitArt.receiverGear, Android core GearArt.receiverGear):
+  // [helmet, pads, bat], each 0 for the classic one, else thousandths: the helmet's shell [r, g, b, shade0, shade1],
+  // the pads and gloves [r, g, b], the bat [sticker r, g, b, finish r, g, b, finish shade0, shade1] (a plain willow's
+  // finish all 0). Worn through the gear masks (gear-masks-bowler-end-N, made by scripts/locker/gear-masks.py: green the
+  // pads and gloves, blue the willow, red the shell where blue is 0 and the sticker zone where blue is above 0) with
+  // shared/stadium/gear-art.json's two operations, as the phones wear it. An older receiver never reads it.
+  const GEAR_HELMET_OPACITY = 1;
+  const GEAR_FINISH_OPACITY = 1;
+  const GEAR_STICKER = { opacity: 0.95, shade: [0.45, 0.76] };
+  function readGear(value) {
+    if (!isArray(value) || value.length !== 3) return null;
+    const sizes = [5, 3, 8];
+    const parts = value.map((part, index) => (isArray(part) && part.length === sizes[index] && part.every((v) => Number.isFinite(Number(v)))
+      ? part.map((v) => Math.max(-5000, Math.min(5000, Math.round(Number(v))))) : null));
+    if (!parts.some(Boolean)) return null;
+    return "g" + parts.map((part) => (part ? part.join(",") : "-")).join("|");
+  }
+  // {helmet, pads, bat} as 0-1 numbers (null for the classic one).
+  function gearColours(gear) {
+    const parts = String(gear || "").replace(/^g/, "").split("|")
+      .map((part) => (part === "-" || part === "" ? null : part.split(",").map((v) => Number(v) / 1000)));
+    const [helmet, pads, bat] = [parts[0] || null, parts[1] || null, parts[2] || null];
+    return {
+      helmet: helmet && { shell: helmet.slice(0, 3), shade: helmet.slice(3, 5) },
+      pads,
+      bat: bat && { sticker: bat.slice(0, 3), finish: bat.slice(3, 6).some((v) => v !== 0) ? bat.slice(3, 6) : null, shade: bat.slice(6, 8) }
+    };
+  }
+  function tintPixel(rgb, colour, share, shade) {
+    const light = shade[0] + shade[1] * (0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2]);
+    for (let c = 0; c < 3; c += 1) rgb[c] = rgb[c] * (1 - share) + Math.max(0, Math.min(1, colour[c] * light)) * share;
+  }
+
   // Dyes `rgba` (a frame's pixels, straight alpha, as ImageData) through
-  // `mask` (the same size: red fabric, green trim, blue grip) in `look`.
-  function dyeFrame(rgba, mask, look) {
-    const [fabric, trim, grip] = lookColours(look);
+  // `mask` (the same size: red fabric, green trim, blue grip) in `look`,
+  // and wears `gear` through `gearMask` (receiver 81): the kit's cloth and
+  // the pads in one dye, then the helmet's shell, the bat's finish and its
+  // sticker, then the grip, in the phones' order.
+  function dyeFrame(rgba, mask, look, gearMask, gear) {
+    const [fabric, trim, grip] = look ? lookColours(look) : [null, null, null];
+    const worn = gear && gearMask ? gearColours(gear) : { helmet: null, pads: null, bat: null };
+    const rgb = [0, 0, 0];
     for (let i = 0; i < rgba.length; i += 4) {
       if (!rgba[i + 3]) continue;
-      const f = fabric ? mask[i] / 255 : 0, t = trim ? mask[i + 1] / 255 : 0, g = grip ? mask[i + 2] / 255 : 0;
-      if (!f && !t && !g) continue;
+      const f = fabric && mask ? mask[i] / 255 : 0, t = trim && mask ? mask[i + 1] / 255 : 0, g = grip && mask ? mask[i + 2] / 255 : 0;
+      const red = worn.helmet || worn.bat ? gearMask[i] : 0, willow = worn.bat ? gearMask[i + 2] : 0;
+      const p = worn.pads ? gearMask[i + 1] / 255 : 0, h = worn.helmet && !gearMask[i + 2] ? red / 255 : 0;
+      const w = willow / 255, s = willow ? red / 255 : 0;
+      if (!f && !t && !g && !p && !h && !w) continue;
       let r = rgba[i] / 255, gr = rgba[i + 1] / 255, b = rgba[i + 2] / 255;
-      if (f || t) {
+      if (f || t || p) {
         const factor = [1, 1, 1];
         for (let c = 0; c < 3; c += 1) {
           if (f) factor[c] = factor[c] * (1 - f) + fabric[c] * f;
           if (t) factor[c] = factor[c] * (1 - t) + trim[c] * t;
+          if (p) factor[c] = factor[c] * (1 - p) + worn.pads[c] * p;
         }
         r *= factor[0]; gr *= factor[1]; b *= factor[2];
+      }
+      if (h || w) {
+        rgb[0] = r; rgb[1] = gr; rgb[2] = b;
+        if (h) tintPixel(rgb, worn.helmet.shell, h * GEAR_HELMET_OPACITY, worn.helmet.shade);
+        if (w && worn.bat.finish) tintPixel(rgb, worn.bat.finish, w * GEAR_FINISH_OPACITY, worn.bat.shade);
+        if (s) tintPixel(rgb, worn.bat.sticker, s * GEAR_STICKER.opacity, GEAR_STICKER.shade);
+        r = rgb[0]; gr = rgb[1]; b = rgb[2];
       }
       if (g) {
         const light = GRIP_SHADE[0] + GRIP_SHADE[1] * (0.2126 * r + 0.7152 * gr + 0.0722 * b);
@@ -141,7 +192,7 @@
 
   function expandInset(op, out) {
     const rect = op[2], parts = op[4];
-    const look = readLook(op[5]);
+    const look = readLook(op[5]), gear = readGear(op[6]);
     if (!isArray(rect) || rect.length < 4 || !isArray(parts)) return;
     const [x, y, w, h] = rect.map((v) => Number(v) / 10);
     if (!(w > 0) || !(h > 0) || ![x, y].every(Number.isFinite)) return;
@@ -157,8 +208,9 @@
       if (!isArray(part)) continue;
       if (part[0] === "i" && typeof part[1] === "string" && isArray(part[2]) && part[2].length === 6) {
         const drawn = ["i", A((part[3] == null ? 1000 : Number(part[3])) / 1000), "source-over", part[1], part[2], -1, -1];
-        // The batter in his kit: his frames carry the look.
-        if (look && /^bowler-end-batter-/.test(part[1])) drawn.push(look);
+        // The batter in his kit: his frames carry the look, and his gear after it (receiver 81).
+        if ((look || gear) && /^bowler-end-batter-/.test(part[1])) drawn.push(look || "");
+        if (gear && /^bowler-end-batter-/.test(part[1])) drawn.push(gear);
         out.push(drawn);
       } else if (part[0] === "e" && isArray(part[1]) && part[1].length === 4 && isArray(part[2])) {
         const [cx, cy, rx, ry] = part[1].map((v) => Number(v) / 10);
@@ -1178,6 +1230,7 @@
     isWeakDongle, drawsInset, storageNames, STAGE, MAX_BLEND_GAP, MAX_STEP, CANVAS, normalizeFrame, plainFrame, expandInset, shapeKey, opShape, viewOf, matchOps, blendMatched, blendMatchedInto,
     blendFrames, blendFramesInto, cloneFrame, createTimeline, createClock,
     percentile, tracePath, cssColor, pictureSize, canvasPlan, canvasWidth, createRateWatch, STEADY, createSteadyWatch, createLiveLayer, hasLiveSlot, poseAge, poseAhead,
-    filterParts, opBounds, layerEnd, clipsWholeStage, mergeRects, overStrip, readLook, lookColours, dyeFrame, GRIP_OPACITY, GRIP_SHADE
+    filterParts, opBounds, layerEnd, clipsWholeStage, mergeRects, overStrip, readLook, lookColours, dyeFrame, GRIP_OPACITY, GRIP_SHADE,
+    readGear, gearColours, GEAR_HELMET_OPACITY, GEAR_FINISH_OPACITY, GEAR_STICKER
   };
 });
