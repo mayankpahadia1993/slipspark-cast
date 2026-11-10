@@ -1,0 +1,956 @@
+{
+ "version": 1,
+ "clips": "v1",
+ "base": {
+  "sandbox": "https://mayankpahadia1993.github.io/slipspark-cast/staging/crowd/chant/v1/",
+  "production": null
+ },
+ "generic": {
+  "walkout": "crowd-walkout",
+  "milestone": "crowd-milestone"
+ },
+ "loudness": {
+  "target": -26.0,
+  "measure": "ITU-R BS.1770-4 integrated LUFS of the decoded .m4a",
+  "reference": "SlipSpark/Resources/CricketAudio/cricket-cheer.wav is -26.3 LUFS",
+  "min": -26.1,
+  "max": -26.0,
+  "generic": {
+   "walkout": {
+    "lufs": -26.1,
+    "truePeak": -10.3
+   },
+   "milestone": {
+    "lufs": -26.1,
+    "truePeak": -14.3
+   }
+  }
+ },
+ "checks": "A name is here only when both clips passed: Gemini audio analysis (gemini-3.8-flash, majority of 3 asks) picked the right name from it plus 5 confusable names from the list plus \"none\", and faster-whisper large-v3-turbo forced alignment scored the right name highest on the clip's chant stem.",
+ "names": {
+  "amit": {
+   "walkout": {
+    "file": "amit-walkout.m4a",
+    "bytes": 133694,
+    "sha256": "5256a861136803d44e6987827848670dc8afa9dd26a6925ee8b037f9113951a6",
+    "seconds": 8.24,
+    "lufs": -26.1
+   },
+   "milestone": {
+    "file": "amit-milestone.m4a",
+    "bytes": 89797,
+    "sha256": "8578a5e2648fe30cb53885779b4e83c15a5e4f0a4e32c30e6da128f0bbd33298",
+    "seconds": 5.53,
+    "lufs": -26.1
+   },
+   "heard": {
+    "gemini": "amit",
+    "whisper": "amit"
+   },
+   "clear": 3
+  },
+  "arjun": {
+   "walkout": {
+    "file": "arjun-walkout.m4a",
+    "bytes": 133736,
+    "sha256": "b20ed0fa1500e67c4d61f1aff44ba63ef7343b1831c32062eaaa15af69a3fa4e",
+    "seconds": 8.24,
+    "lufs": -26.1
+   },
+   "milestone": {
+    "file": "arjun-milestone.m4a",
+    "bytes": 89878,
+    "sha256": "e6a70249ab54725883302907fc7a41c91a0401bc9b7c3faf0a61e3260de3c33a",
+    "seconds": 5.53,
+    "lufs": -26.1
+   },
+   "heard": {
+    "gemini": "arjun",
+    "whisper": "arjun"
+   },
+   "clear": 1
+  },
+  "akash": {
+   "walkout": {
+    "file": "akash-walkout.m4a",
+    "bytes": 133829,
+    "sha256": "c745a8adc9cfc67a93281a336ac6a4230c6de77f3ce72d8afacf80daeefa3726",
+    "seconds": 8.24,
+    "lufs": -26.1
+   },
+   "milestone": {
+    "file": "akash-milestone.m4a",
+    "bytes": 89984,
+    "sha256": "5a79f02c87db8baa33247132131e50d5cd20ce16d81f7a5197fac77bbe52fe67",
+    "seconds": 5.53,
+    "lufs": -26.1
+   },
+   "heard": {
+    "gemini": "akash",
+    "whisper": "akash"
+   },
+   "clear": 1
+  },
+  "abhishek": {
+   "walkout": {
+    "file": "abhishek-walkout.m4a",
+    "bytes": 134348,
+    "sha256": "98ae98589b36704329ed01e148d1593c30b4ea761db2ff3a129cabf0b58e3b0a",
+    "seconds": 8.24,
+    "lufs": -26.1
+   },
+   "milestone": {
+    "file": "abhishek-milestone.m4a",
+    "bytes": 89891,
+    "sha256": "09b5c95addfa86d4378eb494f90bc13cff5a0a03d1e0fe729bb7c70bb1cbbe4a",
+    "seconds": 5.53,
+    "lufs": -26.1
+   },
+   "heard": {
+    "gemini": "abhishek",
+    "whisper": "abhishek"
+   },
+   "clear": 1
+  },
+  "nitin": {
+   "walkout": {
+    "file": "nitin-walkout.m4a",
+    "bytes": 133751,
+    "sha256": "f614565b654b0e976f18de92d7f64e168074f13010ee2923d51eb1d7298627f8",
+    "seconds": 8.24,
+    "lufs": -26.1
+   },
+   "milestone": {
+    "file": "nitin-milestone.m4a",
+    "bytes": 89972,
+    "sha256": "19b7ba7390656e54b82c8516cc7bfc154dc0b924069497b1db2f80dcb7feb0ab",
+    "seconds": 5.53,
+    "lufs": -26.1
+   },
+   "heard": {
+    "gemini": "nitin",
+    "whisper": "nitin"
+   },
+   "clear": 1
+  },
+  "aarav": {
+   "walkout": {
+    "file": "aarav-walkout.m4a",
+    "bytes": 133796,
+    "sha256": "99acef7fc03a4fbc59bd145bb2c9b0b4422d874c5c1d38d881213687be642f95",
+    "seconds": 8.24,
+    "lufs": -26.1
+   },
+   "milestone": {
+    "file": "aarav-milestone.m4a",
+    "bytes": 89918,
+    "sha256": "d0caff122aa5351d6ff82b821236fe7c3e740781da80f94c3fd9b8e5e3b0b02a",
+    "seconds": 5.53,
+    "lufs": -26.0
+   },
+   "heard": {
+    "gemini": "aarav",
+    "whisper": "aarav"
+   },
+   "clear": 1
+  },
+  "anuj": {
+   "walkout": {
+    "file": "anuj-walkout.m4a",
+    "bytes": 134318,
+    "sha256": "ad4aaa94530c50973b0e102988868aaa5d3b78f112f989ffd4059fa5fdc7409b",
+    "seconds": 8.24,
+    "lufs": -26.1
+   },
+   "milestone": {
+    "file": "anuj-milestone.m4a",
+    "bytes": 89975,
+    "sha256": "5cf549ec777e33442a38b1ddf68549ff7aec9f745bcf280844dae9113b422b0f",
+    "seconds": 5.53,
+    "lufs": -26.1
+   },
+   "heard": {
+    "gemini": "anuj",
+    "whisper": "anuj"
+   },
+   "clear": 1
+  },
+  "ashish": {
+   "walkout": {
+    "file": "ashish-walkout.m4a",
+    "bytes": 134326,
+    "sha256": "aecbbb27d4eafd0bada1256f33daf0cdf9f2a4aa36bb7172f2dedf6774ffdaad",
+    "seconds": 8.24,
+    "lufs": -26.1
+   },
+   "milestone": {
+    "file": "ashish-milestone.m4a",
+    "bytes": 90066,
+    "sha256": "ae58f28e8c392dd5d621c86951583c25fdb831167e9a6b705535a9eb9b968c50",
+    "seconds": 5.53,
+    "lufs": -26.1
+   },
+   "heard": {
+    "gemini": "ashish",
+    "whisper": "ashish"
+   },
+   "clear": 1
+  },
+  "ayush": {
+   "walkout": {
+    "file": "ayush-walkout.m4a",
+    "bytes": 134399,
+    "sha256": "a6ca78b6b60d39266870a4c36352c530a415dad06a59917c3597b99bf4d840c6",
+    "seconds": 8.24,
+    "lufs": -26.1
+   },
+   "milestone": {
+    "file": "ayush-milestone.m4a",
+    "bytes": 89795,
+    "sha256": "48db671e598285c2b3499822c14f7c5e9ecd337791b267aa41bea6e6b54f679f",
+    "seconds": 5.53,
+    "lufs": -26.1
+   },
+   "heard": {
+    "gemini": "ayush",
+    "whisper": "ayush"
+   },
+   "clear": 1
+  },
+  "deepak": {
+   "walkout": {
+    "file": "deepak-walkout.m4a",
+    "bytes": 133574,
+    "sha256": "c17971ee2de2d39c4b929696b9ca5ce1dd8ce389364542682986f254578840d4",
+    "seconds": 8.24,
+    "lufs": -26.1
+   },
+   "milestone": {
+    "file": "deepak-milestone.m4a",
+    "bytes": 89978,
+    "sha256": "c475f6b5b4f71f501e2de89ef87f3d08b719ac3647e3a90783609fcef1ae6163",
+    "seconds": 5.53,
+    "lufs": -26.1
+   },
+   "heard": {
+    "gemini": "deepak",
+    "whisper": "deepak"
+   },
+   "clear": 1
+  },
+  "anand": {
+   "walkout": {
+    "file": "anand-walkout.m4a",
+    "bytes": 133789,
+    "sha256": "1ef8c91783c1f6fe9d2218e20be12636bf91e78c6cafd6368b25fd5712c2cc98",
+    "seconds": 8.24,
+    "lufs": -26.0
+   },
+   "milestone": {
+    "file": "anand-milestone.m4a",
+    "bytes": 89926,
+    "sha256": "bbc9a577a7a4774e353aea2da4751a874b9ef9db3955efac5aef308d9a4d9970",
+    "seconds": 5.53,
+    "lufs": -26.0
+   },
+   "heard": {
+    "gemini": "anand",
+    "whisper": "anand"
+   },
+   "clear": 2
+  },
+  "aniket": {
+   "walkout": {
+    "file": "aniket-walkout.m4a",
+    "bytes": 134480,
+    "sha256": "9aaf9cf02d2a10250b0ee0cce9aa32c2939d5fd835467eeb9b1969e4277b2ee8",
+    "seconds": 8.24,
+    "lufs": -26.1
+   },
+   "milestone": {
+    "file": "aniket-milestone.m4a",
+    "bytes": 89849,
+    "sha256": "387dab49c4c7d409b25ff905d7d754244bd459f5b5feb8726d0a25adc25947ab",
+    "seconds": 5.53,
+    "lufs": -26.1
+   },
+   "heard": {
+    "gemini": "aniket",
+    "whisper": "aniket"
+   },
+   "clear": 1
+  },
+  "ashwin": {
+   "walkout": {
+    "file": "ashwin-walkout.m4a",
+    "bytes": 134338,
+    "sha256": "9d4430fe5daf9ac7b900bc71d5069ec021c7e37f535b2f5bdb5d3f437482bd3c",
+    "seconds": 8.24,
+    "lufs": -26.1
+   },
+   "milestone": {
+    "file": "ashwin-milestone.m4a",
+    "bytes": 89870,
+    "sha256": "b42a6d0de34277e5f04ce3a2e2c11c3837f63de7c24753d921b54ce966146322",
+    "seconds": 5.53,
+    "lufs": -26.1
+   },
+   "heard": {
+    "gemini": "ashwin",
+    "whisper": "ashwin"
+   },
+   "clear": 2
+  },
+  "chetan": {
+   "walkout": {
+    "file": "chetan-walkout.m4a",
+    "bytes": 133833,
+    "sha256": "e5118f530fd77977219fb113c71408a703983d3933f30a3d5c0837831b5e5a22",
+    "seconds": 8.24,
+    "lufs": -26.1
+   },
+   "milestone": {
+    "file": "chetan-milestone.m4a",
+    "bytes": 89973,
+    "sha256": "fbe9f19434c3e27e818604c62a1dca9ad25a1220b9f1209dc1fc248a5623aaf4",
+    "seconds": 5.53,
+    "lufs": -26.1
+   },
+   "heard": {
+    "gemini": "chetan",
+    "whisper": "chetan"
+   },
+   "clear": 2
+  },
+  "dinesh": {
+   "walkout": {
+    "file": "dinesh-walkout.m4a",
+    "bytes": 134245,
+    "sha256": "ca595b0ed3a6c5b161e49517e9f111ef664e67975cabf87d75a587234b2096f2",
+    "seconds": 8.24,
+    "lufs": -26.1
+   },
+   "milestone": {
+    "file": "dinesh-milestone.m4a",
+    "bytes": 89666,
+    "sha256": "ad993ad0e494d0406a083a9dfeeadf6c25d8cf71e41dc22a9e30f3c0763ec2d1",
+    "seconds": 5.53,
+    "lufs": -26.1
+   },
+   "heard": {
+    "gemini": "dinesh",
+    "whisper": "dinesh"
+   },
+   "clear": 1
+  },
+  "himanshu": {
+   "walkout": {
+    "file": "himanshu-walkout.m4a",
+    "bytes": 133803,
+    "sha256": "c1037b70373f44bcafd354272f747f2fed494631b3f6a8366dc45331d5e3abe3",
+    "seconds": 8.24,
+    "lufs": -26.1
+   },
+   "milestone": {
+    "file": "himanshu-milestone.m4a",
+    "bytes": 89906,
+    "sha256": "3b6f7e7298c5f37e2cbf97116d753d0b36ce227b68f6ecfa9e74955d1d295245",
+    "seconds": 5.53,
+    "lufs": -26.1
+   },
+   "heard": {
+    "gemini": "himanshu",
+    "whisper": "himanshu"
+   },
+   "clear": 2
+  },
+  "kapil": {
+   "walkout": {
+    "file": "kapil-walkout.m4a",
+    "bytes": 133635,
+    "sha256": "11c5b22f0a9a5209e7643d62f689b633552aa0e57bf25ccf180ca32ca84ca928",
+    "seconds": 8.24,
+    "lufs": -26.1
+   },
+   "milestone": {
+    "file": "kapil-milestone.m4a",
+    "bytes": 89912,
+    "sha256": "a306511cb6864f8e0a881c9e9d4683a7042cfd42bf1a7b2391cbea01cee7721d",
+    "seconds": 5.53,
+    "lufs": -26.1
+   },
+   "heard": {
+    "gemini": "kapil",
+    "whisper": "kapil"
+   },
+   "clear": 2
+  },
+  "krishna": {
+   "walkout": {
+    "file": "krishna-walkout.m4a",
+    "bytes": 134460,
+    "sha256": "df56ca5432e5ebcdef4a62faf9ecc5db7e1874edcd5fdce42db929fbb87d92db",
+    "seconds": 8.24,
+    "lufs": -26.1
+   },
+   "milestone": {
+    "file": "krishna-milestone.m4a",
+    "bytes": 89891,
+    "sha256": "1bbabb975c92ad7af53d226cea31a83858e8aa9b5f3af1a5d0779e9fdd18d85e",
+    "seconds": 5.53,
+    "lufs": -26.1
+   },
+   "heard": {
+    "gemini": "krishna",
+    "whisper": "krishna"
+   },
+   "clear": 2
+  },
+  "lalit": {
+   "walkout": {
+    "file": "lalit-walkout.m4a",
+    "bytes": 133649,
+    "sha256": "1dc4ddba01725f240fb5abad6c1cbfbe5c6584285dde7c0440813de56043cad8",
+    "seconds": 8.24,
+    "lufs": -26.1
+   },
+   "milestone": {
+    "file": "lalit-milestone.m4a",
+    "bytes": 89863,
+    "sha256": "9ee279d7971e4e598326a3c7a4c30235c51adecd7c6021cbcb965d679f26d259",
+    "seconds": 5.53,
+    "lufs": -26.1
+   },
+   "heard": {
+    "gemini": "lalit",
+    "whisper": "lalit"
+   },
+   "clear": 1
+  },
+  "dhruv": {
+   "walkout": {
+    "file": "dhruv-walkout.m4a",
+    "bytes": 134350,
+    "sha256": "005cc3e7a1b8e3dcf17ce13ab1be998477725ebe1ad4fc9ec1fd5569b060763e",
+    "seconds": 8.24,
+    "lufs": -26.1
+   },
+   "milestone": {
+    "file": "dhruv-milestone.m4a",
+    "bytes": 89926,
+    "sha256": "7de889b4c6f1f77f008f25f68be1303bbed4f8a1dc9114f19a4871a83ea63613",
+    "seconds": 5.53,
+    "lufs": -26.0
+   },
+   "heard": {
+    "gemini": "dhruv",
+    "whisper": "dhruv"
+   },
+   "clear": 1
+  },
+  "chirag": {
+   "walkout": {
+    "file": "chirag-walkout.m4a",
+    "bytes": 134273,
+    "sha256": "d2fb9699025447c62e9897d59d12ae402dacb51660b486ba2377e83c98993abc",
+    "seconds": 8.24,
+    "lufs": -26.1
+   },
+   "milestone": {
+    "file": "chirag-milestone.m4a",
+    "bytes": 90088,
+    "sha256": "2bd0ce5ab08f8d80f64f66dd8f2ae7a9d220a75ad91bbfc43be983d0b7eb7c03",
+    "seconds": 5.53,
+    "lufs": -26.1
+   },
+   "heard": {
+    "gemini": "chirag",
+    "whisper": "chirag"
+   },
+   "clear": 1
+  },
+  "debashish": {
+   "walkout": {
+    "file": "debashish-walkout.m4a",
+    "bytes": 134260,
+    "sha256": "795fbf9613fd27b6dede64dbe4d727db4863c202f7df853ded9146e83145a403",
+    "seconds": 8.24,
+    "lufs": -26.1
+   },
+   "milestone": {
+    "file": "debashish-milestone.m4a",
+    "bytes": 90009,
+    "sha256": "e359ef64f1bb8488d79a19174a5d410c0155ecee8fc0e228c4bb35c878d31492",
+    "seconds": 5.53,
+    "lufs": -26.1
+   },
+   "heard": {
+    "gemini": "debashish",
+    "whisper": "debashish"
+   },
+   "clear": 4
+  },
+  "ajith": {
+   "walkout": {
+    "file": "ajith-walkout.m4a",
+    "bytes": 133907,
+    "sha256": "00b4a1b25fcf154bd0ce36d3d4629ee0fde3f931bd5d669ef3ea94b71fbf0189",
+    "seconds": 8.24,
+    "lufs": -26.1
+   },
+   "milestone": {
+    "file": "ajith-milestone.m4a",
+    "bytes": 89838,
+    "sha256": "a9bffd92732a752de028c8c1e536c6f40963ff93e89f2a80feca6bc9402d761f",
+    "seconds": 5.53,
+    "lufs": -26.1
+   },
+   "heard": {
+    "gemini": "ajith",
+    "whisper": "ajith"
+   },
+   "clear": 2
+  },
+  "akhil": {
+   "walkout": {
+    "file": "akhil-walkout.m4a",
+    "bytes": 134730,
+    "sha256": "287489f783f28dfdb55e871de590a1023fbb47373fda699aba6e009fed4b7efd",
+    "seconds": 8.24,
+    "lufs": -26.1
+   },
+   "milestone": {
+    "file": "akhil-milestone.m4a",
+    "bytes": 89866,
+    "sha256": "665b5e8abc065d09c063bf2e28fd0861986b76c281fe314f21c499c0881e1b6b",
+    "seconds": 5.53,
+    "lufs": -26.1
+   },
+   "heard": {
+    "gemini": "akhil",
+    "whisper": "akhil"
+   },
+   "clear": 3
+  },
+  "anoop": {
+   "walkout": {
+    "file": "anoop-walkout.m4a",
+    "bytes": 133785,
+    "sha256": "6c073f95c8b5f62e0ef06c58a70bba19e14243fcbcca03a89124aee49ee44c28",
+    "seconds": 8.24,
+    "lufs": -26.1
+   },
+   "milestone": {
+    "file": "anoop-milestone.m4a",
+    "bytes": 89886,
+    "sha256": "4cdfdadd9201ecf2ae2b71fea8147ca87b4f9942606df0f15735033af843c4b4",
+    "seconds": 5.53,
+    "lufs": -26.1
+   },
+   "heard": {
+    "gemini": "anoop",
+    "whisper": "anoop"
+   },
+   "clear": 4
+  },
+  "imran": {
+   "walkout": {
+    "file": "imran-walkout.m4a",
+    "bytes": 134282,
+    "sha256": "3f7d28b1e9e105e60f7566ea379b6bcce0b5146d862455c23d3f7467c0d9355d",
+    "seconds": 8.24,
+    "lufs": -26.0
+   },
+   "milestone": {
+    "file": "imran-milestone.m4a",
+    "bytes": 89927,
+    "sha256": "17d181c7723d471acc44e99e633142dee532643695ab8dc2de608b89e8341d31",
+    "seconds": 5.53,
+    "lufs": -26.1
+   },
+   "heard": {
+    "gemini": "imran",
+    "whisper": "imran"
+   },
+   "clear": 1
+  },
+  "irfan": {
+   "walkout": {
+    "file": "irfan-walkout.m4a",
+    "bytes": 133723,
+    "sha256": "0fa4d3f012c310053454c5c7a5d44eb390d267b66751df4a7bb7e869ff0f1cfd",
+    "seconds": 8.24,
+    "lufs": -26.1
+   },
+   "milestone": {
+    "file": "irfan-milestone.m4a",
+    "bytes": 89857,
+    "sha256": "36630c55bc89765a77a198f80b5b1654d5dbfd3f4fe75121c9bffe53a6da8f12",
+    "seconds": 5.53,
+    "lufs": -26.1
+   },
+   "heard": {
+    "gemini": "irfan",
+    "whisper": "irfan"
+   },
+   "clear": 2
+  },
+  "aamir": {
+   "walkout": {
+    "file": "aamir-walkout.m4a",
+    "bytes": 134309,
+    "sha256": "44e45f2aca6262fd6955601d4898b4a95527fc3e1398ad0153ef68f95d750cec",
+    "seconds": 8.24,
+    "lufs": -26.1
+   },
+   "milestone": {
+    "file": "aamir-milestone.m4a",
+    "bytes": 89952,
+    "sha256": "3963a2b5434958092b69490e0b00cd7be344860902e6b967c51ab6db1bceaeb2",
+    "seconds": 5.53,
+    "lufs": -26.1
+   },
+   "heard": {
+    "gemini": "aamir",
+    "whisper": "aamir"
+   },
+   "clear": 1
+  },
+  "faisal": {
+   "walkout": {
+    "file": "faisal-walkout.m4a",
+    "bytes": 133686,
+    "sha256": "86af2cbcb2cd012b5ed51507f0af6e86c8a420d41e8158ab70081075bc636bfe",
+    "seconds": 8.24,
+    "lufs": -26.1
+   },
+   "milestone": {
+    "file": "faisal-milestone.m4a",
+    "bytes": 89983,
+    "sha256": "3155bef671da5adb1029516e8646bd0b59cc2e69b4f656ffee36df41014ae2cc",
+    "seconds": 5.53,
+    "lufs": -26.1
+   },
+   "heard": {
+    "gemini": "faisal",
+    "whisper": "faisal"
+   },
+   "clear": 1
+  },
+  "ali": {
+   "walkout": {
+    "file": "ali-walkout.m4a",
+    "bytes": 133844,
+    "sha256": "4c697b3736c375166ff311fd9075266c80942f072e31f016453d1af53eddbc05",
+    "seconds": 8.24,
+    "lufs": -26.1
+   },
+   "milestone": {
+    "file": "ali-milestone.m4a",
+    "bytes": 89969,
+    "sha256": "eebdbc8bdf28a07e2a52dfbf336f925336a0e71133a2149222fd9f4216e960f8",
+    "seconds": 5.53,
+    "lufs": -26.1
+   },
+   "heard": {
+    "gemini": "ali",
+    "whisper": "ali"
+   },
+   "clear": 1
+  },
+  "bilal": {
+   "walkout": {
+    "file": "bilal-walkout.m4a",
+    "bytes": 133688,
+    "sha256": "8f87364baabc32cc8eb292b2bd323032b05776bcf33fc3cfe6810a9edb207f44",
+    "seconds": 8.24,
+    "lufs": -26.0
+   },
+   "milestone": {
+    "file": "bilal-milestone.m4a",
+    "bytes": 89904,
+    "sha256": "0193b4961fb252e3513701cfcc8afc6e97607899cab6cbdf028e91786deb08f1",
+    "seconds": 5.53,
+    "lufs": -26.0
+   },
+   "heard": {
+    "gemini": "bilal",
+    "whisper": "bilal"
+   },
+   "clear": 1
+  },
+  "ahmed": {
+   "walkout": {
+    "file": "ahmed-walkout.m4a",
+    "bytes": 134188,
+    "sha256": "bd887050fa5ed31540e47efec6f282119d2f01b0a292c4b4bf82dfcdfa672424",
+    "seconds": 8.24,
+    "lufs": -26.1
+   },
+   "milestone": {
+    "file": "ahmed-milestone.m4a",
+    "bytes": 89751,
+    "sha256": "1849e7aacb7462ee8f041eece77decaf798acfa179968a624aefae48eb67bd85",
+    "seconds": 5.53,
+    "lufs": -26.1
+   },
+   "heard": {
+    "gemini": "ahmed",
+    "whisper": "ahmed"
+   },
+   "clear": 2
+  },
+  "haris": {
+   "walkout": {
+    "file": "haris-walkout.m4a",
+    "bytes": 133773,
+    "sha256": "63ba784d4b6975bd9f2ae5178a92f47ad9a0a1a5a32dafc4b593869f63dad4dc",
+    "seconds": 8.24,
+    "lufs": -26.1
+   },
+   "milestone": {
+    "file": "haris-milestone.m4a",
+    "bytes": 89733,
+    "sha256": "18f269e5a9282ebb075d91e1d6fa16874dad8f052dc63f7a61368fd7c60f493c",
+    "seconds": 5.53,
+    "lufs": -26.1
+   },
+   "heard": {
+    "gemini": "haris",
+    "whisper": "haris"
+   },
+   "clear": 1
+  },
+  "babar": {
+   "walkout": {
+    "file": "babar-walkout.m4a",
+    "bytes": 133749,
+    "sha256": "3891f4d7bb2926833ab94095bc9e74ff9c6039bea35fa24250dffae072e4afb1",
+    "seconds": 8.24,
+    "lufs": -26.1
+   },
+   "milestone": {
+    "file": "babar-milestone.m4a",
+    "bytes": 90011,
+    "sha256": "4932f38721b8b4f9b459195be2576f999e5e189471d9b00a78c76bfef9d9afce",
+    "seconds": 5.53,
+    "lufs": -26.1
+   },
+   "heard": {
+    "gemini": "babar",
+    "whisper": "babar"
+   },
+   "clear": 1
+  },
+  "ibrahim": {
+   "walkout": {
+    "file": "ibrahim-walkout.m4a",
+    "bytes": 133767,
+    "sha256": "1f61d464a29ab2771434df3479f687094874da73f8ab22d3f1ee4a5c04c89bca",
+    "seconds": 8.24,
+    "lufs": -26.1
+   },
+   "milestone": {
+    "file": "ibrahim-milestone.m4a",
+    "bytes": 89694,
+    "sha256": "a0e24fb5e577e66ab990734792f7367cf69067c43df0840ef74a6e89a2ed4ae7",
+    "seconds": 5.53,
+    "lufs": -26.1
+   },
+   "heard": {
+    "gemini": "ibrahim",
+    "whisper": "ibrahim"
+   },
+   "clear": 2
+  },
+  "dasun": {
+   "walkout": {
+    "file": "dasun-walkout.m4a",
+    "bytes": 134317,
+    "sha256": "fa1ab4a1dffd7b843f2b4b5f3623950c21c7ea89748248e9c7822e55cf8050ef",
+    "seconds": 8.24,
+    "lufs": -26.1
+   },
+   "milestone": {
+    "file": "dasun-milestone.m4a",
+    "bytes": 89927,
+    "sha256": "8d957f6188de38df755d2fd2812c5fe627d0cea3f5aa0d8ed5b50acccea306fc",
+    "seconds": 5.53,
+    "lufs": -26.1
+   },
+   "heard": {
+    "gemini": "dasun",
+    "whisper": "dasun"
+   },
+   "clear": 1
+  },
+  "charith": {
+   "walkout": {
+    "file": "charith-walkout.m4a",
+    "bytes": 133642,
+    "sha256": "d43d0b25a3373a14625c126f7dd5f744e5fb4764f2f45c4143e7e23f6151100a",
+    "seconds": 8.24,
+    "lufs": -26.1
+   },
+   "milestone": {
+    "file": "charith-milestone.m4a",
+    "bytes": 89888,
+    "sha256": "cd929f2e9226366f878c23a7277ef50ae3f2935b79f2cb3f03277e10614caf97",
+    "seconds": 5.53,
+    "lufs": -26.1
+   },
+   "heard": {
+    "gemini": "charith",
+    "whisper": "charith"
+   },
+   "clear": 2
+  },
+  "jack": {
+   "walkout": {
+    "file": "jack-walkout.m4a",
+    "bytes": 134089,
+    "sha256": "c826ebc84e6ac0b7bdfe843ff9878e5bac361290afcb4fa28ed24d84645055bb",
+    "seconds": 8.24,
+    "lufs": -26.1
+   },
+   "milestone": {
+    "file": "jack-milestone.m4a",
+    "bytes": 89892,
+    "sha256": "33c5afd18c8f92c05c4f7cd91694f245602206d8b5f2b95e670c3bb965cb803e",
+    "seconds": 5.53,
+    "lufs": -26.1
+   },
+   "heard": {
+    "gemini": "jack",
+    "whisper": "jack"
+   },
+   "clear": 2
+  },
+  "harry": {
+   "walkout": {
+    "file": "harry-walkout.m4a",
+    "bytes": 133702,
+    "sha256": "60ed80a3a7280fdf8785f32db772daec4eb4e7069f1ab7b6224f37a20422e91c",
+    "seconds": 8.24,
+    "lufs": -26.1
+   },
+   "milestone": {
+    "file": "harry-milestone.m4a",
+    "bytes": 89962,
+    "sha256": "3b16b71fe5941db2e695ef2f37492017fbc716c3df602b27cb2f96f080182eea",
+    "seconds": 5.53,
+    "lufs": -26.1
+   },
+   "heard": {
+    "gemini": "harry",
+    "whisper": "harry"
+   },
+   "clear": 2
+  },
+  "ollie": {
+   "walkout": {
+    "file": "ollie-walkout.m4a",
+    "bytes": 134294,
+    "sha256": "74253389f08819013aa2d670f7695490f28895097c673b320201346093d0eb45",
+    "seconds": 8.24,
+    "lufs": -26.1
+   },
+   "milestone": {
+    "file": "ollie-milestone.m4a",
+    "bytes": 89979,
+    "sha256": "f1b20193db5f6ac1137d1b216c7a87083e3303234558501476dd228f2b5f3fce",
+    "seconds": 5.53,
+    "lufs": -26.1
+   },
+   "heard": {
+    "gemini": "ollie",
+    "whisper": "ollie"
+   },
+   "clear": 2
+  },
+  "james": {
+   "walkout": {
+    "file": "james-walkout.m4a",
+    "bytes": 133800,
+    "sha256": "f947ebda2fc391b8c897aa471564178f3f7587ace9522cae80dd36abd735d98c",
+    "seconds": 8.24,
+    "lufs": -26.1
+   },
+   "milestone": {
+    "file": "james-milestone.m4a",
+    "bytes": 89792,
+    "sha256": "cd5411cb69e49ac89d1f0ad62e372f2fac55c60b8d7206f38f900bfe1e731b5b",
+    "seconds": 5.53,
+    "lufs": -26.1
+   },
+   "heard": {
+    "gemini": "james",
+    "whisper": "james"
+   },
+   "clear": 1
+  },
+  "ben": {
+   "walkout": {
+    "file": "ben-walkout.m4a",
+    "bytes": 133732,
+    "sha256": "0fcef0baabeef1021059804a079f954933c4164880328d2adb1f8d55a9f62ea0",
+    "seconds": 8.24,
+    "lufs": -26.1
+   },
+   "milestone": {
+    "file": "ben-milestone.m4a",
+    "bytes": 89888,
+    "sha256": "6393e4f4996d61a63aa9a3a2dc5843e3981f7d8292ead8129319159abba65f89",
+    "seconds": 5.53,
+    "lufs": -26.1
+   },
+   "heard": {
+    "gemini": "ben",
+    "whisper": "ben"
+   },
+   "clear": 2
+  },
+  "alex": {
+   "walkout": {
+    "file": "alex-walkout.m4a",
+    "bytes": 133780,
+    "sha256": "4cded6dcef1217fbdce1e79bb737c41e3c76165e8ce42bc6959bdf31d266fead",
+    "seconds": 8.24,
+    "lufs": -26.1
+   },
+   "milestone": {
+    "file": "alex-milestone.m4a",
+    "bytes": 89605,
+    "sha256": "f6d6d739a525a51274a8e08dd1c3ef655c384e65fb1623d5362401b427dae6d9",
+    "seconds": 5.53,
+    "lufs": -26.1
+   },
+   "heard": {
+    "gemini": "alex",
+    "whisper": "alex"
+   },
+   "clear": 1
+  },
+  "priya": {
+   "walkout": {
+    "file": "priya-walkout.m4a",
+    "bytes": 134278,
+    "sha256": "02bb544033b13732fec4b0fed0467978c41a0fce7f88ee2bf1568bd3958e3342",
+    "seconds": 8.24,
+    "lufs": -26.1
+   },
+   "milestone": {
+    "file": "priya-milestone.m4a",
+    "bytes": 89947,
+    "sha256": "6197b902712a957ff4d87dc4cd5e1b97cc39d90227aa1bd17b39e5fe2cd9c091",
+    "seconds": 5.53,
+    "lufs": -26.1
+   },
+   "heard": {
+    "gemini": "priya",
+    "whisper": "priya"
+   },
+   "clear": 1
+  }
+ }
+}
