@@ -1,17 +1,51 @@
 {
   "environment": "staging",
-  "commit": "4b18bed328d8582acf7bbf7b37f1f196d84ec022",
-  "subject": "Staging back to receiver 83 while the 88 no-ball bug (zh118rcy, w5894awn, gd8n74f6) is found",
-  "receiverTree": "d2acb3ec2bff0955111c2856414443abcc8e7e6d",
-  "revision": 83,
-  "deployedAt": "2026-11-11T19:52:18Z",
+  "commit": "a4ee9aaa605f5bd637789199764f873b3e56a340",
+  "subject": "Receiver 89: kept copies from the last few deploys; GPU memory let go at each session's end",
+  "receiverTree": "0e46f80b580a21a2151801dfeb5754c30135c6a2",
+  "revision": 89,
+  "deployedAt": "2026-11-11T20:49:38Z",
   "previous": {
-    "tree": "7ff6e78e14756b5782353a18973ed39fd21ba753",
+    "tree": "d2acb3ec2bff0955111c2856414443abcc8e7e6d",
     "changed": [
       "README.md",
       "index.html",
       "receiver-pickleball.js",
       "receiver-scene.js"
     ]
-  }
+  },
+  "earlier": [
+    {
+      "tree": "7ff6e78e14756b5782353a18973ed39fd21ba753",
+      "changed": [
+        "index.html",
+        "receiver-pickleball.js",
+        "receiver-scene.js"
+      ]
+    },
+    {
+      "tree": "1b56cd6fac445aeaae8ecd541942d4d0ccb83503",
+      "changed": [
+        "index.html",
+        "receiver-pickleball.js",
+        "receiver-scene.js"
+      ]
+    },
+    {
+      "tree": "f8397e632b38def906857a95dd879f49f9bd3376",
+      "changed": [
+        "index.html",
+        "receiver-pickleball.js",
+        "receiver-scene.js"
+      ]
+    },
+    {
+      "tree": "f4ef83f3a972a174c41fecb01594e83aad157fe6",
+      "changed": [
+        "index.html",
+        "receiver-pickleball.js",
+        "receiver-scene.js"
+      ]
+    }
+  ]
 }
