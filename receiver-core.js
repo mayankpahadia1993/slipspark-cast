@@ -369,7 +369,24 @@
     return null;
   }
 
-  return { clamp, normalizeJoints, normalizeState, normalizeWelcome, normalizeCelebration, normalizeNextMatch, normalizeLevel, levelLine,
+  // A failure as a phone may report it (docs/diagnostics.md): a stage and a fixed code, never the message.
+  // `where` is one of the receiver's own words; an error adds only its class. The message stays in the phone's
+  // log line. Phones show the category; the numbers on `stats` are separate and unchanged.
+  const failureStages = {
+    image: "asset", kit: "asset", atlas: "asset", manifest: "asset", card: "asset", picture: "asset",
+    music: "audio", audio: "audio", play: "audio",
+    script: "script", promise: "script",
+  };
+  const errorClasses = new Set(["typeerror", "rangeerror", "referenceerror", "syntaxerror", "securityerror", "quotaexceedederror",
+    "networkerror", "aborterror", "notallowederror", "notsupportederror", "invalidstateerror", "encodingerror"]);
+  function failureReport(where, error) {
+    const word = /^[a-zA-Z][a-zA-Z0-9]{0,15}$/.test(String(where)) ? String(where).toLowerCase() : "other";
+    const name = String((error && error.name) || "").toLowerCase();
+    const code = /^code \d{1,2}\b/.test(String(error)) ? String(error).slice(5).split(" ")[0] : errorClasses.has(name) ? name : "failed";
+    return { cat: failureStages[word] || "render", code: word + "_" + code };
+  }
+
+  return { failureReport, clamp, normalizeJoints, normalizeState, normalizeWelcome, normalizeCelebration, normalizeNextMatch, normalizeLevel, levelLine,
     parseMessage, sampleState, resultHeadlineSize, estimateWidth,
     wrapLines, hideTarget, TARGET_REVEAL_MS };
 });

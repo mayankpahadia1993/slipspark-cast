@@ -14,7 +14,14 @@
   // (a friend's look, each player's kit); the HUD's `nm` names the score's rows, `sp` a same-phone split screen with
   // `ban2`/`call2` for its right half; a frame's "V" ops split the court in two; `friends: 1` says this TV draws them.
   const NAMESPACE = "urn:x-cast:com.slipspark.pickleball";
-  const RECEIVER_VERSION = 79;
+  // Receiver 82 (Nov 10 2026): cricket's grounds in every view (receiver-scene.js preloadViews); pickleball as 81.
+  // Receiver 83 (Nov 10 2026, qnkrpct6): warm-up reports and kept files carried across deploys (receiver-scene.js).
+  // Receiver 84 (Nov 11 2026, fn6t394j): the batter's look whole or not at all; the TV's own copies before Play.
+  // Receiver 85: Android's dyed pieces (named without a size) too.
+  // Receiver 86: the hello's `pieces` load with the stadium; the whites while a dyed piece isn't decoded yet.
+  // Receiver 87 (hn6ae62a): a stalled dyed piece can't hold the whites; at most 6 s.
+  // Receiver 88 (w34kr8dq): no steady verdict while the stadium's pictures still load.
+  const RECEIVER_VERSION = 89;
   const core = window.RallycadePickleballCore;
   const sceneCore = window.RallycadeSceneCore;
 
@@ -136,15 +143,38 @@
       return entry.wait;
     }
 
+    // One load of the court however many ask (receiver 83: a view can ask before the look's preload does).
+    let plateWait = null;
     function loadPlate() {
-      if (plate || plateLoaded) return Promise.resolve(plate);
+      if (plate) return Promise.resolve(plate);
+      if (plateWait) return plateWait;
       plateLoaded = true;
       plateImg.src = base + "PickleballCourt.webp?v=" + RECEIVER_VERSION;
-      return new Promise((resolve) => {
+      plateWait = new Promise((resolve) => {
         const done = () => { plate = plateImg.naturalWidth ? plateImg : null; resolve(plate); };
         if (plateImg.complete && plateImg.naturalWidth) done();
         else { plateImg.onload = done; plateImg.onerror = () => resolve(null); }
       });
+      return plateWait;
+    }
+
+    // Receiver 83 (Nov 10 2026, the owner: "If cricket is selected, we should only download cricket. If pickleball is
+    // selected, we should only download pickleball."): a 3.0 phone says hello here on every cast, cricket ones too, and
+    // the hello loaded the look's 15 sheets and the court (~1.4 MB fetched each cast, ~39 MB decoded; 3.4 s on the
+    // Living Room TV's Ultra beside iOS 293's cricket setup, qnkrpct6). With `options.waitForGame` (the receiver page
+    // on a TV) the hello's look waits until the phone starts or asks for pickleball (`selectGame`, from receiver.js:
+    // a view other than off, a frame), as any pickleball phone does; cricket's screens never load it.
+    let pickleballWanted = !options.waitForGame;
+    let pending = null;
+    function selectGame(game) {
+      pickleballWanted = game === "pickleball";
+      if (!pickleballWanted) { if (warmLeft > 0) endWarm(); return; }
+      if (pending) { const next = pending; pending = null; preload(next.look, next.sheets); }
+    }
+    function preloadWhenWanted(nextLook, sheets) {
+      if (pickleballWanted) return preload(nextLook, sheets);
+      pending = { look: nextLook, sheets };
+      return Promise.resolve();
     }
 
     function preload(nextLook, sheets) {
@@ -409,7 +439,8 @@
     }
 
     function report(where, error) {
-      send({ t: "error", where, message: String((error && error.message) || error) });
+      const receiverCore = typeof globalThis !== "undefined" ? globalThis.SlipSparkReceiverCore : null;
+      send(Object.assign({ t: "error", where, message: String((error && error.message) || error) }, receiverCore ? receiverCore.failureReport(where, error) : {}));
     }
 
     // MARK: Messages
@@ -423,7 +454,7 @@
           debug = message.debug === 1;
           if (["frames", "visible", "hud", "none"].includes(message.warm)) warmMode = message.warm;
           if (chip) chip.hidden = !debug;
-          preload(message.look, message.sheets);
+          preloadWhenWanted(message.look, message.sheets);
           send({ t: "ready", pickleball: core.VERSION, version: RECEIVER_VERSION, looks: ["man", "woman"], friends: 1 });
           break;
         case "ping":
@@ -435,7 +466,7 @@
         case "view":
           setView(message);
           if ((message.look && message.look !== look) || (Array.isArray(message.sheets) && message.sheets.join() !== named.join())) {
-            preload(message.look || look, message.sheets);
+            preloadWhenWanted(message.look || look, message.sheets);
           }
           break;
         case "f": {
@@ -461,7 +492,8 @@
     window.addEventListener("resize", () => { if (running) sizeCanvas(); });
 
     return {
-      NAMESPACE, handle, drawAt, senderLeft, report, playout, preload, setView,
+      NAMESPACE, handle, drawAt, senderLeft, report, playout, preload, setView, selectGame,
+      get pickleballWanted() { return pickleballWanted; },
       get view() { return view; }, get drawn() { return drawn; }, get look() { return look; },
       stats: () => maybeReport(true), sizeCanvas, picture, loaded: () => lookLoadedAt !== null,
       release() { stop(); pictures.clear(); }

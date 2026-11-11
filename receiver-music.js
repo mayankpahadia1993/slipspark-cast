@@ -16,8 +16,9 @@
     function reply(t, extra = {}) {
       if (owner) send(owner, Object.assign({ t, id, seq: sequence, time: now(), position: Number(audio.currentTime) || 0 }, extra));
     }
-    function failure() { stop(); reply("music-error", { stopped: true }); }
-    audio.addEventListener("error", failure);
+    // The phone hears which kind of failure: the bundled file would not load (asset) or the TV refused to play it (audio).
+    function failure(kind) { stop(); reply("music-error", { stopped: true, cat: kind === "play" ? "audio" : "asset", code: kind === "play" ? "music_play" : "music_load" }); }
+    audio.addEventListener("error", () => failure("load"));
     function fade(to, seconds) {
       clearTimer(ramp);
       const from = audio.volume, began = now(), token = version;
@@ -61,8 +62,8 @@
             playPending = false;
             if (now() >= deadline || target === 0) { stop(); return; }
             reply("music-status", { stopped: false });
-          }, () => { if (token === ownerVersion) failure(); });
-        } catch (_) { failure(); return; }
+          }, () => { if (token === ownerVersion) failure("play"); });
+        } catch (_) { failure("play"); return; }
       } else if (!playPending) reply("music-status", { stopped: volume === 0 && audio.paused });
       if (shouldRamp) fade(volume, Math.max(0, Math.min(3, Number(message.fade) || 0)));
     }
