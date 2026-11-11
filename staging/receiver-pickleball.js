@@ -17,7 +17,8 @@
   // Receiver 82 (Nov 10 2026): cricket's grounds in every view (receiver-scene.js preloadViews); pickleball as 81.
   // Receiver 83 (Nov 10 2026, qnkrpct6): warm-up reports and kept files carried across deploys (receiver-scene.js).
   // Receiver 84 (Nov 11 2026, fn6t394j): the batter's look whole or not at all; the TV's own copies before Play.
-  const RECEIVER_VERSION = 84;
+  // Receiver 85: Android's dyed pieces (named without a size) too.
+  const RECEIVER_VERSION = 85;
   const core = window.RallycadePickleballCore;
   const sceneCore = window.RallycadeSceneCore;
 

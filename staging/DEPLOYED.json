@@ -1,14 +1,13 @@
 {
   "environment": "staging",
-  "commit": "3872b749daf219728f909511226c7f6ff40395cb",
-  "subject": "Receiver 84: the batter's look whole or not at all; the TV's own copies before Play",
-  "receiverTree": "3aea15e898ef80f2978a0c1e76f5139569e2205b",
-  "revision": 84,
-  "deployedAt": "2026-11-11T18:27:47Z",
+  "commit": "1802835dacf00951b279fd556b99c2cb11b1364d",
+  "subject": "Receiver 85: Android's dyed pieces and gear whole or not at all too",
+  "receiverTree": "f4ef83f3a972a174c41fecb01594e83aad157fe6",
+  "revision": 85,
+  "deployedAt": "2026-11-11T18:32:49Z",
   "previous": {
-    "tree": "d2acb3ec2bff0955111c2856414443abcc8e7e6d",
+    "tree": "3aea15e898ef80f2978a0c1e76f5139569e2205b",
     "changed": [
-      "README.md",
       "index.html",
       "receiver-pickleball.js",
       "receiver-scene.js"

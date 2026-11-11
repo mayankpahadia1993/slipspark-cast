@@ -1226,20 +1226,36 @@
     // Android sendPictures), so the batter turned piece by piece. Now while a new look's pieces come in (one on its
     // way, or one arrived within DRESSING_QUIET_MS) every dyed piece is drawn as its photographed one, the batter in the
     // whites, and the look goes on whole once they stop coming: the next draw, since the phone draws each piece the TV
-    // holds dyed. At most DRESSING_LONGEST_MS, so a piece that never comes can't keep the batter white. A piece this page
-    // has held before (sent again after the TV let it go) is no new look: the batter stays dressed.
+    // holds dyed. At most DRESSING_LONGEST_MS, so a piece that never comes can't keep the batter white. A piece sent again
+    // to the same phone's connection (after the TV let it go) is no new look: the batter stays dressed. After a hello
+    // every piece counts again: Android sends its pieces anew on every cast whatever the TV keeps (core CastImageLedger),
+    // drawing the photographed one until each `got`.
     const DRESSING_QUIET_MS = 1500;
     const DRESSING_LONGEST_MS = 15000;
     const incomingPieces = new Set();
     const piecesHeld = new Set();
     let dressingSince = 0, dressingLast = 0, dressingWasOn = false;
-    function isDressedPiece(key) { return /^kit-./.test(key) || /^stroke-blade-face-bat-./.test(key); }
-    // The photographed piece a dyed one stands in for ("kit-crimson.pads-navy-nearShin-306x519" → "stroke-nearShin-306x519").
+    // iOS keys a dyed piece "kit-<look>-<piece>-<size>" and a bat's face "stroke-blade-face-bat-<bat>-<size>"; Android
+    // "android-kit-<look>-<piece>" and "android-stroke-blade-face-<bat>" (core CookedKits), drawn at their own size.
+    function isDressedPiece(key) { return /^(android-)?kit-./.test(key) || /^(android-)?stroke-blade-face-bat-./.test(key); }
+    // The photographed piece a dyed one stands in for: "kit-crimson.pads-navy-nearShin-306x519" and
+    // "android-kit-crimson-pads-navy-nearShin" → "stroke-nearShin-306x519"; a bat's face → "stroke-blade-face-928x186".
+    const plainPieces = new Map();
     function plainPiece(key) {
+      if (plainPieces.has(key)) return plainPieces.get(key);
+      let found = null;
       let match = /^stroke-blade-face-bat-.+-(\d+x\d+)$/.exec(key);
-      if (match) return "stroke-blade-face-" + match[1];
-      match = /^kit-.+-([A-Za-z]+)-(\d+x\d+)$/.exec(key);
-      return match ? "stroke-" + match[1] + "-" + match[2] : null;
+      if (match) found = "stroke-blade-face-" + match[1];
+      else if ((match = /^kit-.+-([A-Za-z]+)-(\d+x\d+)$/.exec(key))) found = "stroke-" + match[1] + "-" + match[2];
+      else {
+        // Android's carry no size: the receiver's own photographed piece by its name.
+        const face = /^android-stroke-blade-face-bat-/.test(key);
+        const piece = face ? null : (/^android-kit-.+-([A-Za-z]+)$/.exec(key) || [])[1];
+        const wanted = face ? /^stroke-blade-face-\d+x\d+$/ : piece ? new RegExp("^stroke-" + piece + "-\\d+x\\d+$") : null;
+        if (wanted) for (const name of bundled.keys()) if (wanted.test(name)) { found = name; break; }
+      }
+      if (found || bundled.size) plainPieces.set(key, found);
+      return found;
     }
     function dressingOn(local) {
       if (!dressingSince) return false;
@@ -1252,7 +1268,7 @@
       const local = performance.now();
       if (!arrived) {
         // Sent again after the TV let it go: no new look.
-        if (piecesHeld.has(key) || images.has(key)) return;
+        if (piecesHeld.has(key)) return;
         if (!dressingOn(local)) dressingSince = local;
         dressingLast = local;
         incomingPieces.add(key);
@@ -2757,6 +2773,8 @@
           // Receiver 60: the phone's kit, whose cached pieces load with the batter's.
           helloKit = typeof message.kit === "string" ? message.kit : null;
           helloGround = groundKey(message.ground);
+          // Receiver 85: a phone's new connection sends its pieces anew (Android every cast): each a new look's again.
+          piecesHeld.clear();
           helloViews = Array.isArray(message.views) ? message.views : null;
           // Receiver 65: the phone holds its first ball until the TV draws steadily.
           phoneWaitsSteady = message.steady === 1;
