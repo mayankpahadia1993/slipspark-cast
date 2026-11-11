@@ -20,7 +20,8 @@
   // Receiver 85: Android's dyed pieces (named without a size) too.
   // Receiver 86: the hello's `pieces` load with the stadium; the whites while a dyed piece isn't decoded yet.
   // Receiver 87 (hn6ae62a): a stalled dyed piece can't hold the whites; at most 6 s.
-  const RECEIVER_VERSION = 87;
+  // Receiver 88 (w34kr8dq): no steady verdict while the stadium's pictures still load.
+  const RECEIVER_VERSION = 88;
   const core = window.RallycadePickleballCore;
   const sceneCore = window.RallycadeSceneCore;
 

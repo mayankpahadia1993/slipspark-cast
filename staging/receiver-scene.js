@@ -915,6 +915,8 @@
     // until then and the phone's picture stays over the stadium meanwhile, at
     // most STEADY_COVER_MS (the phone's own cap, CastSceneStreamer.steadyLimit).
     const steadyWatch = core.createSteadyWatch();
+    // Receiver 87: when a draw last lacked a picture (no plateau verdict while the stadium is still loading).
+    let lastMissingAt = -Infinity;
     const STEADY_COVER_MS = 8000;
     let phoneWaitsSteady = false;
     let onAt = 0;
@@ -1734,6 +1736,7 @@
       if (rehearsing) return null;
       ensure(key);
       counters.missing += 1;
+      lastMissingAt = performance.now();
       // A picture still being made: its undyed photo meanwhile.
       const picture = pictures.get(key);
       const fallback = picture && picture.fallback && images.get(picture.fallback);
@@ -2527,7 +2530,15 @@
         if (result.blended) counters.blended += 1;
         if (result.partly) counters.partly += 1;
         lastStamp = result.stamp;
-        if (steadyWatch.started && !steadyWatch.verdict) noteSteady(steadyWatch.draw(local), local);
+        if (steadyWatch.started && !steadyWatch.verdict) {
+          // Receiver 87 (w34kr8dq, iOS 294 after a reconnect: "it bowled me because I couldn't even see the ball coming on
+          // the TV"): a plateau verdict while the stadium's pictures were still loading (397 draws missing one 2 s before)
+          // said steady at 18 a second and let the first ball go. While pictures are still loading the watch starts again
+          // (the phone holds its first ball at most its own 8 s, as before).
+          const verdict = steadyWatch.draw(local);
+          if (verdict && verdict.why === "plateau" && (local - lastMissingAt < 500 || startLoading > 0)) steadyWatch.start(local);
+          else noteSteady(verdict, local);
+        }
       }
       // How far behind the clock the stadium on screen is (receiver 65): 0
       // while blending toward the next frame, the time since the frame shown
