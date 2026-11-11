@@ -1,20 +1,28 @@
 {
   "environment": "staging",
-  "commit": "a4ee9aaa605f5bd637789199764f873b3e56a340",
-  "subject": "Receiver 89: kept copies from the last few deploys; GPU memory let go at each session's end",
-  "receiverTree": "0e46f80b580a21a2151801dfeb5754c30135c6a2",
-  "revision": 89,
-  "deployedAt": "2026-11-11T20:49:38Z",
+  "commit": "9a3b5a9f836ba6b41de586312ca5f9a57ad9a30e",
+  "subject": "Receiver 90: a look's whites start once, and the batter is never half dressed",
+  "receiverTree": "ee81a57f1b19d9c1786fbc65554d7eed439a0e86",
+  "revision": 90,
+  "deployedAt": "2026-11-11T22:18:01Z",
   "previous": {
-    "tree": "d2acb3ec2bff0955111c2856414443abcc8e7e6d",
+    "tree": "0e46f80b580a21a2151801dfeb5754c30135c6a2",
     "changed": [
-      "README.md",
       "index.html",
       "receiver-pickleball.js",
       "receiver-scene.js"
     ]
   },
   "earlier": [
+    {
+      "tree": "d2acb3ec2bff0955111c2856414443abcc8e7e6d",
+      "changed": [
+        "README.md",
+        "index.html",
+        "receiver-pickleball.js",
+        "receiver-scene.js"
+      ]
+    },
     {
       "tree": "7ff6e78e14756b5782353a18973ed39fd21ba753",
       "changed": [
@@ -33,14 +41,6 @@
     },
     {
       "tree": "f8397e632b38def906857a95dd879f49f9bd3376",
-      "changed": [
-        "index.html",
-        "receiver-pickleball.js",
-        "receiver-scene.js"
-      ]
-    },
-    {
-      "tree": "f4ef83f3a972a174c41fecb01594e83aad157fe6",
       "changed": [
         "index.html",
         "receiver-pickleball.js",

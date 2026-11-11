@@ -21,7 +21,8 @@
   // Receiver 86: the hello's `pieces` load with the stadium; the whites while a dyed piece isn't decoded yet.
   // Receiver 87 (hn6ae62a): a stalled dyed piece can't hold the whites; at most 6 s.
   // Receiver 88 (w34kr8dq): no steady verdict while the stadium's pictures still load.
-  const RECEIVER_VERSION = 89;
+  // Receiver 90: a look's whites start once; never half dressed (a stalled piece keeps the whole batter photographed).
+  const RECEIVER_VERSION = 90;
   const core = window.RallycadePickleballCore;
   const sceneCore = window.RallycadeSceneCore;
 
