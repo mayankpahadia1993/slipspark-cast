@@ -22,7 +22,8 @@
   // Receiver 87 (hn6ae62a): a stalled dyed piece can't hold the whites; at most 6 s.
   // Receiver 88 (w34kr8dq): no steady verdict while the stadium's pictures still load.
   // Receiver 90: a look's whites start once; never half dressed (a stalled piece keeps the whole batter photographed).
-  const RECEIVER_VERSION = 90;
+  // Receiver 91: a 2.9.9 look (dyed clothes, photographed forearms, gloves and bat face) is whole, not half dressed.
+  const RECEIVER_VERSION = 91;
   const core = window.RallycadePickleballCore;
   const sceneCore = window.RallycadeSceneCore;
 

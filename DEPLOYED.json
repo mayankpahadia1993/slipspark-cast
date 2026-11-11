@@ -1,12 +1,12 @@
 {
   "environment": "production",
-  "commit": "9a3b5a9f836ba6b41de586312ca5f9a57ad9a30e",
-  "subject": "Receiver 90: a look's whites start once, and the batter is never half dressed",
-  "receiverTree": "ee81a57f1b19d9c1786fbc65554d7eed439a0e86",
-  "revision": 90,
-  "deployedAt": "2026-11-11T22:44:11Z",
+  "commit": "8a053bc69dd590eaad1c1c71c9e2ad9db8960c79",
+  "subject": "Receiver 91: a 2.9.9 look (dyed clothes, photographed forearms, gloves and bat face) is whole, not half dressed",
+  "receiverTree": "1596897f5bcd7cebace842323fc4ceddb305d773",
+  "revision": 91,
+  "deployedAt": "2026-11-11T23:09:05Z",
   "previous": {
-    "tree": "0e46f80b580a21a2151801dfeb5754c30135c6a2",
+    "tree": "ee81a57f1b19d9c1786fbc65554d7eed439a0e86",
     "changed": [
       "index.html",
       "receiver-pickleball.js",
@@ -14,6 +14,14 @@
     ]
   },
   "earlier": [
+    {
+      "tree": "0e46f80b580a21a2151801dfeb5754c30135c6a2",
+      "changed": [
+        "index.html",
+        "receiver-pickleball.js",
+        "receiver-scene.js"
+      ]
+    },
     {
       "tree": "c4c8d143251147b9901c186ed1a1f988ed58841b",
       "changed": [
@@ -113,44 +121,8 @@
         "scene-images/ground-pavilion-outfield-1672x941.jpg",
         "scene-images/manifest.json"
       ]
-    },
-    {
-      "tree": "79ca28ee6a417b29917c96c5515e5ddf5643bd6d",
-      "changed": [
-        "README.md",
-        "index.html",
-        "receiver-card-core.js",
-        "receiver-core.js",
-        "receiver-music.js",
-        "receiver-pickleball-core.js",
-        "receiver-pickleball.js",
-        "receiver-scene-core.js",
-        "receiver-scene.js",
-        "receiver-video.js",
-        "receiver.css",
-        "receiver.js",
-        "scene-images/gear-masks-bowler-end-0-1280x1576.png",
-        "scene-images/gear-masks-bowler-end-1-1272x1668.png",
-        "scene-images/gear-masks-bowler-end-2-1264x1560.png",
-        "scene-images/ground-cauldron-1672x941.jpg",
-        "scene-images/ground-cauldron-inset-660x372.jpg",
-        "scene-images/ground-cauldron-outfield-1672x941.jpg",
-        "scene-images/ground-coral-bay-1672x941.jpg",
-        "scene-images/ground-coral-bay-inset-660x372.jpg",
-        "scene-images/ground-coral-bay-outfield-1672x941.jpg",
-        "scene-images/ground-hilltop-1672x941.jpg",
-        "scene-images/ground-hilltop-inset-660x372.jpg",
-        "scene-images/ground-hilltop-outfield-1672x941.jpg",
-        "scene-images/ground-ironbark-1672x941.jpg",
-        "scene-images/ground-ironbark-inset-660x372.jpg",
-        "scene-images/ground-ironbark-outfield-1672x941.jpg",
-        "scene-images/ground-pavilion-1672x941.jpg",
-        "scene-images/ground-pavilion-inset-660x372.jpg",
-        "scene-images/ground-pavilion-outfield-1672x941.jpg",
-        "scene-images/manifest.json"
-      ]
     }
   ],
   "promotedFrom": "staging",
-  "stagedAt": "2026-11-11T22:18:01Z"
+  "stagedAt": "2026-11-11T23:05:32Z"
 }
