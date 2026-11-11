@@ -1,12 +1,12 @@
 {
   "environment": "staging",
-  "commit": "851aef6664c825876e1569792e3328a60ada4607",
-  "subject": "Receiver 86: a re-cast's look from the TV's copies with the stadium; whites while a dyed piece is missing",
-  "receiverTree": "f8397e632b38def906857a95dd879f49f9bd3376",
-  "revision": 86,
-  "deployedAt": "2026-11-11T19:16:11Z",
+  "commit": "95169ffe92facb783bfc0196140333516d773f3c",
+  "subject": "Receiver 87: a stalled dyed piece can't hold the batter's whites; at most 6 s",
+  "receiverTree": "1b56cd6fac445aeaae8ecd541942d4d0ccb83503",
+  "revision": 87,
+  "deployedAt": "2026-11-11T19:31:34Z",
   "previous": {
-    "tree": "f4ef83f3a972a174c41fecb01594e83aad157fe6",
+    "tree": "f8397e632b38def906857a95dd879f49f9bd3376",
     "changed": [
       "index.html",
       "receiver-pickleball.js",

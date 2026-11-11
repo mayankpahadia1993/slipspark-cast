@@ -215,6 +215,7 @@
     function addImage(key, source) {
       images.set(key, source);
       if (missingPieces.delete(key)) dressingLast = performance.now();
+      piecesStalled.delete(key);
       if (staticLayer) { staticLayer.key = null; staticLayer.keys = null; }
       sizes.set(key, core.pictureSize(key)
         || { width: source.naturalWidth || source.width, height: source.naturalHeight || source.height });
@@ -1236,12 +1237,22 @@
     // every piece counts again: Android sends its pieces anew on every cast whatever the TV keeps (core CastImageLedger),
     // drawing the photographed one until each `got`.
     const DRESSING_QUIET_MS = 1500;
-    const DRESSING_LONGEST_MS = 15000;
+    // Receiver 87 (hn6ae62a, Android 27433: "Still completely white"): a piece whose parts stopped coming, or a dyed piece
+    // that never decodes, held the whites for 15 s. Each now counts only while it moves (a part or a try within
+    // DRESSING_STALL_MS), and the whites last at most DRESSING_LONGEST_MS (6 s) whatever comes.
+    const DRESSING_LONGEST_MS = 6000;
+    const DRESSING_STALL_MS = 2000;
+    const pieceMoved = new Map(); // key -> when a part of it last came (or a draw last asked for it)
+    const piecesStalled = new Set(); // given up on until they decode: never the whites again for them
+    function stillMoving(set, local) {
+      for (const key of set) if (local - (pieceMoved.get(key) || 0) >= DRESSING_STALL_MS) { set.delete(key); piecesStalled.add(key); }
+      return set.size > 0;
+    }
     const incomingPieces = new Set();
     // Receiver 86: dyed pieces a draw asked for that aren't decoded yet (a re-cast's, loading from the TV's own copy).
     const missingPieces = new Set();
     const piecesHeld = new Set();
-    let dressingSince = 0, dressingLast = 0, dressingWasOn = false;
+    let dressingSince = null, dressingLast = -Infinity, dressingWasOn = false;
     // iOS keys a dyed piece "kit-<look>-<piece>-<size>" and a bat's face "stroke-blade-face-bat-<bat>-<size>"; Android
     // "android-kit-<look>-<piece>" and "android-stroke-blade-face-<bat>" (core CookedKits), drawn at their own size.
     function isDressedPiece(key) { return /^(android-)?kit-./.test(key) || /^(android-)?stroke-blade-face-bat-./.test(key); }
@@ -1265,9 +1276,9 @@
       return found;
     }
     function dressingOn(local) {
-      if (!dressingSince) return false;
+      if (dressingSince === null) return false;
       if (local - dressingSince >= DRESSING_LONGEST_MS) return false;
-      return incomingPieces.size > 0 || missingPieces.size > 0 || local - dressingLast < DRESSING_QUIET_MS;
+      return stillMoving(incomingPieces, local) || stillMoving(missingPieces, local) || local - dressingLast < DRESSING_QUIET_MS;
     }
     // A dyed piece's first part (`arrived` false) or the piece decoded (true).
     function noteIncomingPiece(key, arrived) {
@@ -1286,6 +1297,9 @@
     }
     // Each frame: the swap to the whole look draws at once (the frame on screen drawn again).
     function noteDressing(local) {
+      // Receiver 87: pieces that stopped moving are given up on every frame, the whites on or off.
+      stillMoving(incomingPieces, local);
+      stillMoving(missingPieces, local);
       const onNow = dressingOn(local);
       if (dressingWasOn && !onNow) { needsRedraw = true; if (staticLayer) { staticLayer.key = null; staticLayer.keys = null; } }
       dressingWasOn = onNow;
@@ -1295,6 +1309,7 @@
       const key = String(message.k || "");
       if (!key) return;
       if (!uploads.has(key)) noteIncomingPiece(key, false);
+      if (isDressedPiece(key)) pieceMoved.set(key, performance.now());
       let upload = uploads.get(key);
       if (!upload) { upload = { type: message.type, of: message.of, parts: [], count: 0 }; uploads.set(key, upload); }
       if (upload.parts[message.n] == null) { upload.parts[message.n] = message.d; upload.count += 1; }
@@ -1698,11 +1713,12 @@
     // nothing can be drawn.
     function pictureFor(key) {
       // Receiver 86: a dyed piece not decoded yet is a look still coming in: the whites until it is (and the rest).
-      if (isDressedPiece(key) && !images.has(key) && !missingPieces.has(key)) {
+      if (isDressedPiece(key) && !images.has(key) && !missingPieces.has(key) && !piecesStalled.has(key)) {
         const local = performance.now();
         if (!dressingOn(local)) dressingSince = local;
         dressingLast = local;
         missingPieces.add(key);
+        pieceMoved.set(key, local);
         dressingWasOn = true;
         // Fetched as any missing picture is: from the TV's own copy, else asked of the phone.
         ensure(key);
