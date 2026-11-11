@@ -937,6 +937,31 @@
   // it settles.
   const STEADY = { fps: 25, window: 2000, maxGap: 100, plateau: 3000, plateauWindow: 1000, hold: 0.85 };
 
+  // MARK: Start-up reports (receiver 83, Nov 10 2026)
+  //
+  // qnkrpct6, iOS 293 on the Living Room TV's Chromecast Ultra ("Started quite slow … FPS of 11 or 7 or 17 or 20 or
+  // 12"): the stadium came on 4 s after the TV answered, with seven of the player's 21 dyed kit and gear pieces still on
+  // their way. The TV's frame loop ran every 139 ms, then 85-87 ms, while it took them in, and the phone's pace
+  // (CastPace.Governor) read those reports as the TV's capacity: 21 → 17 → 15, and 15 held for 30 s before it tried
+  // higher. A report taken while the start's pictures were still coming in or loading measures their decoding, not the
+  // TV: it now says `warm` and gives its rate as `wfps` and `wgap` instead of `fps` and `gap`. A phone's pace takes a
+  // report without `fps` for a stall and changes nothing, and its draw-rate watch skips one too (iOS CricketTVDrawRate,
+  // Android TVWatch), so every phone, old ones included, waits for a report of the TV itself. Only in the stadium's
+  // first WARM_REPORT_MS: a TV still slow after that is paced as before (receiver 70's lag notes).
+  const WARM_REPORT_MS = 8000;
+  // `stats` as measured; `state`: ms since the stadium came on (`sinceOn`, null while it is off), phone pictures
+  // still arriving (`uploading`) or decoded during this report (`received`), the receiver's own pictures loading
+  // (`loading`), and draws that lacked a picture (`missing`).
+  function warmReport(stats, state) {
+    const since = state && state.sinceOn != null ? Number(state.sinceOn) : NaN;
+    if (!(since >= 0 && since <= WARM_REPORT_MS)) return stats;
+    if (!["uploading", "received", "loading", "missing"].some((key) => Number(state[key]) > 0)) return stats;
+    const out = Object.assign({}, stats, { warm: 1 });
+    if ("fps" in out) { out.wfps = out.fps; delete out.fps; }
+    if ("gap" in out) { out.wgap = out.gap; delete out.gap; }
+    return out;
+  }
+
   function createSteadyWatch(options) {
     const fps = (options && options.fps) || STEADY.fps;
     const span = (options && options.window) || STEADY.window;
@@ -1231,6 +1256,6 @@
     blendFrames, blendFramesInto, cloneFrame, createTimeline, createClock,
     percentile, tracePath, cssColor, pictureSize, canvasPlan, canvasWidth, createRateWatch, STEADY, createSteadyWatch, createLiveLayer, hasLiveSlot, poseAge, poseAhead,
     filterParts, opBounds, layerEnd, clipsWholeStage, mergeRects, overStrip, readLook, lookColours, dyeFrame, GRIP_OPACITY, GRIP_SHADE,
-    readGear, gearColours, GEAR_HELMET_OPACITY, GEAR_FINISH_OPACITY, GEAR_STICKER
+    readGear, gearColours, GEAR_HELMET_OPACITY, GEAR_FINISH_OPACITY, GEAR_STICKER, WARM_REPORT_MS, warmReport
   };
 });

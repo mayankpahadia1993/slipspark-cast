@@ -322,6 +322,8 @@
     new Set(Object.values(screens)).forEach((screen) => setVisible(screen, screen === shown));
     if (state.positioning) renderPositioning(state.positioning);
     lastState = state;
+    // Receiver 83: a cricket screen is cricket selected.
+    if (CRICKET_SCREENS.has(state.screen)) selectGame("cricket");
     if (!PLAY_SCREENS.has(state.screen)) stadiumThisPlay = false;
     if (PLAY_SCREENS.has(state.screen)) renderHolding(state, sceneLost);
     updateHold();
@@ -336,6 +338,25 @@
 
   const query = new URLSearchParams(window.location.search);
   const preview = query.get("preview");
+  // Receiver 83 (Nov 10 2026, the owner: "If cricket is selected, we should only download cricket. If pickleball is
+  // selected, we should only download pickleball."): on a TV (the Cast framework; not a preview or a recording, unless
+  // `games=1` for a bench or a test) each game's pictures load once the phone starts or asks for that game, and the
+  // other game's wait. Cricket: a cricket screen in the game state (the setup on), the stadium on, a frame of it; every
+  // phone sends those, 2.9.9's too. Pickleball: a view other than off, or a frame, on its channel. Nothing at the cast's
+  // start: the phones say hello on both channels whatever the player goes on to play.
+  const waitForGame = query.get("games") === "1"
+    || (!preview && !query.get("scene") && !query.get("pickleball") && !!(window.cast && window.cast.framework));
+  const CRICKET_SCREENS = new Set(["positioning", "cricket", "timingCheck", "cricketDuelHandoff", "cricketDuelResult"]);
+  let game = null;
+  function selectGame(next) {
+    if (next === game) return;
+    game = next;
+    app.dataset.game = next;
+    if (window.__rallycadeScene && window.__rallycadeScene.selectGame) window.__rallycadeScene.selectGame(next);
+    if (window.__rallycadePickleball && window.__rallycadePickleball.selectGame) window.__rallycadePickleball.selectGame(next);
+  }
+  window.__rallycadeGame = { select: selectGame, get current() { return game; }, waitForGame };
+
   if (welcomeHeld) {
     const state = core.sampleState(preview);
     if (state.welcome) state.welcome.elapsed = Math.round(Number(query.get("at")) * 1000);
@@ -401,6 +422,7 @@
     backdrop: document.getElementById("scene-backdrop"),
     hud: document.getElementById("scene-hud"),
     send: (message) => sendScene(message),
+    waitForGame,
     // Receiver 67: `ready` says which of the phone's pictures this TV holds.
     heldCards: () => (cardView ? cardView.heldList() : []),
     // Receiver 70: the stadium covered by the phone's picture while it warms, then drawn over it; the picture
@@ -432,6 +454,7 @@
     plate: document.getElementById("pk-plate"), plate2: document.getElementById("pk-plate2"), canvas: document.getElementById("pk-canvas"), hud: document.getElementById("pk-hud"),
     ready: document.getElementById("pk-ready"), result: document.getElementById("pk-result"), chip: document.getElementById("pk-chip"),
     send: (message) => sendPickleball(message),
+    waitForGame,
     now: () => (filmClock !== null ? filmClock : performance.now()),
     manualClock: query.get("film") === "1",
     canvasWidth: Number(query.get("canvas")) || undefined
@@ -517,6 +540,9 @@
           stadiumPhone = true;
           window.clearTimeout(sceneGone);
         }
+        // Receiver 83: the stadium on, or its frames, is cricket selected.
+        const kind = event.data && event.data.t;
+        if ((kind === "scene" && event.data.on === 1) || kind === "f" || kind === "fs" || kind === "b") selectGame("cricket");
         try { scene.handle(event.data); } catch (error) { scene.report("handle", error); }
         if (event.data && event.data.t === "scene") {
           if (event.data.on === 1) { sceneLost = false; if (lastState && PLAY_SCREENS.has(lastState.screen)) stadiumThisPlay = true; }
@@ -569,6 +595,9 @@
       context.addCustomMessageListener(pickleballModule.NAMESPACE, (event) => {
         pickleballSender = event.senderId;
         window.clearTimeout(pickleballGone);
+        // Receiver 83: a pickleball view (its setup's ready card, the match, its result) or frame is pickleball selected.
+        const data = event.data;
+        if (data && ((data.t === "view" && data.v && data.v !== "off") || data.t === "f")) selectGame("pickleball");
         try { pickleball.handle(event.data); } catch (error) { pickleball.report("handle", error); }
       });
       context.addEventListener(window.cast.framework.system.EventType.SENDER_DISCONNECTED, (event) => {

@@ -1,8 +1,18 @@
 {
   "environment": "staging",
-  "commit": "2306589f2f7ce3176b412f4f7bcadec5bb50f64a",
-  "subject": "Build 292: 291 plus the Career tabs declutter (#191)",
-  "receiverTree": "8b723c806e3a8971de06ddca953aec4fbf82163d",
-  "revision": 82,
-  "deployedAt": "2026-11-11T05:24:13Z"
+  "commit": "707caf5218e1689558120bb99ba0d32e4aaded81",
+  "subject": "Receiver 83: per-game loading, warm-up reports, kept files across deploys; the pace settles while start pictures go",
+  "receiverTree": "d2acb3ec2bff0955111c2856414443abcc8e7e6d",
+  "revision": 83,
+  "deployedAt": "2026-11-11T06:50:19Z",
+  "previous": {
+    "tree": "8b723c806e3a8971de06ddca953aec4fbf82163d",
+    "changed": [
+      "index.html",
+      "receiver-pickleball.js",
+      "receiver-scene-core.js",
+      "receiver-scene.js",
+      "receiver.js"
+    ]
+  }
 }

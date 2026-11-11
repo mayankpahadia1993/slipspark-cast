@@ -130,8 +130,9 @@
     // Receiver 82 (Nov 10 2026, grounds in every view): the hello's `views`, the ground's own pictures the phone draws
     // this game in place of the classic whole-ground photo and bowler's-end view (groundViews).
     let helloViews = null;
+    // `received` (receiver 83): the phone's pictures decoded since the last report (core.warmReport).
     const counters = { draws: 0, blended: 0, frames: 0, late: [], drawMs: [], missing: 0, redraws: 0, gaps: [], live: 0, pose: [], ahead: [], eff: [],
-      js: 0, long: 0, lag: [], partly: 0, stale: [] };
+      js: 0, long: 0, lag: [], partly: 0, stale: [], received: 0 };
 
     // What the page's thread does besides drawing (Oct 19 2026): `js`, the
     // script's own time in the loop and the messages; `long`, tasks of 50 ms
@@ -496,6 +497,25 @@
       if (key === preloadViews.inset) return "inset";
       return null;
     }
+    // Receiver 83 (Nov 10 2026, the owner: "If cricket is selected, we should only download cricket. If pickleball is
+    // selected, we should only download pickleball."): with `options.waitForGame` (the receiver page on a TV) the
+    // stadium's pictures and its rehearsal wait until the phone starts or asks for cricket (`selectGame`, from
+    // receiver.js: a cricket screen in the game state, the stadium on, its frames), and pause while pickleball is on.
+    // A phone of any age sends those for cricket; a frame drawing a picture still loads it at once (`ensure`).
+    let cricketWanted = !options.waitForGame;
+    // The receiver's own pictures a phone's picture asked for before cricket was (a 3.0 phone composes its grip at the
+    // cast's start): fetched once it is.
+    const deferredEnsure = new Set();
+    function selectGame(game) {
+      const wanted = game === "cricket";
+      if (wanted === cricketWanted) return;
+      cricketWanted = wanted;
+      if (!wanted) return;
+      const waiting = Array.from(deferredEnsure);
+      deferredEnsure.clear();
+      waiting.forEach(ensure);
+      pumpSome();
+    }
     // Receiver 77: when the preload last ran dry (stats `preloadMs`, from the
     // hello), and how many of the start's pictures are on their way.
     let preloadDoneAt = null;
@@ -580,6 +600,7 @@
       return preloadQueue.length ? preloadQueue[0] : null;
     }
     function pumpPreload() {
+      if (!cricketWanted) return false;
       const next = nextPreload();
       if (next === null) {
         if (!preloading && preloadDoneAt === null) { preloadDoneAt = performance.now(); pruneKept(); }
@@ -766,7 +787,7 @@
     }
 
     function rehearse(local) {
-      if (!rehearsal.wanted || on || released || !rehearsalReady(local)) return;
+      if (!rehearsal.wanted || !cricketWanted || on || released || !rehearsalReady(local)) return;
       if (plan.weak && local - rehearsal.lastAt < WEAK_REHEARSAL_GAP) return;
       // Receiver 77: the stadium's own canvas while no stadium has been shown
       // on this page (hidden: nothing on it to keep, no held frame); else one
@@ -982,14 +1003,34 @@
     // casts; files of any other tree are dropped once the preload is done.
     // Served without a DEPLOYED.json (a preview, a test) nothing is kept.
     // `stats.kept` and `stats.fetched` say how many files came from the TV and from the network.
+    //
+    // Receiver 83 (Nov 10 2026): a deploy keeps the files it didn't change. Each deploy is a new tree, so every TV
+    // fetched all ~13 MB of the receiver's pictures again on its first cast after one (iOS 293's first cast to
+    // staging 82 drew 7-12 a second while it did, qnkrpct6). DEPLOYED.json's `previous` names the tree deployed
+    // before this one and the files this one changed or added (scripts/deploy-cast-receiver.sh); the TV's copies of
+    // that tree's other files are this one's: read where they are (`stats.carried`), and moved under this tree once
+    // the preload is done, before the other trees' files go.
     let keptDb = null;
     let keptTree = null;
     const keptFiles = new Set();
-    const keptCounts = { read: 0, fetched: 0 };
+    const carried = new Map(); // path -> the key its copy is kept under (the previous tree's)
+    const keptCounts = { read: 0, fetched: 0, carried: 0 };
+    // DEPLOYED.json's `previous`, when it makes sense: { tree, changed: Set of paths }.
+    function previousDeploy(deployed, tree) {
+      const previous = deployed && deployed.previous;
+      if (!previous || typeof previous.tree !== "string" || !/^[0-9a-f]{7,64}$/.test(previous.tree) || previous.tree === tree) return null;
+      if (!Array.isArray(previous.changed) || previous.changed.length > 5000 || !previous.changed.every((path) => typeof path === "string")) return null;
+      return { tree: previous.tree, changed: new Set(previous.changed) };
+    }
     function openKept() {
       if (!window.indexedDB || options.noKept) return Promise.resolve();
+      let previous = null;
       const tree = fetch("DEPLOYED.json").then((response) => (response && response.ok && typeof response.json === "function" ? response.json() : null))
-        .then((deployed) => (deployed && typeof deployed.receiverTree === "string" && /^[0-9a-f]{7,64}$/.test(deployed.receiverTree) ? deployed.receiverTree : null))
+        .then((deployed) => {
+          const found = deployed && typeof deployed.receiverTree === "string" && /^[0-9a-f]{7,64}$/.test(deployed.receiverTree) ? deployed.receiverTree : null;
+          if (found) previous = previousDeploy(deployed, found);
+          return found;
+        })
         .catch(() => null);
       return tree.then((found) => new Promise((resolve) => {
         if (!found) { resolve(); return; }
@@ -1002,7 +1043,15 @@
           try {
             const keys = db.transaction("files", "readonly").objectStore("files").getAllKeys();
             keys.onsuccess = () => {
-              (keys.result || []).forEach((key) => { const text = String(key); if (text.indexOf(found + "/") === 0) keptFiles.add(text.slice(found.length + 1)); });
+              (keys.result || []).forEach((key) => {
+                const text = String(key);
+                if (text.indexOf(found + "/") === 0) keptFiles.add(text.slice(found.length + 1));
+                else if (previous && text.indexOf(previous.tree + "/") === 0) {
+                  const path = text.slice(previous.tree.length + 1);
+                  if (!previous.changed.has(path)) carried.set(path, text);
+                }
+              });
+              keptFiles.forEach((path) => carried.delete(path));
               keptDb = db;
               keptTree = found;
               resolve();
@@ -1030,13 +1079,17 @@
         } catch (error) { /* full: fetched again next time */ }
         return URL.createObjectURL(blob);
       }).catch(() => path);
-      if (!keptFiles.has(path)) return fetched();
+      // Receiver 83: this tree's copy, else the previous tree's of a file this deploy didn't change.
+      const from = keptFiles.has(path) ? key : carried.get(path);
+      if (!from) return fetched();
       return new Promise((resolve) => {
+        const gone = () => { keptFiles.delete(path); carried.delete(path); resolve(fetched()); };
         try {
-          const read = keptDb.transaction("files", "readonly").objectStore("files").get(key);
+          const read = keptDb.transaction("files", "readonly").objectStore("files").get(from);
           read.onsuccess = () => {
-            if (!read.result) { keptFiles.delete(path); resolve(fetched()); return; }
+            if (!read.result) { gone(); return; }
             keptCounts.read += 1;
+            if (from !== key) keptCounts.carried += 1;
             resolve(URL.createObjectURL(read.result));
           };
           read.onerror = () => resolve(fetched());
@@ -1044,7 +1097,8 @@
       });
     }
 
-    // Once the preload is done: files kept by any other tree go.
+    // Once the preload is done: the previous tree's files this deploy carried move under this tree (receiver 83),
+    // then files kept by any other tree go.
     let keptPruned = false;
     function pruneKept() {
       if (!keptDb || keptPruned) return;
@@ -1052,8 +1106,23 @@
       try {
         const write = keptDb.transaction("files", "readwrite");
         const store = write.objectStore("files");
-        const keys = store.getAllKeys();
-        keys.onsuccess = () => (keys.result || []).forEach((key) => { if (String(key).indexOf(keptTree + "/") !== 0) store.delete(key); });
+        const dropOthers = () => {
+          const keys = store.getAllKeys();
+          keys.onsuccess = () => (keys.result || []).forEach((key) => { if (String(key).indexOf(keptTree + "/") !== 0) store.delete(key); });
+        };
+        const moving = Array.from(carried.entries());
+        let left = moving.length;
+        if (!left) { dropOthers(); return; }
+        moving.forEach(([path, from]) => {
+          const read = store.get(from);
+          const next = () => { left -= 1; if (!left) dropOthers(); };
+          read.onsuccess = () => {
+            if (read.result) { store.put(read.result, keptTree + "/" + path); keptFiles.add(path); }
+            carried.delete(path);
+            next();
+          };
+          read.onerror = next;
+        });
       } catch (error) { /* next time */ }
     }
 
@@ -1105,6 +1174,8 @@
       const cut = cutOf(key);
       if (cut) { loadSheet(cut.atlas); return; }
       const ask = () => { loading.delete(key); cached.delete(key); bundled.delete(key); wanted.add(key); };
+      // Receiver 83: none of the receiver's own pictures before cricket is selected.
+      if (!cricketWanted && (bundled.has(key) || cached.has(key))) { deferredEnsure.add(key); return; }
       if (bundled.has(key)) {
         loading.add(key);
         keptURL("scene-images/" + bundled.get(key)).then((url) => loadPicture(key, url)).catch(ask);
@@ -1137,6 +1208,7 @@
       fetch("data:" + type + ";base64," + data).then((response) => response.blob()).then((blob) => {
         const url = URL.createObjectURL(blob);
         return loadPicture(key, url, blob).then(() => {
+          counters.received += 1;
           cacheImage(key, blob);
           // Receiver 77: a picture the phone sends during the setup (a dyed
           // kit's piece) is warmed as the receiver's own are, not decoded at
@@ -2394,7 +2466,7 @@
         if (preloadDoneAt !== null && rehearsal.asked) stats.preloadMs = Math.max(0, Math.round(preloadDoneAt - rehearsal.askedAt));
         // The receiver's own files read from the TV and fetched this page (receiver 77, keptURL);
         // numbers, not a list: a phone's log writes each field on one line.
-        if (keptDb) { stats.kept = keptCounts.read; stats.fetched = keptCounts.fetched; }
+        if (keptDb) { stats.kept = keptCounts.read; stats.fetched = keptCounts.fetched; if (keptCounts.carried) stats.carried = keptCounts.carried; }
         if (steadyWatch.verdict) stats.steady = steadyWatch.verdict.fps;
         if (counters.pose.length) {
           stats.pose = Math.round(core.percentile(counters.pose, 0.5));
@@ -2405,8 +2477,12 @@
           stats.eff = Math.round(core.percentile(counters.eff, 0.5));
           stats.eff90 = Math.round(core.percentile(counters.eff, 0.9));
         }
-        send(stats);
+        // Receiver 83: a report of the start's pictures coming in, not of the TV (core.warmReport).
+        const report = core.warmReport(stats, { sinceOn: on ? local - onAt : null, uploading: uploads.size, received: counters.received,
+          loading: loading.size, missing: counters.missing });
+        send(report);
         if (debug) setDebug(stats);
+        counters.received = 0;
         counters.draws = 0; counters.blended = 0; counters.frames = 0; counters.redraws = 0;
         counters.late = []; counters.drawMs = []; counters.missing = 0; counters.gaps = [];
         counters.live = 0; counters.pose = []; counters.ahead = []; counters.eff = [];
@@ -2791,7 +2867,8 @@
       dropStaticLayer();
     }
 
-    return { NAMESPACE, handle, report, setOn, renderHUD, drawFrame, playRecording, playRecordingAt, snapshot, timeline, clock, live, images, bitmaps, release,
+    return { NAMESPACE, handle, report, setOn, renderHUD, drawFrame, playRecording, playRecordingAt, snapshot, timeline, clock, live, images, bitmaps, release, selectGame,
+      get cricketWanted() { return cricketWanted; },
       pictures, counters, tune, setTune, warmed, staticLayer, holdLast, get holding() { return holding; }, get hasFrame() { return !!shownFrame; },
       // Receiver 77: how the rehearsal and the preload stand (tests and the bench's probe).
       get rehearsal() { return { draws: rehearsal.draws, wanted: rehearsal.wanted, own: rehearsal.own, startedAt: rehearsal.startedAt, askedAt: rehearsal.askedAt }; },
