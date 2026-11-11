@@ -1272,6 +1272,19 @@
     // DRESSING_STALL_MS), and the whites last at most DRESSING_LONGEST_MS (6 s) whatever comes.
     const DRESSING_LONGEST_MS = 6000;
     const DRESSING_STALL_MS = 2000;
+    // Receiver 90 (Nov 11 2026, the owner's final test, Android 27437 on the restarted Ultra: "started in whites, then showed
+    // bits of the kit, and was the full kit only after 2-3 balls"; the TV drew 18 frames dyed but for a plain torso, and
+    // the whites ran ~15 s): a look's window starts once, at its first piece; a piece within DRESSING_NEW_LOOK_MS of the
+    // last is the same look and never starts the 6 s again. And a draw that asks for a dyed piece the TV can't draw, or
+    // for dyed and photographed pieces of the batter together, draws the whole batter in the photographed pieces (and the
+    // next LOOK_WHITES_MS of draws): never half dressed, whether the window is on or not.
+    const DRESSING_NEW_LOOK_MS = 3000;
+    const LOOK_WHITES_MS = 400;
+    let lookWhitesUntil = -Infinity;
+    let drawDyed = null; // this draw's dyed pieces asked for (null outside a draw)
+    let drawPlainLook = false; // and whether it asked for a photographed piece a look dyes
+    function isPlainLookPiece(key) { return /^stroke-(torso|pelvis|near(?!Elbow)[A-Za-z]+|far(?!Elbow)[A-Za-z]+|gloves|blade-face)-\d+x\d+$/.test(key); }
+    function startsLook(local) { return !dressingOn(local) && local - dressingLast >= DRESSING_NEW_LOOK_MS; }
     const pieceMoved = new Map(); // key -> when a part of it last came (or a draw last asked for it)
     const piecesStalled = new Set(); // given up on until they decode: never the whites again for them
     function stillMoving(set, local) {
@@ -1317,7 +1330,7 @@
       if (!arrived) {
         // Sent again after the TV let it go: no new look.
         if (piecesHeld.has(key)) return;
-        if (!dressingOn(local)) dressingSince = local;
+        if (startsLook(local)) dressingSince = local;
         dressingLast = local;
         incomingPieces.add(key);
         return;
@@ -1330,7 +1343,7 @@
       // Receiver 87: pieces that stopped moving are given up on every frame, the whites on or off.
       stillMoving(incomingPieces, local);
       stillMoving(missingPieces, local);
-      const onNow = dressingOn(local);
+      const onNow = dressingOn(local) || local < lookWhitesUntil;
       if (dressingWasOn && !onNow) { needsRedraw = true; if (staticLayer) { staticLayer.key = null; staticLayer.keys = null; } }
       dressingWasOn = onNow;
     }
@@ -1743,10 +1756,12 @@
     // the same place. A decoded bitmap is drawn when there is one. Null while
     // nothing can be drawn.
     function pictureFor(key) {
+      // Receiver 90: what this draw asks of the batter.
+      if (drawDyed) { if (isDressedPiece(key)) drawDyed.add(key); else if (isPlainLookPiece(key)) drawPlainLook = true; }
       // Receiver 86: a dyed piece not decoded yet is a look still coming in: the whites until it is (and the rest).
       if (isDressedPiece(key) && !images.has(key) && !missingPieces.has(key) && !piecesStalled.has(key)) {
         const local = performance.now();
-        if (!dressingOn(local)) dressingSince = local;
+        if (startsLook(local)) dressingSince = local;
         dressingLast = local;
         missingPieces.add(key);
         pieceMoved.set(key, local);
@@ -1965,6 +1980,7 @@
 
     function drawFrame(frame, batter) {
       const started = performance.now();
+      if (!rehearsing) { drawDyed = new Set(); drawPlainLook = false; }
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.globalAlpha = 1;
       ctx.globalCompositeOperation = "source-over";
@@ -2005,6 +2021,17 @@
         live: batter === undefined ? live.current : batter }, 0, drawn);
       if (tune.shade === "canvas") drawShade();
       if (rehearsing) return;
+      // Receiver 90: a dyed piece it couldn't draw, or dyed and photographed pieces together: the whole batter in the
+      // photographed pieces, drawn again at once.
+      if (drawDyed && drawDyed.size) {
+        let half = drawPlainLook;
+        if (!half) for (const key of drawDyed) if (!images.has(key)) { half = true; break; }
+        if (half) {
+          if (!dressingWasOn) { dressingWasOn = true; needsRedraw = true; if (staticLayer) { staticLayer.key = null; staticLayer.keys = null; } }
+          lookWhitesUntil = performance.now() + LOOK_WHITES_MS;
+        }
+      }
+      drawDyed = null;
       if (drawn && !drawn.full) canvasDrawn = core.mergeRects(drawn.rects, canvas.width, canvas.height);
       counters.drawMs.push(performance.now() - started);
       counters.draws += 1;
