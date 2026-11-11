@@ -18,7 +18,8 @@
   // Receiver 83 (Nov 10 2026, qnkrpct6): warm-up reports and kept files carried across deploys (receiver-scene.js).
   // Receiver 84 (Nov 11 2026, fn6t394j): the batter's look whole or not at all; the TV's own copies before Play.
   // Receiver 85: Android's dyed pieces (named without a size) too.
-  const RECEIVER_VERSION = 85;
+  // Receiver 86: the hello's `pieces` load with the stadium; the whites while a dyed piece isn't decoded yet.
+  const RECEIVER_VERSION = 86;
   const core = window.RallycadePickleballCore;
   const sceneCore = window.RallycadeSceneCore;
 

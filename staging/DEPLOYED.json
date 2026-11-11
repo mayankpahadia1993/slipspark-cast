@@ -1,12 +1,12 @@
 {
   "environment": "staging",
-  "commit": "1802835dacf00951b279fd556b99c2cb11b1364d",
-  "subject": "Receiver 85: Android's dyed pieces and gear whole or not at all too",
-  "receiverTree": "f4ef83f3a972a174c41fecb01594e83aad157fe6",
-  "revision": 85,
-  "deployedAt": "2026-11-11T18:32:49Z",
+  "commit": "851aef6664c825876e1569792e3328a60ada4607",
+  "subject": "Receiver 86: a re-cast's look from the TV's copies with the stadium; whites while a dyed piece is missing",
+  "receiverTree": "f8397e632b38def906857a95dd879f49f9bd3376",
+  "revision": 86,
+  "deployedAt": "2026-11-11T19:16:11Z",
   "previous": {
-    "tree": "3aea15e898ef80f2978a0c1e76f5139569e2205b",
+    "tree": "f4ef83f3a972a174c41fecb01594e83aad157fe6",
     "changed": [
       "index.html",
       "receiver-pickleball.js",

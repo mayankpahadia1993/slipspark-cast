@@ -130,6 +130,9 @@
     // Receiver 82 (Nov 10 2026, grounds in every view): the hello's `views`, the ground's own pictures the phone draws
     // this game in place of the classic whole-ground photo and bowler's-end view (groundViews).
     let helloViews = null;
+    // Receiver 86 (Nov 11 2026): the hello's `pieces` (Android: the coming look's dressed pieces, its install's dressing
+    // in their keys): those this TV keeps load with the stadium's first pictures, so a re-cast's look is here at once.
+    let helloPieces = new Set();
     // `received` (receiver 83): the phone's pictures decoded since the last report (core.warmReport).
     const counters = { draws: 0, blended: 0, frames: 0, late: [], drawMs: [], missing: 0, redraws: 0, gaps: [], live: 0, pose: [], ahead: [], eff: [],
       js: 0, long: 0, lag: [], partly: 0, stale: [], received: 0 };
@@ -211,6 +214,7 @@
 
     function addImage(key, source) {
       images.set(key, source);
+      if (missingPieces.delete(key)) dressingLast = performance.now();
       if (staticLayer) { staticLayer.key = null; staticLayer.keys = null; }
       sizes.set(key, core.pictureSize(key)
         || { width: source.naturalWidth || source.width, height: source.naturalHeight || source.height });
@@ -558,6 +562,7 @@
       if (/^stadium-/.test(key)) return 0;
       if (/^stroke-/.test(key)) return 1;
       if (preloadKit && key.indexOf("kit-" + preloadKit + "-") === 0) return 1;
+      if (helloPieces.has(key)) return 1;
       if (/^bowler-11-/.test(key)) return 2;
       if (/^bowler-/.test(key)) return 3;
       if (/^fielder-[A-Za-z]+-idle-/.test(key)) return 4;
@@ -1233,6 +1238,8 @@
     const DRESSING_QUIET_MS = 1500;
     const DRESSING_LONGEST_MS = 15000;
     const incomingPieces = new Set();
+    // Receiver 86: dyed pieces a draw asked for that aren't decoded yet (a re-cast's, loading from the TV's own copy).
+    const missingPieces = new Set();
     const piecesHeld = new Set();
     let dressingSince = 0, dressingLast = 0, dressingWasOn = false;
     // iOS keys a dyed piece "kit-<look>-<piece>-<size>" and a bat's face "stroke-blade-face-bat-<bat>-<size>"; Android
@@ -1260,7 +1267,7 @@
     function dressingOn(local) {
       if (!dressingSince) return false;
       if (local - dressingSince >= DRESSING_LONGEST_MS) return false;
-      return incomingPieces.size > 0 || local - dressingLast < DRESSING_QUIET_MS;
+      return incomingPieces.size > 0 || missingPieces.size > 0 || local - dressingLast < DRESSING_QUIET_MS;
     }
     // A dyed piece's first part (`arrived` false) or the piece decoded (true).
     function noteIncomingPiece(key, arrived) {
@@ -1690,6 +1697,16 @@
     // the same place. A decoded bitmap is drawn when there is one. Null while
     // nothing can be drawn.
     function pictureFor(key) {
+      // Receiver 86: a dyed piece not decoded yet is a look still coming in: the whites until it is (and the rest).
+      if (isDressedPiece(key) && !images.has(key) && !missingPieces.has(key)) {
+        const local = performance.now();
+        if (!dressingOn(local)) dressingSince = local;
+        dressingLast = local;
+        missingPieces.add(key);
+        dressingWasOn = true;
+        // Fetched as any missing picture is: from the TV's own copy, else asked of the phone.
+        ensure(key);
+      }
       // Receiver 84: a new look's pieces still coming in: the batter in the photographed pieces, never half dressed.
       if (dressingWasOn && isDressedPiece(key)) {
         const plain = plainPiece(key);
@@ -2776,6 +2793,8 @@
           // Receiver 85: a phone's new connection sends its pieces anew (Android every cast): each a new look's again.
           piecesHeld.clear();
           helloViews = Array.isArray(message.views) ? message.views : null;
+          helloPieces = new Set(Array.isArray(message.pieces)
+            ? message.pieces.slice(0, 40).filter((key) => typeof key === "string" && key.length <= 120 && isDressedPiece(key)) : []);
           // Receiver 65: the phone holds its first ball until the TV draws steadily.
           phoneWaitsSteady = message.steady === 1;
           steadyWatch.reset();
