@@ -1,13 +1,14 @@
 {
   "environment": "staging",
-  "commit": "919e8fa097a40e1b8c2e361ff9a10aa1705b164d",
-  "subject": "Receiver 88: no steady verdict while the stadium's pictures still load",
-  "receiverTree": "7ff6e78e14756b5782353a18973ed39fd21ba753",
-  "revision": 88,
-  "deployedAt": "2026-11-11T19:35:17Z",
+  "commit": "4b18bed328d8582acf7bbf7b37f1f196d84ec022",
+  "subject": "Staging back to receiver 83 while the 88 no-ball bug (zh118rcy, w5894awn, gd8n74f6) is found",
+  "receiverTree": "d2acb3ec2bff0955111c2856414443abcc8e7e6d",
+  "revision": 83,
+  "deployedAt": "2026-11-11T19:52:18Z",
   "previous": {
-    "tree": "1b56cd6fac445aeaae8ecd541942d4d0ccb83503",
+    "tree": "7ff6e78e14756b5782353a18973ed39fd21ba753",
     "changed": [
+      "README.md",
       "index.html",
       "receiver-pickleball.js",
       "receiver-scene.js"

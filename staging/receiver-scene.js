@@ -130,9 +130,6 @@
     // Receiver 82 (Nov 10 2026, grounds in every view): the hello's `views`, the ground's own pictures the phone draws
     // this game in place of the classic whole-ground photo and bowler's-end view (groundViews).
     let helloViews = null;
-    // Receiver 86 (Nov 11 2026): the hello's `pieces` (Android: the coming look's dressed pieces, its install's dressing
-    // in their keys): those this TV keeps load with the stadium's first pictures, so a re-cast's look is here at once.
-    let helloPieces = new Set();
     // `received` (receiver 83): the phone's pictures decoded since the last report (core.warmReport).
     const counters = { draws: 0, blended: 0, frames: 0, late: [], drawMs: [], missing: 0, redraws: 0, gaps: [], live: 0, pose: [], ahead: [], eff: [],
       js: 0, long: 0, lag: [], partly: 0, stale: [], received: 0 };
@@ -214,8 +211,6 @@
 
     function addImage(key, source) {
       images.set(key, source);
-      if (missingPieces.delete(key)) dressingLast = performance.now();
-      piecesStalled.delete(key);
       if (staticLayer) { staticLayer.key = null; staticLayer.keys = null; }
       sizes.set(key, core.pictureSize(key)
         || { width: source.naturalWidth || source.width, height: source.naturalHeight || source.height });
@@ -507,29 +502,11 @@
     // stadium's pictures and its rehearsal wait until the phone starts or asks for cricket (`selectGame`, from
     // receiver.js: a cricket screen in the game state, the stadium on, its frames), and pause while pickleball is on.
     // A phone of any age sends those for cricket; a frame drawing a picture still loads it at once (`ensure`).
-    //
-    // Receiver 84 (Nov 11 2026, fn6t394j: Android 27431 pressed Play 0.8 s into the setup and the Ultra had 2 of its
-    // pictures as the stadium came on, every one 8.7 s later): before either game is chosen the stadium's pictures this
-    // TV already keeps (receiver 77's copies, its picture cache) load from the TV itself, so nothing is downloaded
-    // before cricket is chosen and nothing waits for Play; the rest come from the site once it is. Pickleball chosen:
-    // none of them.
     let cricketWanted = !options.waitForGame;
-    let selectedGame = options.waitForGame ? null : "cricket";
     // The receiver's own pictures a phone's picture asked for before cricket was (a 3.0 phone composes its grip at the
     // cast's start): fetched once it is.
     const deferredEnsure = new Set();
-    function keptHere(path) { return !!keptDb && (keptFiles.has(path) || carried.has(path)); }
-    // Whether `key` would load from the TV's own copy, not the site.
-    function onThisTV(key) {
-      const cut = cutOf(key);
-      if (cut) { const sheet = sheets.get(cut.atlas); return !!sheet && keptHere("scene-images/" + sheet.file); }
-      if (bundled.has(key)) return keptHere("scene-images/" + bundled.get(key));
-      return cached.has(key) && !!database;
-    }
-    // Before a game is chosen, only the TV's own copies; once cricket is, everything; pickleball, nothing.
-    function mayLoad(key) { return cricketWanted || (selectedGame === null && onThisTV(key)); }
     function selectGame(game) {
-      selectedGame = game;
       const wanted = game === "cricket";
       if (wanted === cricketWanted) return;
       cricketWanted = wanted;
@@ -563,7 +540,6 @@
       if (/^stadium-/.test(key)) return 0;
       if (/^stroke-/.test(key)) return 1;
       if (preloadKit && key.indexOf("kit-" + preloadKit + "-") === 0) return 1;
-      if (helloPieces.has(key)) return 1;
       if (/^bowler-11-/.test(key)) return 2;
       if (/^bowler-/.test(key)) return 3;
       if (/^fielder-[A-Za-z]+-idle-/.test(key)) return 4;
@@ -624,23 +600,16 @@
       return preloadQueue.length ? preloadQueue[0] : null;
     }
     function pumpPreload() {
-      if (!cricketWanted && selectedGame !== null) return false;
-      let next = nextPreload();
+      if (!cricketWanted) return false;
+      const next = nextPreload();
       if (next === null) {
         if (!preloading && preloadDoneAt === null) { preloadDoneAt = performance.now(); pruneKept(); }
         return false;
       }
-      // Receiver 84: no game chosen yet: the next of the TV's own copies, the rest left queued for cricket.
-      let at = 0;
-      if (!cricketWanted) {
-        at = preloadQueue.findIndex((key) => !images.has(key) && !loading.has(key) && onThisTV(key));
-        if (at < 0) return false;
-        next = preloadQueue[at];
-      }
       // Receiver 77: the rest waits while a rehearsal is due and while the stadium is on.
       if (!isStart(next) && restWaits()) return false;
       preloadDoneAt = null;
-      const key = preloadQueue.splice(at, 1)[0];
+      const key = preloadQueue.shift();
       const start = isStart(key);
       preloading += 1;
       if (start) startLoading += 1;
@@ -915,8 +884,6 @@
     // until then and the phone's picture stays over the stadium meanwhile, at
     // most STEADY_COVER_MS (the phone's own cap, CastSceneStreamer.steadyLimit).
     const steadyWatch = core.createSteadyWatch();
-    // Receiver 87: when a draw last lacked a picture (no plateau verdict while the stadium is still loading).
-    let lastMissingAt = -Infinity;
     const STEADY_COVER_MS = 8000;
     let phoneWaitsSteady = false;
     let onAt = 0;
@@ -1208,7 +1175,7 @@
       if (cut) { loadSheet(cut.atlas); return; }
       const ask = () => { loading.delete(key); cached.delete(key); bundled.delete(key); wanted.add(key); };
       // Receiver 83: none of the receiver's own pictures before cricket is selected.
-      if ((bundled.has(key) || cached.has(key)) && !mayLoad(key)) { deferredEnsure.add(key); return; }
+      if (!cricketWanted && (bundled.has(key) || cached.has(key))) { deferredEnsure.add(key); return; }
       if (bundled.has(key)) {
         loading.add(key);
         keptURL("scene-images/" + bundled.get(key)).then((url) => loadPicture(key, url)).catch(ask);
@@ -1225,93 +1192,9 @@
       for (const op of frame.o) if (op[0] === "i") ensure(op[3]);
     }
 
-    // MARK: The batter's look, whole or not at all (receiver 84, Nov 11 2026)
-    //
-    // fn6t394j (Android 27431 on the Living Room TV's Chromecast Ultra, receiver 83, a Crimson kit just bought): "It
-    // was white at the start and then the legs became red. Then the hands … and then finally the torso … it took like
-    // three balls". The phone sends the player's dyed pieces (`kit-…`, the bat's face `stroke-blade-face-bat-…`) one
-    // after another and, until the TV holds one, draws the photographed piece (`stroke-…`) in its place (iOS heldKit,
-    // Android sendPictures), so the batter turned piece by piece. Now while a new look's pieces come in (one on its
-    // way, or one arrived within DRESSING_QUIET_MS) every dyed piece is drawn as its photographed one, the batter in the
-    // whites, and the look goes on whole once they stop coming: the next draw, since the phone draws each piece the TV
-    // holds dyed. At most DRESSING_LONGEST_MS, so a piece that never comes can't keep the batter white. A piece sent again
-    // to the same phone's connection (after the TV let it go) is no new look: the batter stays dressed. After a hello
-    // every piece counts again: Android sends its pieces anew on every cast whatever the TV keeps (core CastImageLedger),
-    // drawing the photographed one until each `got`.
-    const DRESSING_QUIET_MS = 1500;
-    // Receiver 87 (hn6ae62a, Android 27433: "Still completely white"): a piece whose parts stopped coming, or a dyed piece
-    // that never decodes, held the whites for 15 s. Each now counts only while it moves (a part or a try within
-    // DRESSING_STALL_MS), and the whites last at most DRESSING_LONGEST_MS (6 s) whatever comes.
-    const DRESSING_LONGEST_MS = 6000;
-    const DRESSING_STALL_MS = 2000;
-    const pieceMoved = new Map(); // key -> when a part of it last came (or a draw last asked for it)
-    const piecesStalled = new Set(); // given up on until they decode: never the whites again for them
-    function stillMoving(set, local) {
-      for (const key of set) if (local - (pieceMoved.get(key) || 0) >= DRESSING_STALL_MS) { set.delete(key); piecesStalled.add(key); }
-      return set.size > 0;
-    }
-    const incomingPieces = new Set();
-    // Receiver 86: dyed pieces a draw asked for that aren't decoded yet (a re-cast's, loading from the TV's own copy).
-    const missingPieces = new Set();
-    const piecesHeld = new Set();
-    let dressingSince = null, dressingLast = -Infinity, dressingWasOn = false;
-    // iOS keys a dyed piece "kit-<look>-<piece>-<size>" and a bat's face "stroke-blade-face-bat-<bat>-<size>"; Android
-    // "android-kit-<look>-<piece>" and "android-stroke-blade-face-<bat>" (core CookedKits), drawn at their own size.
-    function isDressedPiece(key) { return /^(android-)?kit-./.test(key) || /^(android-)?stroke-blade-face-bat-./.test(key); }
-    // The photographed piece a dyed one stands in for: "kit-crimson.pads-navy-nearShin-306x519" and
-    // "android-kit-crimson-pads-navy-nearShin" → "stroke-nearShin-306x519"; a bat's face → "stroke-blade-face-928x186".
-    const plainPieces = new Map();
-    function plainPiece(key) {
-      if (plainPieces.has(key)) return plainPieces.get(key);
-      let found = null;
-      let match = /^stroke-blade-face-bat-.+-(\d+x\d+)$/.exec(key);
-      if (match) found = "stroke-blade-face-" + match[1];
-      else if ((match = /^kit-.+-([A-Za-z]+)-(\d+x\d+)$/.exec(key))) found = "stroke-" + match[1] + "-" + match[2];
-      else {
-        // Android's carry no size: the receiver's own photographed piece by its name.
-        const face = /^android-stroke-blade-face-bat-/.test(key);
-        const piece = face ? null : (/^android-kit-.+-([A-Za-z]+)$/.exec(key) || [])[1];
-        const wanted = face ? /^stroke-blade-face-\d+x\d+$/ : piece ? new RegExp("^stroke-" + piece + "-\\d+x\\d+$") : null;
-        if (wanted) for (const name of bundled.keys()) if (wanted.test(name)) { found = name; break; }
-      }
-      if (found || bundled.size) plainPieces.set(key, found);
-      return found;
-    }
-    function dressingOn(local) {
-      if (dressingSince === null) return false;
-      if (local - dressingSince >= DRESSING_LONGEST_MS) return false;
-      return stillMoving(incomingPieces, local) || stillMoving(missingPieces, local) || local - dressingLast < DRESSING_QUIET_MS;
-    }
-    // A dyed piece's first part (`arrived` false) or the piece decoded (true).
-    function noteIncomingPiece(key, arrived) {
-      if (!isDressedPiece(key)) return;
-      const local = performance.now();
-      if (!arrived) {
-        // Sent again after the TV let it go: no new look.
-        if (piecesHeld.has(key)) return;
-        if (!dressingOn(local)) dressingSince = local;
-        dressingLast = local;
-        incomingPieces.add(key);
-        return;
-      }
-      if (!incomingPieces.delete(key)) return;
-      dressingLast = local;
-    }
-    // Each frame: the swap to the whole look draws at once (the frame on screen drawn again).
-    function noteDressing(local) {
-      // Receiver 87: pieces that stopped moving are given up on every frame, the whites on or off.
-      stillMoving(incomingPieces, local);
-      stillMoving(missingPieces, local);
-      const onNow = dressingOn(local);
-      if (dressingWasOn && !onNow) { needsRedraw = true; if (staticLayer) { staticLayer.key = null; staticLayer.keys = null; } }
-      dressingWasOn = onNow;
-    }
-
     function receivePart(message) {
       const key = String(message.k || "");
       if (!key) return;
-      if (!uploads.has(key)) noteIncomingPiece(key, false);
-      if (isDressedPiece(key)) pieceMoved.set(key, performance.now());
       let upload = uploads.get(key);
       if (!upload) { upload = { type: message.type, of: message.of, parts: [], count: 0 }; uploads.set(key, upload); }
       if (upload.parts[message.n] == null) { upload.parts[message.n] = message.d; upload.count += 1; }
@@ -1325,8 +1208,6 @@
       fetch("data:" + type + ";base64," + data).then((response) => response.blob()).then((blob) => {
         const url = URL.createObjectURL(blob);
         return loadPicture(key, url, blob).then(() => {
-          noteIncomingPiece(key, true);
-          if (isDressedPiece(key)) piecesHeld.add(key);
           counters.received += 1;
           cacheImage(key, blob);
           // Receiver 77: a picture the phone sends during the setup (a dyed
@@ -1335,7 +1216,7 @@
           warmDecode(key);
           send({ t: "got", k: key });
         });
-      }).catch((error) => { incomingPieces.delete(key); report("image", error); });
+      }).catch((error) => report("image", error));
     }
 
     // A picture with a colour multiplied in (`colorMultiply`), made once
@@ -1714,29 +1595,12 @@
     // the same place. A decoded bitmap is drawn when there is one. Null while
     // nothing can be drawn.
     function pictureFor(key) {
-      // Receiver 86: a dyed piece not decoded yet is a look still coming in: the whites until it is (and the rest).
-      if (isDressedPiece(key) && !images.has(key) && !missingPieces.has(key) && !piecesStalled.has(key)) {
-        const local = performance.now();
-        if (!dressingOn(local)) dressingSince = local;
-        dressingLast = local;
-        missingPieces.add(key);
-        pieceMoved.set(key, local);
-        dressingWasOn = true;
-        // Fetched as any missing picture is: from the TV's own copy, else asked of the phone.
-        ensure(key);
-      }
-      // Receiver 84: a new look's pieces still coming in: the batter in the photographed pieces, never half dressed.
-      if (dressingWasOn && isDressedPiece(key)) {
-        const plain = plainPiece(key);
-        if (plain && (images.has(plain) || bundled.has(plain) || cutOf(plain))) key = plain;
-      }
       const image = images.get(key);
       if (image) return drawable(key, image, sizes.get(key));
       // A rehearsal draws what is here and asks for nothing.
       if (rehearsing) return null;
       ensure(key);
       counters.missing += 1;
-      lastMissingAt = performance.now();
       // A picture still being made: its undyed photo meanwhile.
       const picture = pictures.get(key);
       const fallback = picture && picture.fallback && images.get(picture.fallback);
@@ -2501,7 +2365,6 @@
 
     function frameStep(began) {
       const local = began;
-      noteDressing(local);
       // Shown once whole with its photo on its layer for a frame, or at
       // COVER_MS whatever.
       // Receiver 70 (the owner, Oct 23 2026: "getting the tv ready screen takes a long time and the circle keeps on
@@ -2530,15 +2393,7 @@
         if (result.blended) counters.blended += 1;
         if (result.partly) counters.partly += 1;
         lastStamp = result.stamp;
-        if (steadyWatch.started && !steadyWatch.verdict) {
-          // Receiver 87 (w34kr8dq, iOS 294 after a reconnect: "it bowled me because I couldn't even see the ball coming on
-          // the TV"): a plateau verdict while the stadium's pictures were still loading (397 draws missing one 2 s before)
-          // said steady at 18 a second and let the first ball go. While pictures are still loading the watch starts again
-          // (the phone holds its first ball at most its own 8 s, as before).
-          const verdict = steadyWatch.draw(local);
-          if (verdict && verdict.why === "plateau" && (local - lastMissingAt < 500 || startLoading > 0)) steadyWatch.start(local);
-          else noteSteady(verdict, local);
-        }
+        if (steadyWatch.started && !steadyWatch.verdict) noteSteady(steadyWatch.draw(local), local);
       }
       // How far behind the clock the stadium on screen is (receiver 65): 0
       // while blending toward the next frame, the time since the frame shown
@@ -2817,11 +2672,7 @@
           // Receiver 60: the phone's kit, whose cached pieces load with the batter's.
           helloKit = typeof message.kit === "string" ? message.kit : null;
           helloGround = groundKey(message.ground);
-          // Receiver 85: a phone's new connection sends its pieces anew (Android every cast): each a new look's again.
-          piecesHeld.clear();
           helloViews = Array.isArray(message.views) ? message.views : null;
-          helloPieces = new Set(Array.isArray(message.pieces)
-            ? message.pieces.slice(0, 40).filter((key) => typeof key === "string" && key.length <= 120 && isDressedPiece(key)) : []);
           // Receiver 65: the phone holds its first ball until the TV draws steadily.
           phoneWaitsSteady = message.steady === 1;
           steadyWatch.reset();
