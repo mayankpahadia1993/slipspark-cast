@@ -502,11 +502,29 @@
     // stadium's pictures and its rehearsal wait until the phone starts or asks for cricket (`selectGame`, from
     // receiver.js: a cricket screen in the game state, the stadium on, its frames), and pause while pickleball is on.
     // A phone of any age sends those for cricket; a frame drawing a picture still loads it at once (`ensure`).
+    //
+    // Receiver 84 (Nov 11 2026, fn6t394j: Android 27431 pressed Play 0.8 s into the setup and the Ultra had 2 of its
+    // pictures as the stadium came on, every one 8.7 s later): before either game is chosen the stadium's pictures this
+    // TV already keeps (receiver 77's copies, its picture cache) load from the TV itself, so nothing is downloaded
+    // before cricket is chosen and nothing waits for Play; the rest come from the site once it is. Pickleball chosen:
+    // none of them.
     let cricketWanted = !options.waitForGame;
+    let selectedGame = options.waitForGame ? null : "cricket";
     // The receiver's own pictures a phone's picture asked for before cricket was (a 3.0 phone composes its grip at the
     // cast's start): fetched once it is.
     const deferredEnsure = new Set();
+    function keptHere(path) { return !!keptDb && (keptFiles.has(path) || carried.has(path)); }
+    // Whether `key` would load from the TV's own copy, not the site.
+    function onThisTV(key) {
+      const cut = cutOf(key);
+      if (cut) { const sheet = sheets.get(cut.atlas); return !!sheet && keptHere("scene-images/" + sheet.file); }
+      if (bundled.has(key)) return keptHere("scene-images/" + bundled.get(key));
+      return cached.has(key) && !!database;
+    }
+    // Before a game is chosen, only the TV's own copies; once cricket is, everything; pickleball, nothing.
+    function mayLoad(key) { return cricketWanted || (selectedGame === null && onThisTV(key)); }
     function selectGame(game) {
+      selectedGame = game;
       const wanted = game === "cricket";
       if (wanted === cricketWanted) return;
       cricketWanted = wanted;
@@ -600,16 +618,23 @@
       return preloadQueue.length ? preloadQueue[0] : null;
     }
     function pumpPreload() {
-      if (!cricketWanted) return false;
-      const next = nextPreload();
+      if (!cricketWanted && selectedGame !== null) return false;
+      let next = nextPreload();
       if (next === null) {
         if (!preloading && preloadDoneAt === null) { preloadDoneAt = performance.now(); pruneKept(); }
         return false;
       }
+      // Receiver 84: no game chosen yet: the next of the TV's own copies, the rest left queued for cricket.
+      let at = 0;
+      if (!cricketWanted) {
+        at = preloadQueue.findIndex((key) => !images.has(key) && !loading.has(key) && onThisTV(key));
+        if (at < 0) return false;
+        next = preloadQueue[at];
+      }
       // Receiver 77: the rest waits while a rehearsal is due and while the stadium is on.
       if (!isStart(next) && restWaits()) return false;
       preloadDoneAt = null;
-      const key = preloadQueue.shift();
+      const key = preloadQueue.splice(at, 1)[0];
       const start = isStart(key);
       preloading += 1;
       if (start) startLoading += 1;
@@ -1175,7 +1200,7 @@
       if (cut) { loadSheet(cut.atlas); return; }
       const ask = () => { loading.delete(key); cached.delete(key); bundled.delete(key); wanted.add(key); };
       // Receiver 83: none of the receiver's own pictures before cricket is selected.
-      if (!cricketWanted && (bundled.has(key) || cached.has(key))) { deferredEnsure.add(key); return; }
+      if ((bundled.has(key) || cached.has(key)) && !mayLoad(key)) { deferredEnsure.add(key); return; }
       if (bundled.has(key)) {
         loading.add(key);
         keptURL("scene-images/" + bundled.get(key)).then((url) => loadPicture(key, url)).catch(ask);
@@ -1192,9 +1217,61 @@
       for (const op of frame.o) if (op[0] === "i") ensure(op[3]);
     }
 
+    // MARK: The batter's look, whole or not at all (receiver 84, Nov 11 2026)
+    //
+    // fn6t394j (Android 27431 on the Living Room TV's Chromecast Ultra, receiver 83, a Crimson kit just bought): "It
+    // was white at the start and then the legs became red. Then the hands … and then finally the torso … it took like
+    // three balls". The phone sends the player's dyed pieces (`kit-…`, the bat's face `stroke-blade-face-bat-…`) one
+    // after another and, until the TV holds one, draws the photographed piece (`stroke-…`) in its place (iOS heldKit,
+    // Android sendPictures), so the batter turned piece by piece. Now while a new look's pieces come in (one on its
+    // way, or one arrived within DRESSING_QUIET_MS) every dyed piece is drawn as its photographed one, the batter in the
+    // whites, and the look goes on whole once they stop coming: the next draw, since the phone draws each piece the TV
+    // holds dyed. At most DRESSING_LONGEST_MS, so a piece that never comes can't keep the batter white. A piece this page
+    // has held before (sent again after the TV let it go) is no new look: the batter stays dressed.
+    const DRESSING_QUIET_MS = 1500;
+    const DRESSING_LONGEST_MS = 15000;
+    const incomingPieces = new Set();
+    const piecesHeld = new Set();
+    let dressingSince = 0, dressingLast = 0, dressingWasOn = false;
+    function isDressedPiece(key) { return /^kit-./.test(key) || /^stroke-blade-face-bat-./.test(key); }
+    // The photographed piece a dyed one stands in for ("kit-crimson.pads-navy-nearShin-306x519" → "stroke-nearShin-306x519").
+    function plainPiece(key) {
+      let match = /^stroke-blade-face-bat-.+-(\d+x\d+)$/.exec(key);
+      if (match) return "stroke-blade-face-" + match[1];
+      match = /^kit-.+-([A-Za-z]+)-(\d+x\d+)$/.exec(key);
+      return match ? "stroke-" + match[1] + "-" + match[2] : null;
+    }
+    function dressingOn(local) {
+      if (!dressingSince) return false;
+      if (local - dressingSince >= DRESSING_LONGEST_MS) return false;
+      return incomingPieces.size > 0 || local - dressingLast < DRESSING_QUIET_MS;
+    }
+    // A dyed piece's first part (`arrived` false) or the piece decoded (true).
+    function noteIncomingPiece(key, arrived) {
+      if (!isDressedPiece(key)) return;
+      const local = performance.now();
+      if (!arrived) {
+        // Sent again after the TV let it go: no new look.
+        if (piecesHeld.has(key) || images.has(key)) return;
+        if (!dressingOn(local)) dressingSince = local;
+        dressingLast = local;
+        incomingPieces.add(key);
+        return;
+      }
+      if (!incomingPieces.delete(key)) return;
+      dressingLast = local;
+    }
+    // Each frame: the swap to the whole look draws at once (the frame on screen drawn again).
+    function noteDressing(local) {
+      const onNow = dressingOn(local);
+      if (dressingWasOn && !onNow) { needsRedraw = true; if (staticLayer) { staticLayer.key = null; staticLayer.keys = null; } }
+      dressingWasOn = onNow;
+    }
+
     function receivePart(message) {
       const key = String(message.k || "");
       if (!key) return;
+      if (!uploads.has(key)) noteIncomingPiece(key, false);
       let upload = uploads.get(key);
       if (!upload) { upload = { type: message.type, of: message.of, parts: [], count: 0 }; uploads.set(key, upload); }
       if (upload.parts[message.n] == null) { upload.parts[message.n] = message.d; upload.count += 1; }
@@ -1208,6 +1285,8 @@
       fetch("data:" + type + ";base64," + data).then((response) => response.blob()).then((blob) => {
         const url = URL.createObjectURL(blob);
         return loadPicture(key, url, blob).then(() => {
+          noteIncomingPiece(key, true);
+          if (isDressedPiece(key)) piecesHeld.add(key);
           counters.received += 1;
           cacheImage(key, blob);
           // Receiver 77: a picture the phone sends during the setup (a dyed
@@ -1216,7 +1295,7 @@
           warmDecode(key);
           send({ t: "got", k: key });
         });
-      }).catch((error) => report("image", error));
+      }).catch((error) => { incomingPieces.delete(key); report("image", error); });
     }
 
     // A picture with a colour multiplied in (`colorMultiply`), made once
@@ -1595,6 +1674,11 @@
     // the same place. A decoded bitmap is drawn when there is one. Null while
     // nothing can be drawn.
     function pictureFor(key) {
+      // Receiver 84: a new look's pieces still coming in: the batter in the photographed pieces, never half dressed.
+      if (dressingWasOn && isDressedPiece(key)) {
+        const plain = plainPiece(key);
+        if (plain && (images.has(plain) || bundled.has(plain) || cutOf(plain))) key = plain;
+      }
       const image = images.get(key);
       if (image) return drawable(key, image, sizes.get(key));
       // A rehearsal draws what is here and asks for nothing.
@@ -2365,6 +2449,7 @@
 
     function frameStep(began) {
       const local = began;
+      noteDressing(local);
       // Shown once whole with its photo on its layer for a frame, or at
       // COVER_MS whatever.
       // Receiver 70 (the owner, Oct 23 2026: "getting the tv ready screen takes a long time and the circle keeps on
