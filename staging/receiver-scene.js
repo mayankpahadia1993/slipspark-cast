@@ -124,6 +124,12 @@
     let readyToAnswer = false;
     let pendingHello = false;
     let helloKit = null;
+    // The grounds (docs/grounds.md): the plate the phone's hello names ("ground-<id>-1672x941"; nil the classic
+    // stadium). Only that ground's picture loads with the stadium; the other grounds' load only if a frame draws them.
+    let helloGround = null;
+    // Receiver 82 (Nov 10 2026, grounds in every view): the hello's `views`, the ground's own pictures the phone draws
+    // this game in place of the classic whole-ground photo and bowler's-end view (groundViews).
+    let helloViews = null;
     const counters = { draws: 0, blended: 0, frames: 0, late: [], drawMs: [], missing: 0, redraws: 0, gaps: [], live: 0, pose: [], ahead: [], eff: [],
       js: 0, long: 0, lag: [], partly: 0, stale: [] };
 
@@ -460,6 +466,36 @@
     let preloadQueue = [];
     let preloading = 0;
     let preloadKit = null;
+    let preloadGround = null;
+    // A hello's ground as its picture key: "ground-hilltop-1672x941" (or the id "ground-hilltop"), else null.
+    function groundKey(ground) {
+      if (typeof ground !== "string" || !/^ground-[a-z0-9-]{1,40}$/.test(ground)) return null;
+      return /-\d+x\d+$/.test(ground) ? ground : ground + "-1672x941";
+    }
+    // Receiver 82 (Nov 10 2026, docs/grounds.md): a phone that draws the ground's own whole-ground photo and
+    // bowler's-end view names them in its hello (`views`): "ground-<id>-outfield-1672x941" stands in for
+    // field-outfield-1672x941 and "ground-<id>-inset-660x372" for bowler-end-inset-660x372 this game. They preload
+    // as the classic pictures would (the outfield with the fielders, the inset with the first frame's) and the
+    // classic ones they stand in for don't: a Chromecast holds one whole-ground photo, as before. An older phone
+    // sends no `views` and draws the classic two at every ground, so they preload as ever. One of each kind, from the
+    // list's first few entries; anything else is ignored.
+    let preloadViews = { outfield: null, inset: null };
+    function groundViews(views) {
+      const found = { outfield: null, inset: null };
+      if (!Array.isArray(views)) return found;
+      for (const key of views.slice(0, 4)) {
+        if (typeof key !== "string" || !/^ground-[a-z0-9-]{1,60}-\d+x\d+$/.test(key)) continue;
+        const kind = /-outfield-\d+x\d+$/.test(key) ? "outfield" : /-inset-\d+x\d+$/.test(key) ? "inset" : null;
+        if (kind && !found[kind]) found[kind] = key;
+      }
+      return found;
+    }
+    // The classic picture one of the hello's views stands in for ("outfield", "inset"), else null.
+    function viewKind(key) {
+      if (key === preloadViews.outfield) return "outfield";
+      if (key === preloadViews.inset) return "inset";
+      return null;
+    }
     // Receiver 77: when the preload last ran dry (stats `preloadMs`, from the
     // hello), and how many of the start's pictures are on their way.
     let preloadDoneAt = null;
@@ -474,6 +510,13 @@
       if (cutOf(key)) return 2;
       if (/^bowler-end-(inset|batter-stance|keeper-crouch)-/.test(key)) return 2;
       if (/^bowler-end-/.test(key)) return 8;
+      // The ground the hello named is the stadium photo; its views (receiver 82) come where the classic inset (2) and
+      // outfield (5) would; another ground's pictures wait for a frame that draws them.
+      if (/^ground-/.test(key)) {
+        if (key === preloadGround) return 0;
+        const kind = viewKind(key);
+        return kind === "inset" ? 2 : kind === "outfield" ? 5 : 9;
+      }
       if (/^stadium-/.test(key)) return 0;
       if (/^stroke-/.test(key)) return 1;
       if (preloadKit && key.indexOf("kit-" + preloadKit + "-") === 0) return 1;
@@ -496,8 +539,10 @@
     // 8-17); a frame that wants one has it at once (`ensure`).
     const START_RANK = 6;
     function isStart(key) { return preloadRank(key) <= START_RANK; }
-    function preloadBundled(kit) {
+    function preloadBundled(kit, ground, views) {
       if (typeof kit === "string" && /^[a-z0-9-]{1,40}$/.test(kit)) preloadKit = kit;
+      preloadGround = groundKey(ground);
+      preloadViews = groundViews(views);
       // A dyed kit's batter on the inset: the atlases' kit masks now (receiver 73).
       if (dressedKit() && !insetOff) sheets.forEach((sheet, id) => { if (sheet.image) maskSheet(id); });
       // This TV's own copies of pictures earlier casts sent too (receiver
@@ -505,8 +550,16 @@
       // photo the TV had cached but not yet loaded.
       const byRank = (a, b) => preloadRank(a) - preloadRank(b);
       const extra = Array.from(cached).filter((key) => !bundled.has(key)).sort(byRank).slice(0, MAX_CACHED_PRELOAD);
-      // A weak dongle draws no bowler's-end inset (the phone leaves it out).
-      const wanted = (key) => !(insetOff && /^bowler-end-/.test(key));
+      // A weak dongle draws no bowler's-end inset (the phone leaves it out): neither the classic view nor a ground's.
+      // Grounds: only the named one and its views, and then not the classic stadium's photos (a weak Chromecast keeps
+      // one plate), nor the classic pictures its views stand in for (receiver 82).
+      const wanted = (key) => {
+        if (insetOff && (/^bowler-end-/.test(key) || viewKind(key) === "inset")) return false;
+        if (/^ground-/.test(key)) return key === preloadGround || viewKind(key) !== null;
+        if (preloadGround && /^stadium-(ground|backdrop)-/.test(key)) return false;
+        if (preloadViews.outfield && /^field-outfield-/.test(key)) return false;
+        return !(preloadViews.inset && /^bowler-end-inset-/.test(key));
+      };
       // An atlas once, in its first picture's place.
       const atlases = new Set();
       const once = (key) => {
@@ -555,7 +608,8 @@
           // of a cast 0.7-1 s on a Chromecast Ultra.
           // Receiver 65: the replay's outfield too (made at the first replay,
           // it cost an onn's first replay a 283 ms/s of long tasks).
-          if (/^(stadium-(ground|backdrop)|field-outfield)-/.test(key) && opaque.has(key)) backdropLayer(key);
+          // Receiver 82: a ground's plate and outfield, never its inset (drawn small on the canvas, as the classic one).
+          if (/^(stadium-(ground|backdrop)|field-outfield|ground)-/.test(key) && !/-inset-\d+x\d+$/.test(key) && opaque.has(key)) backdropLayer(key);
           warmDecode(key);
         }, () => loading.delete(key))
         .then(done, done);
@@ -2468,7 +2522,7 @@
       // A weak dongle: the phone sends frames and live batters at its pace.
       if (plan.weak) ready.weak = 1;
       send(ready);
-      preloadBundled(helloKit);
+      preloadBundled(helloKit, helloGround, helloViews);
     }
 
     function report(where, error) {
@@ -2541,6 +2595,8 @@
           wholeSent = false;
           // Receiver 60: the phone's kit, whose cached pieces load with the batter's.
           helloKit = typeof message.kit === "string" ? message.kit : null;
+          helloGround = groundKey(message.ground);
+          helloViews = Array.isArray(message.views) ? message.views : null;
           // Receiver 65: the phone holds its first ball until the TV draws steadily.
           phoneWaitsSteady = message.steady === 1;
           steadyWatch.reset();

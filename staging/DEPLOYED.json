@@ -1,8 +1,8 @@
 {
   "environment": "staging",
-  "commit": "cc9a17bf02f91371bdae9316e2ed1b207807526d",
-  "subject": "Receiver 81: the batter's gear at the bowler's end; derived exports for shopVersion 4",
-  "receiverTree": "e5c8745d016ad966ebe1b4cc1b2c7068c1fe173b",
-  "revision": 81,
-  "deployedAt": "2026-11-09T02:30:31Z"
+  "commit": "2306589f2f7ce3176b412f4f7bcadec5bb50f64a",
+  "subject": "Build 292: 291 plus the Career tabs declutter (#191)",
+  "receiverTree": "8b723c806e3a8971de06ddca953aec4fbf82163d",
+  "revision": 82,
+  "deployedAt": "2026-11-11T05:24:13Z"
 }

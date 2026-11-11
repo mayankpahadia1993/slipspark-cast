@@ -14,7 +14,8 @@
   // (a friend's look, each player's kit); the HUD's `nm` names the score's rows, `sp` a same-phone split screen with
   // `ban2`/`call2` for its right half; a frame's "V" ops split the court in two; `friends: 1` says this TV draws them.
   const NAMESPACE = "urn:x-cast:com.slipspark.pickleball";
-  const RECEIVER_VERSION = 81;
+  // Receiver 82 (Nov 10 2026): cricket's grounds in every view (receiver-scene.js preloadViews); pickleball as 81.
+  const RECEIVER_VERSION = 82;
   const core = window.RallycadePickleballCore;
   const sceneCore = window.RallycadeSceneCore;
 
