@@ -1282,8 +1282,23 @@
     const LOOK_WHITES_MS = 400;
     let lookWhitesUntil = -Infinity;
     let drawDyed = null; // this draw's dyed pieces asked for (null outside a draw)
-    let drawPlainLook = false; // and whether it asked for a photographed piece a look dyes
+    let drawPlainLook = null; // and the photographed pieces of the batter it asked for (their names: "torso", "gloves")
     function isPlainLookPiece(key) { return /^stroke-(torso|pelvis|near(?!Elbow)[A-Za-z]+|far(?!Elbow)[A-Za-z]+|gloves|blade-face)-\d+x\d+$/.test(key); }
+    // Receiver 91 (Nov 11 2026: 2.9.9 iPhones on production 90, the batter's kit drawn in the whites throughout): a look
+    // dyes the clothes (torso, pelvis, sleeves, thighs, shins, feet, head), and the forearms and gloves only with pads,
+    // the bat's face only with a bat. A 2.9.9 look (iOS "kit-club-blue-torso-…", no gear) dyes the clothes and keeps the
+    // photographed forearms, gloves and bat's face: that draw is the whole look, not half dressed. Half dressed is a
+    // photographed piece this draw's look itself dyes.
+    function plainLookPieceName(key) { const match = /^stroke-(.+)-\d+x\d+$/.exec(key); return match ? match[1] : null; }
+    function isGearOnlyPiece(name) { return name === "nearFore" || name === "farFore" || name === "gloves" || name === "blade-face"; }
+    function dyesGearPiece(dyed, name) {
+      for (const key of dyed) {
+        if (name === "blade-face") { if (/^(android-)?stroke-blade-face-bat-./.test(key) || /[.-]bat-/.test(key)) return true; }
+        else if (/^(android-)?kit-.*[.-]pads-/.test(key)) return true;
+      }
+      return false;
+    }
+    function lookDyesPiece(dyed, name) { return !isGearOnlyPiece(name) || dyesGearPiece(dyed, name); }
     function startsLook(local) { return !dressingOn(local) && local - dressingLast >= DRESSING_NEW_LOOK_MS; }
     const pieceMoved = new Map(); // key -> when a part of it last came (or a draw last asked for it)
     const piecesStalled = new Set(); // given up on until they decode: never the whites again for them
@@ -1757,7 +1772,7 @@
     // nothing can be drawn.
     function pictureFor(key) {
       // Receiver 90: what this draw asks of the batter.
-      if (drawDyed) { if (isDressedPiece(key)) drawDyed.add(key); else if (isPlainLookPiece(key)) drawPlainLook = true; }
+      if (drawDyed) { if (isDressedPiece(key)) drawDyed.add(key); else if (isPlainLookPiece(key)) drawPlainLook.add(plainLookPieceName(key)); }
       // Receiver 86: a dyed piece not decoded yet is a look still coming in: the whites until it is (and the rest).
       if (isDressedPiece(key) && !images.has(key) && !missingPieces.has(key) && !piecesStalled.has(key)) {
         const local = performance.now();
@@ -1980,7 +1995,7 @@
 
     function drawFrame(frame, batter) {
       const started = performance.now();
-      if (!rehearsing) { drawDyed = new Set(); drawPlainLook = false; }
+      if (!rehearsing) { drawDyed = new Set(); drawPlainLook = new Set(); }
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.globalAlpha = 1;
       ctx.globalCompositeOperation = "source-over";
@@ -2024,14 +2039,16 @@
       // Receiver 90: a dyed piece it couldn't draw, or dyed and photographed pieces together: the whole batter in the
       // photographed pieces, drawn again at once.
       if (drawDyed && drawDyed.size) {
-        let half = drawPlainLook;
+        // Receiver 91: a photographed piece only when this look dyes it (a 2.9.9 look's forearms, gloves and bat's face aren't).
+        let half = false;
+        for (const name of drawPlainLook) if (lookDyesPiece(drawDyed, name)) { half = true; break; }
         if (!half) for (const key of drawDyed) if (!images.has(key)) { half = true; break; }
         if (half) {
           if (!dressingWasOn) { dressingWasOn = true; needsRedraw = true; if (staticLayer) { staticLayer.key = null; staticLayer.keys = null; } }
           lookWhitesUntil = performance.now() + LOOK_WHITES_MS;
         }
       }
-      drawDyed = null;
+      drawDyed = null; drawPlainLook = null;
       if (drawn && !drawn.full) canvasDrawn = core.mergeRects(drawn.rects, canvas.width, canvas.height);
       counters.drawMs.push(performance.now() - started);
       counters.draws += 1;

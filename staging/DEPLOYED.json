@@ -1,12 +1,12 @@
 {
   "environment": "staging",
-  "commit": "9a3b5a9f836ba6b41de586312ca5f9a57ad9a30e",
-  "subject": "Receiver 90: a look's whites start once, and the batter is never half dressed",
-  "receiverTree": "ee81a57f1b19d9c1786fbc65554d7eed439a0e86",
-  "revision": 90,
-  "deployedAt": "2026-11-11T22:18:01Z",
+  "commit": "8a053bc69dd590eaad1c1c71c9e2ad9db8960c79",
+  "subject": "Receiver 91: a 2.9.9 look (dyed clothes, photographed forearms, gloves and bat face) is whole, not half dressed",
+  "receiverTree": "1596897f5bcd7cebace842323fc4ceddb305d773",
+  "revision": 91,
+  "deployedAt": "2026-11-11T23:05:32Z",
   "previous": {
-    "tree": "0e46f80b580a21a2151801dfeb5754c30135c6a2",
+    "tree": "ee81a57f1b19d9c1786fbc65554d7eed439a0e86",
     "changed": [
       "index.html",
       "receiver-pickleball.js",
@@ -14,6 +14,14 @@
     ]
   },
   "earlier": [
+    {
+      "tree": "0e46f80b580a21a2151801dfeb5754c30135c6a2",
+      "changed": [
+        "index.html",
+        "receiver-pickleball.js",
+        "receiver-scene.js"
+      ]
+    },
     {
       "tree": "d2acb3ec2bff0955111c2856414443abcc8e7e6d",
       "changed": [
@@ -33,14 +41,6 @@
     },
     {
       "tree": "1b56cd6fac445aeaae8ecd541942d4d0ccb83503",
-      "changed": [
-        "index.html",
-        "receiver-pickleball.js",
-        "receiver-scene.js"
-      ]
-    },
-    {
-      "tree": "f8397e632b38def906857a95dd879f49f9bd3376",
       "changed": [
         "index.html",
         "receiver-pickleball.js",
