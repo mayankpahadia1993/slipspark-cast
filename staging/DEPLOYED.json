@@ -1,26 +1,34 @@
 {
   "environment": "staging",
-  "commit": "9f26c5d76cc70ead2213f4097bb54e470e3d5709",
-  "subject": "Receiver 92: a full match's bowling plates, loaded only when a frame draws them",
-  "receiverTree": "c4bd5645799247e570e98c72947d99323dc4dca1",
-  "revision": 92,
-  "deployedAt": "2026-11-12T07:30:54Z",
+  "commit": "6e1b06fe9be805713a8be4dca2b7d5b4b06167ca",
+  "subject": "Keep the selected kit across cold-start Cast poses",
+  "receiverTree": "63ef02641af20c8d4cd69438f3b1277393bfc635",
+  "revision": 93,
+  "deployedAt": "2026-11-12T09:45:23Z",
   "previous": {
-    "tree": "1596897f5bcd7cebace842323fc4ceddb305d773",
+    "tree": "c4bd5645799247e570e98c72947d99323dc4dca1",
     "changed": [
       "index.html",
       "receiver-pickleball.js",
-      "receiver-scene.js",
-      "scene-images/bowler-end-plate-1672x941.jpg",
-      "scene-images/ground-cauldron-bowler-end-1672x941.jpg",
-      "scene-images/ground-coral-bay-bowler-end-1672x941.jpg",
-      "scene-images/ground-hilltop-bowler-end-1672x941.jpg",
-      "scene-images/ground-ironbark-bowler-end-1672x941.jpg",
-      "scene-images/ground-pavilion-bowler-end-1672x941.jpg",
-      "scene-images/manifest.json"
+      "receiver-scene.js"
     ]
   },
   "earlier": [
+    {
+      "tree": "1596897f5bcd7cebace842323fc4ceddb305d773",
+      "changed": [
+        "index.html",
+        "receiver-pickleball.js",
+        "receiver-scene.js",
+        "scene-images/bowler-end-plate-1672x941.jpg",
+        "scene-images/ground-cauldron-bowler-end-1672x941.jpg",
+        "scene-images/ground-coral-bay-bowler-end-1672x941.jpg",
+        "scene-images/ground-hilltop-bowler-end-1672x941.jpg",
+        "scene-images/ground-ironbark-bowler-end-1672x941.jpg",
+        "scene-images/ground-pavilion-bowler-end-1672x941.jpg",
+        "scene-images/manifest.json"
+      ]
+    },
     {
       "tree": "ee81a57f1b19d9c1786fbc65554d7eed439a0e86",
       "changed": [
@@ -55,21 +63,6 @@
       "tree": "d2acb3ec2bff0955111c2856414443abcc8e7e6d",
       "changed": [
         "README.md",
-        "index.html",
-        "receiver-pickleball.js",
-        "receiver-scene.js",
-        "scene-images/bowler-end-plate-1672x941.jpg",
-        "scene-images/ground-cauldron-bowler-end-1672x941.jpg",
-        "scene-images/ground-coral-bay-bowler-end-1672x941.jpg",
-        "scene-images/ground-hilltop-bowler-end-1672x941.jpg",
-        "scene-images/ground-ironbark-bowler-end-1672x941.jpg",
-        "scene-images/ground-pavilion-bowler-end-1672x941.jpg",
-        "scene-images/manifest.json"
-      ]
-    },
-    {
-      "tree": "7ff6e78e14756b5782353a18973ed39fd21ba753",
-      "changed": [
         "index.html",
         "receiver-pickleball.js",
         "receiver-scene.js",

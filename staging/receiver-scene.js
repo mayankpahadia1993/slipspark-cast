@@ -1337,6 +1337,28 @@
       if (found || bundled.size) plainPieces.set(key, found);
       return found;
     }
+    // The phone declares only the pieces this batter actually wears, per stadium.
+    // Once the whole look is decoded, use it even for a late pre-warm pose in
+    // photographed whites. Another innings (including bowling) starts afresh.
+    let selectedKeys = [], selectedPictures = null;
+    function selectStadiumLook(keys) {
+      selectedKeys = Array.isArray(keys) && keys.length <= 40
+        ? [...new Set(keys.filter((key) => typeof key === "string" && key.length <= 120 && isDressedPiece(key)))] : [];
+      selectedPictures = null;
+      if (staticLayer) { staticLayer.key = null; staticLayer.keys = null; }
+      needsRedraw = true;
+    }
+    function readySelectedLook() {
+      if (!selectedPictures && selectedKeys.length && selectedKeys.every((key) => images.has(key))) {
+        const next = new Map();
+        for (const key of selectedKeys) {
+          const photo = plainPiece(key);
+          if (!photo) return;
+          next.set(photo, key); next.set(key, key);
+        }
+        selectedPictures = next;
+      }
+    }
     function dressingOn(local) {
       if (dressingSince === null) return false;
       if (local - dressingSince >= DRESSING_LONGEST_MS) return false;
@@ -1775,6 +1797,11 @@
     // the same place. A decoded bitmap is drawn when there is one. Null while
     // nothing can be drawn.
     function pictureFor(key) {
+      if (!rehearsing && selectedPictures && selectedPictures.has(key)) {
+        const chosen = selectedPictures.get(key), image = images.get(chosen);
+        if (image) return drawable(chosen, image, sizes.get(chosen));
+        selectedPictures = null;
+      }
       // Receiver 90: what this draw asks of the batter.
       if (drawDyed) { if (isDressedPiece(key)) drawDyed.add(key); else if (isPlainLookPiece(key)) drawPlainLook.add(plainLookPieceName(key)); }
       // Receiver 86: a dyed piece not decoded yet is a look still coming in: the whites until it is (and the rest).
@@ -2578,6 +2605,7 @@
 
     function frameStep(began) {
       const local = began;
+      readySelectedLook();
       noteDressing(local);
       // Shown once whole with its photo on its layer for a frame, or at
       // COVER_MS whatever.
@@ -2913,6 +2941,7 @@
           clock.set(message.o);
           break;
         case "scene":
+          selectStadiumLook(message.on === 1 ? message.lookPieces : null);
           setOn(message.on === 1);
           break;
         case "f": {
