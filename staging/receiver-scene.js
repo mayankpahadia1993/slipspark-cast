@@ -614,6 +614,10 @@
       // Grounds: only the named one and its views, and then not the classic stadium's photos (a weak Chromecast keeps
       // one plate), nor the classic pictures its views stand in for (receiver 82).
       const wanted = (key) => {
+        // Receiver 88 (Nov 12 2026): the bowler's-end view's whole plate is a full match's bowling only (the phone draws
+        // its bowling view as the stadium's frames, docs/design/FULL_MATCH.md "TV v2"): loaded when a frame draws it,
+        // never with an innings' pictures. A ground's own (ground-<id>-bowler-end-*) is another ground's picture already.
+        if (/^bowler-end-plate-/.test(key)) return false;
         if (insetOff && (/^bowler-end-/.test(key) || viewKind(key) === "inset")) return false;
         if (/^ground-/.test(key)) return key === preloadGround || viewKind(key) !== null;
         if (preloadGround && /^stadium-(ground|backdrop)-/.test(key)) return false;
