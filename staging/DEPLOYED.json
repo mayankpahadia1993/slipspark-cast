@@ -1,25 +1,38 @@
 {
   "environment": "staging",
-  "commit": "6e1b06fe9be805713a8be4dca2b7d5b4b06167ca",
-  "subject": "Keep the selected kit across cold-start Cast poses",
-  "receiverTree": "63ef02641af20c8d4cd69438f3b1277393bfc635",
-  "revision": 93,
-  "deployedAt": "2026-11-12T09:45:23Z",
+  "commit": "de0db15429faed2f647b301bd8d8597c32ffb70a",
+  "subject": "Make the final Chromecast scorecard readable across the room",
+  "receiverTree": "8ca044438a6e4af491bea47465fff7cf9f08cb26",
+  "revision": 94,
+  "deployedAt": "2026-11-12T18:12:46Z",
   "previous": {
-    "tree": "c4bd5645799247e570e98c72947d99323dc4dca1",
+    "tree": "63ef02641af20c8d4cd69438f3b1277393bfc635",
     "changed": [
       "index.html",
       "receiver-pickleball.js",
-      "receiver-scene.js"
+      "receiver.css",
+      "receiver.js"
     ]
   },
   "earlier": [
+    {
+      "tree": "c4bd5645799247e570e98c72947d99323dc4dca1",
+      "changed": [
+        "index.html",
+        "receiver-pickleball.js",
+        "receiver-scene.js",
+        "receiver.css",
+        "receiver.js"
+      ]
+    },
     {
       "tree": "1596897f5bcd7cebace842323fc4ceddb305d773",
       "changed": [
         "index.html",
         "receiver-pickleball.js",
         "receiver-scene.js",
+        "receiver.css",
+        "receiver.js",
         "scene-images/bowler-end-plate-1672x941.jpg",
         "scene-images/ground-cauldron-bowler-end-1672x941.jpg",
         "scene-images/ground-coral-bay-bowler-end-1672x941.jpg",
@@ -35,6 +48,8 @@
         "index.html",
         "receiver-pickleball.js",
         "receiver-scene.js",
+        "receiver.css",
+        "receiver.js",
         "scene-images/bowler-end-plate-1672x941.jpg",
         "scene-images/ground-cauldron-bowler-end-1672x941.jpg",
         "scene-images/ground-coral-bay-bowler-end-1672x941.jpg",
@@ -50,22 +65,8 @@
         "index.html",
         "receiver-pickleball.js",
         "receiver-scene.js",
-        "scene-images/bowler-end-plate-1672x941.jpg",
-        "scene-images/ground-cauldron-bowler-end-1672x941.jpg",
-        "scene-images/ground-coral-bay-bowler-end-1672x941.jpg",
-        "scene-images/ground-hilltop-bowler-end-1672x941.jpg",
-        "scene-images/ground-ironbark-bowler-end-1672x941.jpg",
-        "scene-images/ground-pavilion-bowler-end-1672x941.jpg",
-        "scene-images/manifest.json"
-      ]
-    },
-    {
-      "tree": "d2acb3ec2bff0955111c2856414443abcc8e7e6d",
-      "changed": [
-        "README.md",
-        "index.html",
-        "receiver-pickleball.js",
-        "receiver-scene.js",
+        "receiver.css",
+        "receiver.js",
         "scene-images/bowler-end-plate-1672x941.jpg",
         "scene-images/ground-cauldron-bowler-end-1672x941.jpg",
         "scene-images/ground-coral-bay-bowler-end-1672x941.jpg",

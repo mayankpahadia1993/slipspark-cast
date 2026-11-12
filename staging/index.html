@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800;900&family=Nunito:wght@600;700;800;900&display=swap">
-  <link rel="stylesheet" href="receiver.css?v=93">
+  <link rel="stylesheet" href="receiver.css?v=94">
   <script src="https://www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>
 </head>
 <body>
@@ -88,9 +88,15 @@
       <span id="duel-result-eyebrow" class="eyebrow">CHASE DUEL</span>
       <h1 id="duel-result-headline">TIED</h1>
       <span id="duel-result-margin" class="score-caption">SCORES LEVEL</span>
-      <div class="versus-result-grid">
-        <div id="duel-result-first" class="result-corner"><span id="duel-result-first-name">PLAYER 1</span><strong id="duel-result-first-score">0</strong><small id="duel-result-first-wickets"></small></div>
-        <div id="duel-result-second" class="result-corner"><span id="duel-result-second-name">PLAYER 2</span><strong id="duel-result-second-score">0</strong><small id="duel-result-second-wickets"></small></div>
+      <div class="innings-table">
+        <div id="duel-result-first" class="innings-row">
+          <div><small>1st innings</small><span id="duel-result-first-name">PLAYER 1</span></div>
+          <strong id="duel-result-first-score">0/0</strong>
+        </div>
+        <div id="duel-result-second" class="innings-row">
+          <div><small>2nd innings</small><span id="duel-result-second-name">PLAYER 2</span></div>
+          <strong id="duel-result-second-score">0/0</strong>
+        </div>
       </div>
       <p id="duel-result-note">Raise both hands for another duel</p>
     </section>
@@ -307,17 +313,17 @@
     </div>
   </section>
   <!-- ?v= keeps a Chromecast from mixing cached files of two receiver versions. -->
-  <script src="receiver-core.js?v=93"></script>
-  <script src="receiver-card-core.js?v=93"></script>
-  <script src="receiver-video.js?v=93"></script>
-  <script src="receiver-scene-core.js?v=93"></script>
-  <script src="receiver-scene.js?v=93"></script>
-  <script src="receiver-welcome.js?v=93"></script>
-  <script src="receiver-celebration.js?v=93"></script>
-  <script src="receiver-music.js?v=93"></script>
-  <script src="receiver-pickleball-core.js?v=93"></script>
-  <script src="receiver-pickleball.js?v=93"></script>
-  <script src="receiver-shared.js?v=93"></script>
-  <script src="receiver.js?v=93"></script>
+  <script src="receiver-core.js?v=94"></script>
+  <script src="receiver-card-core.js?v=94"></script>
+  <script src="receiver-video.js?v=94"></script>
+  <script src="receiver-scene-core.js?v=94"></script>
+  <script src="receiver-scene.js?v=94"></script>
+  <script src="receiver-welcome.js?v=94"></script>
+  <script src="receiver-celebration.js?v=94"></script>
+  <script src="receiver-music.js?v=94"></script>
+  <script src="receiver-pickleball-core.js?v=94"></script>
+  <script src="receiver-pickleball.js?v=94"></script>
+  <script src="receiver-shared.js?v=94"></script>
+  <script src="receiver.js?v=94"></script>
 </body>
 </html>
