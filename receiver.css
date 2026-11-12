@@ -45,13 +45,10 @@ body { font-family: Inter, "Google Sans", system-ui, sans-serif; color: var(--pa
 .hero-score { margin-top: 2vh; color: var(--signal); font-size: clamp(120px, 17vw, 320px); line-height: .86; letter-spacing: -.05em; font-variant-numeric: tabular-nums; }
 .score-caption { margin-top: 1.5vh; color: var(--signal); font-size: clamp(18px, 2vw, 38px); font-weight: 950; letter-spacing: .14em; }
 .scorecard-screen p { margin: 3vh 0 0; color: var(--muted); font-size: clamp(16px, 1.5vw, 28px); font-weight: 750; }
-.result-stats, .versus-result-grid { display: flex; gap: 1.5vw; margin-top: 3vh; }
-.result-stat, .result-corner { min-width: 15vw; padding: 2vh 2vw; border: 1px solid rgba(255,255,255,.12); border-radius: 1.4vw; background: rgba(0,0,0,.5); }
+.result-stats { display: flex; gap: 1.5vw; margin-top: 3vh; }
+.result-stat { min-width: 15vw; padding: 2vh 2vw; border: 1px solid rgba(255,255,255,.12); border-radius: 1.4vw; background: rgba(0,0,0,.5); }
 .result-stat strong { display: block; font-size: clamp(24px, 2.8vw, 52px); }
-.result-stat span, .result-corner span, .result-corner small { display: block; margin-top: .7vh; color: var(--muted); font-size: clamp(12px, 1vw, 20px); font-weight: 900; letter-spacing: .1em; }
-.result-corner { min-width: 28vw; }
-.result-corner strong { display: block; margin-top: .5vh; font-size: clamp(64px, 8vw, 150px); line-height: 1; }
-.result-corner.is-winner { border-width: 3px; border-color: var(--signal); box-shadow: 0 0 3vw rgba(214,255,56,.12); }
+.result-stat span { display: block; margin-top: .7vh; color: var(--muted); font-size: clamp(12px, 1vw, 20px); font-weight: 900; letter-spacing: .1em; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; }
@@ -249,16 +246,38 @@ body[data-scene-weak="1"] .scene-hud *, body[data-scene-weak="1"] .scene-hud { a
     url("scene-images/stadium-ground-1672x941.jpg") center / cover no-repeat,
     #0c1a17;
 }
-#app h1, .hero-score, .brand-mark, .result-stat strong, .result-corner strong {
+#app h1, .hero-score, .brand-mark, .result-stat strong, .innings-row strong {
   font-family: Nunito, "Varela Round", "Google Sans", sans-serif;
   font-weight: 900;
 }
 .status-dot { box-shadow: none; }
 .ready-status { border: 0; background: var(--stadium-ink); }
 .ready-screen h1, .scorecard-screen h1, .stadium-card h1 { text-shadow: 0 .4vw 2vw rgba(0, 0, 0, .45); }
-.result-stat, .result-corner { border: 0; background: var(--stadium-ink); }
+.result-stat { border: 0; background: var(--stadium-ink); }
 .hero-score { color: var(--paper); text-shadow: 0 .6vw 2.4vw rgba(0, 0, 0, .4); }
-.result-corner.is-winner { border: 3px solid var(--signal); box-shadow: 0 0 3vw rgba(255, 194, 82, .2); }
+
+/* Full matches and duels share this scorecard on the TV. */
+#duel-result-screen {
+  align-items: stretch;
+  text-align: left;
+  padding: 6vh 12vw;
+  background: linear-gradient(95deg, rgba(5, 24, 20, .89), rgba(8, 24, 21, .62) 65%, rgba(8, 24, 21, .34));
+}
+#duel-result-eyebrow { font-size: 1.65vw; line-height: 1.25; }
+#duel-result-headline { margin: 1.3vh 0 0; font-size: 5.35vw; letter-spacing: -.035em; line-height: 1.05; overflow-wrap: anywhere; }
+#duel-result-margin { margin-top: 1.25vh; font-size: 2.15vw; line-height: 1.15; font-weight: 750; letter-spacing: 0; }
+.innings-table { margin-top: 4.5vh; border-top: 1px solid rgba(252, 245, 222, .4); }
+.innings-row {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 2vw;
+  padding: 1.55vh 2.4vw; border-left: .42vw solid transparent;
+  border-bottom: 1px solid rgba(252, 245, 222, .23); background: rgba(7, 27, 23, .88);
+}
+.innings-row.is-winner { border-left-color: var(--signal); background: rgba(32, 53, 42, .96); }
+.innings-row small { display: block; color: var(--muted); font-size: 1.5vw; font-weight: 650; }
+.innings-row span { display: block; margin-top: .25vh; font-size: 2.5vw; line-height: 1.13; font-weight: 800; overflow-wrap: anywhere; }
+.innings-row strong { font-size: 5.15vw; font-variant-numeric: tabular-nums; line-height: 1; letter-spacing: -.035em; }
+.innings-row.is-winner strong { color: var(--signal); }
+#duel-result-note { margin: 2.8vh 0 0; font-size: 1.65vw; font-weight: 650; }
 
 .timing-check-screen { display: flex; align-items: center; justify-content: center; padding: 6vh 8vw; }
 .stadium-card { width: min(76vw, 1400px); display: flex; flex-direction: column; gap: 1.6vh; }

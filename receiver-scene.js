@@ -614,6 +614,10 @@
       // Grounds: only the named one and its views, and then not the classic stadium's photos (a weak Chromecast keeps
       // one plate), nor the classic pictures its views stand in for (receiver 82).
       const wanted = (key) => {
+        // Receiver 88 (Nov 12 2026): the bowler's-end view's whole plate is a full match's bowling only (the phone draws
+        // its bowling view as the stadium's frames, docs/design/FULL_MATCH.md "TV v2"): loaded when a frame draws it,
+        // never with an innings' pictures. A ground's own (ground-<id>-bowler-end-*) is another ground's picture already.
+        if (/^bowler-end-plate-/.test(key)) return false;
         if (insetOff && (/^bowler-end-/.test(key) || viewKind(key) === "inset")) return false;
         if (/^ground-/.test(key)) return key === preloadGround || viewKind(key) !== null;
         if (preloadGround && /^stadium-(ground|backdrop)-/.test(key)) return false;
@@ -1333,6 +1337,28 @@
       if (found || bundled.size) plainPieces.set(key, found);
       return found;
     }
+    // The phone declares only the pieces this batter actually wears, per stadium.
+    // Once the whole look is decoded, use it even for a late pre-warm pose in
+    // photographed whites. Another innings (including bowling) starts afresh.
+    let selectedKeys = [], selectedPictures = null;
+    function selectStadiumLook(keys) {
+      selectedKeys = Array.isArray(keys) && keys.length <= 40
+        ? [...new Set(keys.filter((key) => typeof key === "string" && key.length <= 120 && isDressedPiece(key)))] : [];
+      selectedPictures = null;
+      if (staticLayer) { staticLayer.key = null; staticLayer.keys = null; }
+      needsRedraw = true;
+    }
+    function readySelectedLook() {
+      if (!selectedPictures && selectedKeys.length && selectedKeys.every((key) => images.has(key))) {
+        const next = new Map();
+        for (const key of selectedKeys) {
+          const photo = plainPiece(key);
+          if (!photo) return;
+          next.set(photo, key); next.set(key, key);
+        }
+        selectedPictures = next;
+      }
+    }
     function dressingOn(local) {
       if (dressingSince === null) return false;
       if (local - dressingSince >= DRESSING_LONGEST_MS) return false;
@@ -1771,6 +1797,11 @@
     // the same place. A decoded bitmap is drawn when there is one. Null while
     // nothing can be drawn.
     function pictureFor(key) {
+      if (!rehearsing && selectedPictures && selectedPictures.has(key)) {
+        const chosen = selectedPictures.get(key), image = images.get(chosen);
+        if (image) return drawable(chosen, image, sizes.get(chosen));
+        selectedPictures = null;
+      }
       // Receiver 90: what this draw asks of the batter.
       if (drawDyed) { if (isDressedPiece(key)) drawDyed.add(key); else if (isPlainLookPiece(key)) drawPlainLook.add(plainLookPieceName(key)); }
       // Receiver 86: a dyed piece not decoded yet is a look still coming in: the whites until it is (and the rest).
@@ -2574,6 +2605,7 @@
 
     function frameStep(began) {
       const local = began;
+      readySelectedLook();
       noteDressing(local);
       // Shown once whole with its photo on its layer for a frame, or at
       // COVER_MS whatever.
@@ -2909,6 +2941,7 @@
           clock.set(message.o);
           break;
         case "scene":
+          selectStadiumLook(message.on === 1 ? message.lookPieces : null);
           setOn(message.on === 1);
           break;
         case "f": {

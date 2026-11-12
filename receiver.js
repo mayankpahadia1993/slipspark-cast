@@ -166,12 +166,20 @@
     text("duel-result-first-name", result.firstName || "PLAYER 1");
     text("duel-result-second-name", result.secondName || "PLAYER 2");
     text("duel-result-note", result.note || "Raise both hands for another duel");
-    text("duel-result-headline", result.headline);
-    text("duel-result-margin", result.margin);
-    text("duel-result-first-score", result.firstRuns.toLocaleString("en-US"));
-    text("duel-result-second-score", result.secondRuns.toLocaleString("en-US"));
-    text("duel-result-first-wickets", `${result.firstWickets} WICKET${result.firstWickets === 1 ? "" : "S"} DOWN`);
-    text("duel-result-second-wickets", `${result.secondWickets} WICKET${result.secondWickets === 1 ? "" : "S"} DOWN`);
+    // Full Match sends the winning margin both in the headline and by itself. A duel can
+    // send a winner's name as its headline and supply the actual outcome in the margin.
+    let headline = result.headline;
+    let detail = result.margin;
+    if (headline.toLowerCase().endsWith(detail.toLowerCase())) {
+      const spare = headline.match(/\s*\(([^()]+)\)\s*$/);
+      detail = spare ? spare[1] : "";
+      if (spare) headline = headline.slice(0, spare.index);
+    }
+    text("duel-result-headline", headline);
+    text("duel-result-margin", detail);
+    element("duel-result-margin").hidden = !detail;
+    text("duel-result-first-score", result.firstRuns.toLocaleString("en-US") + "/" + result.firstWickets);
+    text("duel-result-second-score", result.secondRuns.toLocaleString("en-US") + "/" + result.secondWickets);
     element("duel-result-first").classList.toggle("is-winner", result.winner === "first");
     element("duel-result-second").classList.toggle("is-winner", result.winner === "second");
   }
