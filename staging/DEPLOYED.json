@@ -1,20 +1,33 @@
 {
   "environment": "staging",
-  "commit": "de0db15429faed2f647b301bd8d8597c32ffb70a",
-  "subject": "Make the final Chromecast scorecard readable across the room",
-  "receiverTree": "8ca044438a6e4af491bea47465fff7cf9f08cb26",
-  "revision": 94,
-  "deployedAt": "2026-11-12T18:12:46Z",
+  "commit": "914b499e4588ec02c3ad4da8b125e9b52156ea5e",
+  "subject": "Keep shared Android ceremony pixels until the last cached phase is evicted",
+  "receiverTree": "94852de06c0356510e9e21939552fe2e401dd80b",
+  "revision": 95,
+  "deployedAt": "2026-11-13T00:53:16Z",
   "previous": {
-    "tree": "63ef02641af20c8d4cd69438f3b1277393bfc635",
+    "tree": "8ca044438a6e4af491bea47465fff7cf9f08cb26",
     "changed": [
       "index.html",
       "receiver-pickleball.js",
-      "receiver.css",
-      "receiver.js"
+      "scene-images/kit-masks-bowler-end-0-1280x1576.png",
+      "scene-images/kit-masks-bowler-end-1-1272x1668.png",
+      "scene-images/kit-masks-bowler-end-2-1264x1560.png"
     ]
   },
   "earlier": [
+    {
+      "tree": "63ef02641af20c8d4cd69438f3b1277393bfc635",
+      "changed": [
+        "index.html",
+        "receiver-pickleball.js",
+        "receiver.css",
+        "receiver.js",
+        "scene-images/kit-masks-bowler-end-0-1280x1576.png",
+        "scene-images/kit-masks-bowler-end-1-1272x1668.png",
+        "scene-images/kit-masks-bowler-end-2-1264x1560.png"
+      ]
+    },
     {
       "tree": "c4bd5645799247e570e98c72947d99323dc4dca1",
       "changed": [
@@ -22,7 +35,10 @@
         "receiver-pickleball.js",
         "receiver-scene.js",
         "receiver.css",
-        "receiver.js"
+        "receiver.js",
+        "scene-images/kit-masks-bowler-end-0-1280x1576.png",
+        "scene-images/kit-masks-bowler-end-1-1272x1668.png",
+        "scene-images/kit-masks-bowler-end-2-1264x1560.png"
       ]
     },
     {
@@ -39,6 +55,9 @@
         "scene-images/ground-hilltop-bowler-end-1672x941.jpg",
         "scene-images/ground-ironbark-bowler-end-1672x941.jpg",
         "scene-images/ground-pavilion-bowler-end-1672x941.jpg",
+        "scene-images/kit-masks-bowler-end-0-1280x1576.png",
+        "scene-images/kit-masks-bowler-end-1-1272x1668.png",
+        "scene-images/kit-masks-bowler-end-2-1264x1560.png",
         "scene-images/manifest.json"
       ]
     },
@@ -56,23 +75,9 @@
         "scene-images/ground-hilltop-bowler-end-1672x941.jpg",
         "scene-images/ground-ironbark-bowler-end-1672x941.jpg",
         "scene-images/ground-pavilion-bowler-end-1672x941.jpg",
-        "scene-images/manifest.json"
-      ]
-    },
-    {
-      "tree": "0e46f80b580a21a2151801dfeb5754c30135c6a2",
-      "changed": [
-        "index.html",
-        "receiver-pickleball.js",
-        "receiver-scene.js",
-        "receiver.css",
-        "receiver.js",
-        "scene-images/bowler-end-plate-1672x941.jpg",
-        "scene-images/ground-cauldron-bowler-end-1672x941.jpg",
-        "scene-images/ground-coral-bay-bowler-end-1672x941.jpg",
-        "scene-images/ground-hilltop-bowler-end-1672x941.jpg",
-        "scene-images/ground-ironbark-bowler-end-1672x941.jpg",
-        "scene-images/ground-pavilion-bowler-end-1672x941.jpg",
+        "scene-images/kit-masks-bowler-end-0-1280x1576.png",
+        "scene-images/kit-masks-bowler-end-1-1272x1668.png",
+        "scene-images/kit-masks-bowler-end-2-1264x1560.png",
         "scene-images/manifest.json"
       ]
     }
