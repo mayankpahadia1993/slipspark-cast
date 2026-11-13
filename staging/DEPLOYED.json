@@ -1,25 +1,43 @@
 {
   "environment": "staging",
-  "commit": "914b499e4588ec02c3ad4da8b125e9b52156ea5e",
-  "subject": "Keep shared Android ceremony pixels until the last cached phase is evicted",
-  "receiverTree": "94852de06c0356510e9e21939552fe2e401dd80b",
+  "commit": "65067936795e9b1bf252365641762b9e2dd66fdb",
+  "subject": "Pickleball Side by Side: the tall court plate on iPhone (unbuilt: no disk for an iOS build)",
+  "receiverTree": "e8b5ac83a0d9c20694de2696e8163d49f0985004",
   "revision": 95,
-  "deployedAt": "2026-11-13T00:53:16Z",
+  "deployedAt": "2026-11-13T16:49:01Z",
   "previous": {
-    "tree": "8ca044438a6e4af491bea47465fff7cf9f08cb26",
+    "tree": "94852de06c0356510e9e21939552fe2e401dd80b",
     "changed": [
       "index.html",
+      "pickleball/PickleballCourtTall.webp",
+      "pickleball/manifest.json",
+      "receiver-pickleball-core.js",
       "receiver-pickleball.js",
-      "scene-images/kit-masks-bowler-end-0-1280x1576.png",
-      "scene-images/kit-masks-bowler-end-1-1272x1668.png",
-      "scene-images/kit-masks-bowler-end-2-1264x1560.png"
+      "receiver.js"
     ]
   },
   "earlier": [
     {
+      "tree": "8ca044438a6e4af491bea47465fff7cf9f08cb26",
+      "changed": [
+        "index.html",
+        "pickleball/PickleballCourtTall.webp",
+        "pickleball/manifest.json",
+        "receiver-pickleball-core.js",
+        "receiver-pickleball.js",
+        "receiver.js",
+        "scene-images/kit-masks-bowler-end-0-1280x1576.png",
+        "scene-images/kit-masks-bowler-end-1-1272x1668.png",
+        "scene-images/kit-masks-bowler-end-2-1264x1560.png"
+      ]
+    },
+    {
       "tree": "63ef02641af20c8d4cd69438f3b1277393bfc635",
       "changed": [
         "index.html",
+        "pickleball/PickleballCourtTall.webp",
+        "pickleball/manifest.json",
+        "receiver-pickleball-core.js",
         "receiver-pickleball.js",
         "receiver.css",
         "receiver.js",
@@ -32,6 +50,9 @@
       "tree": "c4bd5645799247e570e98c72947d99323dc4dca1",
       "changed": [
         "index.html",
+        "pickleball/PickleballCourtTall.webp",
+        "pickleball/manifest.json",
+        "receiver-pickleball-core.js",
         "receiver-pickleball.js",
         "receiver-scene.js",
         "receiver.css",
@@ -45,26 +66,9 @@
       "tree": "1596897f5bcd7cebace842323fc4ceddb305d773",
       "changed": [
         "index.html",
-        "receiver-pickleball.js",
-        "receiver-scene.js",
-        "receiver.css",
-        "receiver.js",
-        "scene-images/bowler-end-plate-1672x941.jpg",
-        "scene-images/ground-cauldron-bowler-end-1672x941.jpg",
-        "scene-images/ground-coral-bay-bowler-end-1672x941.jpg",
-        "scene-images/ground-hilltop-bowler-end-1672x941.jpg",
-        "scene-images/ground-ironbark-bowler-end-1672x941.jpg",
-        "scene-images/ground-pavilion-bowler-end-1672x941.jpg",
-        "scene-images/kit-masks-bowler-end-0-1280x1576.png",
-        "scene-images/kit-masks-bowler-end-1-1272x1668.png",
-        "scene-images/kit-masks-bowler-end-2-1264x1560.png",
-        "scene-images/manifest.json"
-      ]
-    },
-    {
-      "tree": "ee81a57f1b19d9c1786fbc65554d7eed439a0e86",
-      "changed": [
-        "index.html",
+        "pickleball/PickleballCourtTall.webp",
+        "pickleball/manifest.json",
+        "receiver-pickleball-core.js",
         "receiver-pickleball.js",
         "receiver-scene.js",
         "receiver.css",

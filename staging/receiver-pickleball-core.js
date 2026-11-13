@@ -61,7 +61,8 @@
   function decodeOp(op) {
     if (!Array.isArray(op) || !KINDS.has(op[0])) return null;
     switch (op[0]) {
-      case "P": return { kind: "P", x: n(op[1]), y: n(op[2]), w: n(op[3]), h: n(op[4]) };
+      // (Receiver 96) a sixth value 1: the tall plate (a split screen's half filled by its court).
+      case "P": return { kind: "P", x: n(op[1]), y: n(op[2]), w: n(op[3]), h: n(op[4]), tall: op[5] === 1 };
       case "S": return { kind: "S", x: n(op[1]), y: n(op[2]), w: n(op[3]), h: n(op[4]), a: op[5] / 1000 };
       case "p": return { kind: "p", sheet: String(op[1]), frame: op[2] | 0, cx: n(op[3]), cy: n(op[4]), cw: n(op[5]), ch: n(op[6]),
         fx: n(op[7]), fy: n(op[8]), ax: n(op[9]), ay: n(op[10]), scale: op[11] / 10000, mirrored: op[12] === 1, a: op[13] / 1000 };
@@ -281,9 +282,12 @@
   // phone sheet pixel) or null; `plate` the court photograph (an image) or
   // null. `withPlate` false leaves the "P" op to a layer under the canvas.
   // Returns how many sprites it could not draw (pictures not loaded).
-  function drawOps(ctx, ops, picture, plate, withPlate) {
+  // `tallPlate`: the tall photograph, for a "P" that names it and the "N" (its
+  // net) after it.
+  function drawOps(ctx, ops, picture, plate, withPlate, tallPlate) {
     let missing = 0;
     let clipped = false;
+    const widePlate = plate;
     for (const op of ops) {
       if (!op) continue;
       switch (op.kind) {
@@ -295,6 +299,7 @@
           clipped = true;
           break;
         case "P":
+          plate = op.tall ? (tallPlate || null) : widePlate;
           if (withPlate) {
             if (plate) ctx.drawImage(plate, op.x, op.y, op.w, op.h);
             else { ctx.fillStyle = "rgb(26,77,153)"; ctx.fillRect(op.x, op.y, op.w, op.h); }
@@ -426,9 +431,12 @@
   function resultView(result) {
     const r = result || {};
     const stats = Array.isArray(r.stats) ? r.stats.filter((s) => Array.isArray(s) && s.length >= 2).slice(0, 6).map((s) => ({ title: String(s[0]), value: String(s[1]) })) : [];
+    // Which score is crowned: the winner's. A match ended early (`early`, from phones that say so) has no winner, so
+    // neither is, whoever was ahead; without the flag (an older phone) the far side is crowned when ahead, as before.
+    const you = Number(r.you) || 0, cpu = Number(r.cpu) || 0, won = r.won === 1, early = r.early === 1;
     return {
       eyebrow: String(r.eyebrow || ""), headline: String(r.headline || "Match over"),
-      you: Number(r.you) || 0, cpu: Number(r.cpu) || 0, won: r.won === 1,
+      you, cpu, won, early, crowned: early ? null : won ? "you" : cpu > you ? "cpu" : null,
       names: [rowName(r.names, 0, "YOU"), rowName(r.names, 1, "COMPUTER")],
       story: String(r.story || ""), coaching: String(r.coaching || ""), stats
     };

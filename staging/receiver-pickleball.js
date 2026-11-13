@@ -23,7 +23,9 @@
   // Receiver 88 (w34kr8dq): no steady verdict while the stadium's pictures still load.
   // Receiver 90: a look's whites start once; never half dressed (a stalled piece keeps the whole batter photographed).
   // Receiver 91: a 2.9.9 look (dyed clothes, photographed forearms, gloves and bat face) is whole, not half dressed.
-  const RECEIVER_VERSION = 95;
+  // Receiver 96: the tall court plate (a "P" with a sixth value 1): a same-phone split screen's halves filled by their
+  // courts; the hello's `tall: 1` says this TV has it.
+  const RECEIVER_VERSION = 96;
   const core = window.RallycadePickleballCore;
   const sceneCore = window.RallycadeSceneCore;
 
@@ -31,6 +33,9 @@
     const root = options.root, stage = options.stage, court = options.court, plateImg = options.plate, canvas = options.canvas;
     // A same-phone split screen's right half's photograph (the left half's is `plateImg`).
     const plateImg2 = options.plate2 || null;
+    // The tall plate's layers, one for each half (receiver 96).
+    const tallImgs = [options.plateTall || null, options.plateTall2 || null];
+    let tallPlate = null;
     const hud = options.hud, readyCard = options.ready, resultCard = options.result, chip = options.chip;
     const send = options.send || (() => {});
     const now = options.now || (() => performance.now());
@@ -152,6 +157,10 @@
       if (plateWait) return plateWait;
       plateLoaded = true;
       plateImg.src = base + "PickleballCourt.webp?v=" + RECEIVER_VERSION;
+      if (tallImgs[0] && !tallImgs[0].src) {
+        tallImgs[0].onload = () => { tallPlate = tallImgs[0]; };
+        for (const image of tallImgs) if (image) image.src = base + "PickleballCourtTall.webp?v=" + RECEIVER_VERSION;
+      }
       plateWait = new Promise((resolve) => {
         const done = () => { plate = plateImg.naturalWidth ? plateImg : null; resolve(plate); };
         if (plateImg.complete && plateImg.naturalWidth) done();
@@ -242,7 +251,18 @@
         plateImg2.hidden = !split;
         if (split && !plateImg2.src && plateImg.src) plateImg2.src = plateImg.src;
       }
-      if (!split) { plateImg.style.clipPath = ""; delete plateImg.dataset.rect; }
+      if (!split) {
+        plateImg.style.clipPath = ""; delete plateImg.dataset.rect; plateImg.style.visibility = "";
+        for (const image of tallImgs) if (image) image.hidden = true;
+      }
+    }
+    // A half's photograph where its "P" puts it: the tall plate's layer when the op names it, else the wide one's.
+    function placeHalf(half, i) {
+      const op = half.ops.find((o) => o.kind === "P");
+      const wide = i === 0 ? plateImg : plateImg2, tall = op && op.tall ? tallImgs[i] : null;
+      if (tallImgs[i]) tallImgs[i].hidden = !tall;
+      if (wide) wide.style.visibility = tall ? "hidden" : "";
+      placePlate(op, tall || wide, half.rect);
     }
 
     function applyPush(push) {
@@ -265,7 +285,7 @@
       const halves = core.halves(ops);
       showSplit(!!halves);
       if (halves) {
-        halves.forEach((half, i) => placePlate(half.ops.find((op) => op.kind === "P"), i === 0 ? plateImg : plateImg2, half.rect));
+        halves.forEach(placeHalf);
       } else {
         placePlate(ops.find((op) => op.kind === "P"));
       }
@@ -277,7 +297,7 @@
       if (clear) ctx.clearRect(Math.floor(clear.x * k) - 1, Math.floor(clear.y * k) - 1, Math.ceil(clear.w * k) + 3, Math.ceil(clear.h * k) + 3);
       else ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.setTransform(k, 0, 0, k, 0, 0);
-      const missing = core.drawOps(ctx, ops, picture, plate, false);
+      const missing = core.drawOps(ctx, ops, picture, plate, false, tallPlate);
       lastDrawn = union(ops.filter((op) => op.kind !== "P" && op.kind !== "V").map((op) => core.opBounds(op)));
       stats.missing += missing;
       renderHUD(core.hudView(shown.hud, shown.moment));
@@ -358,8 +378,8 @@
       setText(el("pk-result-cpu"), r.cpu);
       setText(el("pk-result-you-name"), r.names[0]);
       setText(el("pk-result-cpu-name"), r.names[1]);
-      el("pk-result-you-side").classList.toggle("won", r.won);
-      el("pk-result-cpu-side").classList.toggle("won", !r.won && r.cpu > r.you);
+      el("pk-result-you-side").classList.toggle("won", r.crowned === "you");
+      el("pk-result-cpu-side").classList.toggle("won", r.crowned === "cpu");
       const list = el("pk-result-stats");
       list.textContent = "";
       for (const stat of r.stats) {
@@ -457,7 +477,7 @@
           if (["frames", "visible", "hud", "none"].includes(message.warm)) warmMode = message.warm;
           if (chip) chip.hidden = !debug;
           preloadWhenWanted(message.look, message.sheets);
-          send({ t: "ready", pickleball: core.VERSION, version: RECEIVER_VERSION, looks: ["man", "woman"], friends: 1 });
+          send({ t: "ready", pickleball: core.VERSION, version: RECEIVER_VERSION, looks: ["man", "woman"], friends: 1, tall: tallImgs[0] && tallImgs[1] ? 1 : 0 });
           break;
         case "ping":
           send({ t: "pong", i: message.i, r: now() });

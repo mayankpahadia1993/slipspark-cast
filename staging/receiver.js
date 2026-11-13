@@ -459,7 +459,8 @@
   let filmClock = null;
   const pickleball = pickleballModule && document.getElementById("pickleball") && pickleballModule.createPickleball({
     root: document.getElementById("pickleball"), stage: document.getElementById("pk-stage"), court: document.getElementById("pk-court"),
-    plate: document.getElementById("pk-plate"), plate2: document.getElementById("pk-plate2"), canvas: document.getElementById("pk-canvas"), hud: document.getElementById("pk-hud"),
+    plate: document.getElementById("pk-plate"), plate2: document.getElementById("pk-plate2"),
+    plateTall: document.getElementById("pk-plate-tall"), plateTall2: document.getElementById("pk-plate-tall2"), canvas: document.getElementById("pk-canvas"), hud: document.getElementById("pk-hud"),
     ready: document.getElementById("pk-ready"), result: document.getElementById("pk-result"), chip: document.getElementById("pk-chip"),
     send: (message) => sendPickleball(message),
     waitForGame,
