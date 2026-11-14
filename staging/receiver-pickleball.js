@@ -96,11 +96,19 @@
     // cache holds at once, decoded and dropped again. And when the TV runs short of memory it empties that cache (a
     // "critical" memory pressure notice, seen 1–3 times around a start), so every sheet decoded again on its next use.
     //
-    // Receiver 97: the sheets are decoded bitmaps (`loadSheet`), so nothing is ever decoded in a frame, and the warm-up
-    // draws them a few an animation frame in the shown canvas (under the ready card, all but transparent), so each one's
-    // texture is on the GPU before the match: the first frame's sheets first (`warmOrder`), `WARM_EACH` a frame, twice
-    // as many after a frame that came on time. `warmMode` (the hello's `warm`, for benches): "none" skips it.
-    const WARM_EACH = 2, WARM_MOST = 8, WARM_ALPHA = 0.02, WARM_ON_TIME = 45;
+    // Receiver 97: the warm-up draws the sheets one or two an animation frame in the shown canvas (under the ready card,
+    // all but transparent), so each is decoded and on the GPU before the match: those the first frame draws first, then
+    // the strokes a match opens with (`warmOrder`), `WARM_EACH` a frame, twice as many after a frame that came on time
+    // (those were on the GPU already). `warmMode` (the hello's `warm`, for benches): "none" skips it.
+    //
+    // Not decoded bitmaps of the sheets, as cricket's stadium keeps its pictures (receiver-scene.js `decodePicture`):
+    // tried on the Ultra the same day, a look's fifteen (27 MB) started a match at full rate, but a same-phone match's
+    // thirty-eight (61 MB, which the TV cannot let go when it runs short) stalled the whole TV for 6 to 51 s. The sheets
+    // stay images, which the TV drops and decodes again as its memory allows; only the court's two canvas copies are
+    // bitmaps (`canvasPlate`).
+    const WARM_EACH = 1, WARM_MOST = 8, WARM_ALPHA = 0.02, WARM_ON_TIME = 45;
+    // The strokes a match opens with, in the order their sheets are warmed after the first frame's.
+    const WARM_FIRST = ["Serve", "Forehand", "Backhand", "Shuffle", "Move", "Dink", "Volley", "Overhead"];
     const NEAR_SCALE = 0.62, FAR_SCALE = 0.17;
     let warmMode = "frames", warmRaf = 0, warmStarted = 0;
     // What is still to warm (sheet names, "plate", "tall"), how many this frame, and when the last frame ran.
@@ -112,7 +120,9 @@
       const first = [];
       if (ops) for (const op of ops) if (op.kind === "p" && !first.includes(op.sheet)) first.push(op.sheet);
       const tall = !!ops && ops.some((op) => op.kind === "P" && op.tall);
-      return (tall ? ["tall"] : ["plate"]).concat(first.filter((name) => pictures.has(name)), [...pictures.keys()].filter((name) => !first.includes(name)));
+      const rank = (name) => { const at = WARM_FIRST.findIndex((stroke) => name.includes(stroke)); return at < 0 ? WARM_FIRST.length : at; };
+      const rest = [...pictures.keys()].filter((name) => !first.includes(name)).sort((a, b) => rank(a) - rank(b));
+      return (tall ? ["tall"] : ["plate"]).concat(first.filter((name) => pictures.has(name)), rest);
     }
     // One warm frame: the next few of `warmQueue` drawn at the size the match draws them. True while more remain.
     function warmSome(t) {
@@ -177,13 +187,9 @@
       if (view !== "match") { clearWarm(); canvas.style.visibility = "hidden"; }
     }
 
-    // A sheet as a decoded bitmap (receiver 97; cricket's stadium since receiver 57, receiver-scene.js `decodePicture`):
-    // decoded once, off the page's thread, and it stays decoded, where an image is decoded again whenever the TV has let
-    // its copy go. On a 1280 canvas the far player's sheets are kept at half size (drawn at 0.30–0.50 of their pixels):
-    // 27 MB for a look's fifteen, 72 MB for a same-phone match's thirty-eight. Past `BITMAP_BUDGET`, or where a bitmap
-    // can't be made, the image as before.
+    // The court's canvas copies as decoded bitmaps the canvas's size (`loadPlate`): 3.7 MB and 2 MB.
     const canBitmap = typeof window.createImageBitmap === "function" && typeof window.fetch === "function" && options.bitmaps !== false;
-    const BITMAP_BUDGET = 96e6;
+    const BITMAP_BUDGET = 12e6;
     let bitmapBytes = 0;
     function plannedCanvasWidth() {
       const box = stage.getBoundingClientRect();
@@ -199,26 +205,12 @@
         .then((bitmap) => { if (!bitmap || !(bitmap.width > 0)) return null; bitmapBytes += bitmap.width * bitmap.height * 4; return bitmap; })
         .catch(() => null);
     }
-    function letGo(image) {
-      if (image && typeof image.close === "function") { bitmapBytes -= image.width * image.height * 4; try { image.close(); } catch (error) { /* gone already */ } }
-    }
 
     function loadSheet(name) {
       if (pictures.has(name)) return pictures.get(name).wait;
       const spec = manifest && manifest.sheets && manifest.sheets[name];
       const entry = { image: null, scale: spec ? spec.scale : 1, wait: null, warmed: false };
-      const url = base + name + ".webp?v=" + RECEIVER_VERSION;
-      // The far player's sheets at half size on a 1280 canvas (their cells' places scale with them, `scale`).
-      const half = !!spec && /Opponent/.test(name) && Array.isArray(spec.size) && plannedCanvasWidth() <= 1280;
-      entry.wait = !spec ? Promise.resolve(null) : loadBitmap(url, half ? [Math.round(spec.size[0] / 2), Math.round(spec.size[1] / 2)] : null).then((bitmap) => {
-        if (!bitmap) return loadImage(url);
-        if (half && bitmap.width < spec.size[0]) entry.scale = spec.scale * bitmap.width / spec.size[0];
-        return bitmap;
-      }).then((image) => {
-        // Let go while it loaded (`release`): not kept.
-        if (pictures.get(name) !== entry) { letGo(image); return null; }
-        entry.image = image; return image;
-      });
+      entry.wait = spec ? loadImage(base + name + ".webp?v=" + RECEIVER_VERSION).then((image) => { entry.image = image; return image; }) : Promise.resolve(null);
       pictures.set(name, entry);
       return entry.wait;
     }
@@ -309,7 +301,7 @@
     // first serve until then, so what stutters is a court where nobody moves yet. An older phone plays on underneath, as
     // it did while a sheet was missing. Never longer than `START.cap` from the match coming on (the phones' own cap is
     // 4 s). The hello's `hold: 0` (benches) starts as receiver 96 did. Not on a manual clock (the film, tests' own draws).
-    const START = { cap: 3500, firstFrame: 600, flushFrames: 2, steadyFrames: 8, steadyGap: 45, steadyCap: 1200 };
+    const START = { cap: 3500, firstFrame: 600, warm: 1500, flushFrames: 2, steadyFrames: 8, steadyGap: 45, steadyCap: 1200 };
     let loading = 0, holdOn = !options.manualClock, starting = null, matchAt = null, statsEvery = 2000;
     function beginStart() {
       matchAt = now();
@@ -337,12 +329,13 @@
       }
       if (s.phase === "warm") {
         if (since < START.cap) {
-          if (warmQueue.length) { warmSome(t); return false; }
+          // At most `START.warm` of it: the strokes later in the order are decoded as they are first played, as before.
+          if (warmQueue.length && since - s.load < START.warm) { warmSome(t); return false; }
+          warmQueue = [];
           // A frame or two more: the last ones flushed, and the photographs' layers drawn where the match has them.
           if (s.flush > 0) { s.flush -= 1; return false; }
         }
         warmQueue = [];
-        if (loading === 0 && since < START.cap) warmDone = true;
         stats.warmMs = Math.round(since - s.load);
         clearWarm();
         canvas.style.visibility = "hidden";
@@ -718,7 +711,7 @@
       get view() { return view; }, get drawn() { return drawn; }, get look() { return look; },
       get starting() { return starting ? starting.phase : null; },
       stats: () => maybeReport(true), sizeCanvas, picture, loaded: () => lookLoadedAt !== null,
-      release() { stop(); for (const entry of pictures.values()) letGo(entry.image); pictures.clear(); },
+      release() { stop(); pictures.clear(); },
       get bitmapBytes() { return bitmapBytes; }
     };
   }

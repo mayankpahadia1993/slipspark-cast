@@ -1,17 +1,23 @@
 {
   "environment": "staging",
-  "commit": "03273f635d5e13b2e917da9c69aaf74d4f12c673",
-  "subject": "Pickleball on a Chromecast: the sheets are decoded bitmaps, and the warm-up really puts them on the GPU",
-  "receiverTree": "1ebead2eea9647ae878ba2bf2c8b284ddf6edbfb",
+  "commit": "08a26ea2afa3d4c85b342cbd88c0e099cacdfce9",
+  "subject": "Pickleball on a Chromecast: the sheets stay images; only the court's canvas copies are bitmaps",
+  "receiverTree": "f889101d2e49a77959b7a881795377b55901c8c0",
   "revision": 97,
-  "deployedAt": "2026-11-14T19:04:37Z",
+  "deployedAt": "2026-11-14T19:14:23Z",
   "previous": {
-    "tree": "2074d72ca67b4bea2151771eb6c5ca210aec5f07",
+    "tree": "1ebead2eea9647ae878ba2bf2c8b284ddf6edbfb",
     "changed": [
       "receiver-pickleball.js"
     ]
   },
   "earlier": [
+    {
+      "tree": "2074d72ca67b4bea2151771eb6c5ca210aec5f07",
+      "changed": [
+        "receiver-pickleball.js"
+      ]
+    },
     {
       "tree": "b617b28718f613d1c6a2225e202a945990d2b365",
       "changed": [
@@ -38,21 +44,6 @@
         "receiver-pickleball.js",
         "receiver.css",
         "receiver.js"
-      ]
-    },
-    {
-      "tree": "8ca044438a6e4af491bea47465fff7cf9f08cb26",
-      "changed": [
-        "index.html",
-        "pickleball/PickleballCourtTall.webp",
-        "pickleball/manifest.json",
-        "receiver-pickleball-core.js",
-        "receiver-pickleball.js",
-        "receiver.css",
-        "receiver.js",
-        "scene-images/kit-masks-bowler-end-0-1280x1576.png",
-        "scene-images/kit-masks-bowler-end-1-1272x1668.png",
-        "scene-images/kit-masks-bowler-end-2-1264x1560.png"
       ]
     }
   ]
