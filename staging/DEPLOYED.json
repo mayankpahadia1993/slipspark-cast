@@ -1,18 +1,27 @@
 {
   "environment": "staging",
-  "commit": "e670fad4ea8b6c88ecce59994c617450721c8130",
-  "subject": "Pickleball on a Chromecast: receiver 97 holds a match's start until its pictures are loaded and warmed, then says go",
-  "receiverTree": "b617b28718f613d1c6a2225e202a945990d2b365",
+  "commit": "c058e4d01dd251eb0a64c7cefa6234d3e8bad9d5",
+  "subject": "Pickleball Side by Side on a Chromecast: each half is a box that clips its court, not a clip-path on each photograph",
+  "receiverTree": "2074d72ca67b4bea2151771eb6c5ca210aec5f07",
   "revision": 97,
-  "deployedAt": "2026-11-14T18:16:22Z",
+  "deployedAt": "2026-11-14T18:31:59Z",
   "previous": {
-    "tree": "e8b5ac83a0d9c20694de2696e8163d49f0985004",
+    "tree": "b617b28718f613d1c6a2225e202a945990d2b365",
     "changed": [
       "index.html",
-      "receiver-pickleball.js"
+      "receiver-pickleball.js",
+      "receiver.css"
     ]
   },
   "earlier": [
+    {
+      "tree": "e8b5ac83a0d9c20694de2696e8163d49f0985004",
+      "changed": [
+        "index.html",
+        "receiver-pickleball.js",
+        "receiver.css"
+      ]
+    },
     {
       "tree": "94852de06c0356510e9e21939552fe2e401dd80b",
       "changed": [
@@ -21,25 +30,12 @@
         "pickleball/manifest.json",
         "receiver-pickleball-core.js",
         "receiver-pickleball.js",
+        "receiver.css",
         "receiver.js"
       ]
     },
     {
       "tree": "8ca044438a6e4af491bea47465fff7cf9f08cb26",
-      "changed": [
-        "index.html",
-        "pickleball/PickleballCourtTall.webp",
-        "pickleball/manifest.json",
-        "receiver-pickleball-core.js",
-        "receiver-pickleball.js",
-        "receiver.js",
-        "scene-images/kit-masks-bowler-end-0-1280x1576.png",
-        "scene-images/kit-masks-bowler-end-1-1272x1668.png",
-        "scene-images/kit-masks-bowler-end-2-1264x1560.png"
-      ]
-    },
-    {
-      "tree": "63ef02641af20c8d4cd69438f3b1277393bfc635",
       "changed": [
         "index.html",
         "pickleball/PickleballCourtTall.webp",
@@ -54,14 +50,13 @@
       ]
     },
     {
-      "tree": "c4bd5645799247e570e98c72947d99323dc4dca1",
+      "tree": "63ef02641af20c8d4cd69438f3b1277393bfc635",
       "changed": [
         "index.html",
         "pickleball/PickleballCourtTall.webp",
         "pickleball/manifest.json",
         "receiver-pickleball-core.js",
         "receiver-pickleball.js",
-        "receiver-scene.js",
         "receiver.css",
         "receiver.js",
         "scene-images/kit-masks-bowler-end-0-1280x1576.png",

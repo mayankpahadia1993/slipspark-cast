@@ -269,10 +269,15 @@
   <section id="pickleball" class="pickleball" hidden aria-label="RallyCade pickleball">
     <div id="pk-stage" class="pk-stage">
       <div id="pk-court" class="pk-court">
-        <img id="pk-plate" class="pk-plate" alt="">
-        <img id="pk-plate2" class="pk-plate" alt="" hidden>
-        <img id="pk-plate-tall" class="pk-plate" alt="" hidden>
-        <img id="pk-plate-tall2" class="pk-plate" alt="" hidden>
+        <!-- Receiver 97: a split screen's halves clip their photographs (overflow, not a clip-path on each: see receiver-pickleball.js placePlate). -->
+        <div class="pk-half">
+          <img id="pk-plate" class="pk-plate" alt="">
+          <img id="pk-plate-tall" class="pk-plate" alt="" hidden>
+        </div>
+        <div class="pk-half">
+          <img id="pk-plate2" class="pk-plate" alt="" hidden>
+          <img id="pk-plate-tall2" class="pk-plate" alt="" hidden>
+        </div>
         <canvas id="pk-canvas" class="pk-canvas" width="1280" height="720"></canvas>
       </div>
       <div id="pk-hud" class="pk-hud" hidden>

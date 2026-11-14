@@ -319,6 +319,10 @@
     }
 
     // A photograph layer where its op puts it, clipped to its half of a split screen (`clip`: that half's "V").
+    // Receiver 97: the half is the photograph's box (`.pk-half`, overflow hidden), which takes the half's rectangle. Until
+    // then each photograph carried a clip-path, and a clip-path on a layer of its own (`will-change`) is a mask the
+    // Chromecast Ultra pays for every frame: a same-phone match drew 23 frames a second all match with the tall plates
+    // (28 with the wide pair), 30 with the same pictures in boxes that clip (measured on the owner's Ultra, Nov 14 2026).
     function placePlate(op, image, clip) {
       image = image || plateImg;
       if (!op || !image) return;
@@ -326,6 +330,21 @@
       if (image.dataset.rect === key) return;
       image.dataset.rect = key;
       const W = core.STAGE.width, H = core.STAGE.height;
+      const half = image.parentElement && image.parentElement.classList.contains("pk-half") ? image.parentElement : null;
+      if (half) {
+        const box = clip || { x: 0, y: 0, w: W, h: H };
+        const boxKey = [box.x, box.y, box.w, box.h].map((v) => v.toFixed(1)).join(",");
+        if (half.dataset.rect !== boxKey) {
+          half.dataset.rect = boxKey;
+          Object.assign(half.style, { left: (box.x / W * 100) + "%", top: (box.y / H * 100) + "%", width: (box.w / W * 100) + "%", height: (box.h / H * 100) + "%" });
+          // The box moved: its other photograph is placed again when next shown.
+          for (const other of half.children) if (other !== image) delete other.dataset.rect;
+        }
+        Object.assign(image.style, { left: ((op.x - box.x) / box.w * 100) + "%", top: ((op.y - box.y) / box.h * 100) + "%",
+          width: (op.w / box.w * 100) + "%", height: (op.h / box.h * 100) + "%", clipPath: "" });
+        return;
+      }
+      // A page without the boxes (an older index.html): the clip-path, as before.
       Object.assign(image.style, { left: (op.x / W * 100) + "%", top: (op.y / H * 100) + "%", width: (op.w / W * 100) + "%", height: (op.h / H * 100) + "%" });
       // The half's rectangle in the photograph's own box.
       image.style.clipPath = clip ? "inset(" + [Math.max(0, clip.y - op.y) / op.h * 100, Math.max(0, op.x + op.w - clip.x - clip.w) / op.w * 100,
