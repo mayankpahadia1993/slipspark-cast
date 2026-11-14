@@ -219,7 +219,11 @@
       if (pictures.has(name)) return pictures.get(name).wait;
       const spec = manifest && manifest.sheets && manifest.sheets[name];
       const entry = { image: null, scale: spec ? spec.scale : 1, wait: null, warmed: 0 };
-      entry.wait = spec ? loadImage(base + name + ".webp?v=" + RECEIVER_VERSION).then((image) => { entry.image = image; return image; }) : Promise.resolve(null);
+      // A sheet that did not come is asked for once more (Nov 14 2026, the Ultra just after a deploy: "loaded, missing 1";
+      // a frame that draws a sheet the TV lacks is never shown).
+      const url = base + name + ".webp?v=" + RECEIVER_VERSION;
+      entry.wait = spec ? loadImage(url).then((image) => image || new Promise((resolve) => setTimeout(resolve, 700)).then(() => loadImage(url + "&again=1")))
+        .then((image) => { entry.image = image; return image; }) : Promise.resolve(null);
       pictures.set(name, entry);
       return entry.wait;
     }
