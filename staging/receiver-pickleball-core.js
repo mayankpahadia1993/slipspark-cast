@@ -206,6 +206,9 @@
         return delay;
       },
       setDelay(value) { delay = value; },
+      // The arrivals so far forgotten (receiver 97): those of a match's start came while the TV's page was busy loading and
+      // warming its pictures, and their lateness, the TV's own, took the delay to ~215 ms for the match's first seconds.
+      forgetLateness() { delay = DELAY.start; late = []; lateCount = 0; firstLocal = null; },
       // The moment shown at `local`, the frame for it (blended) and how old
       // the picture is against the phone (`stale`, ms).
       at(local) {

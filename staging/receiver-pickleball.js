@@ -106,15 +106,19 @@
     // thirty-eight (61 MB, which the TV cannot let go when it runs short) stalled the whole TV for 6 to 51 s. The sheets
     // stay images, which the TV drops and decodes again as its memory allows; only the court's two canvas copies are
     // bitmaps (`canvasPlate`).
-    const WARM_EACH = 1, WARM_MOST = 8, WARM_ALPHA = 0.02, WARM_ON_TIME = 45;
+    const WARM_EACH = 1, WARM_MOST = 6, WARM_ALPHA = 0.02, WARM_ON_TIME = 45, WARM_PATCH = 24;
+    // How many sheets a pass warms: about what the TV keeps at once. A same-phone match's thirty-eight took over 2 s to go
+    // round on the Ultra, each one decoded again because the earlier ones had pushed it out; a look has fifteen.
+    const WARM_SET = 16;
     // The strokes a match opens with, in the order their sheets are warmed after the first frame's.
     const WARM_FIRST = ["Serve", "Forehand", "Backhand", "Shuffle", "Move", "Dink", "Volley", "Overhead"];
     const NEAR_SCALE = 0.62, FAR_SCALE = 0.17;
     let warmMode = "frames", warmRaf = 0, warmStarted = 0;
     // What is still to warm (sheet names, "plate", "tall"), how many this frame, and when the last frame ran.
     let warmQueue = [], warmEach = WARM_EACH, warmLast = null;
-    // Whether the pictures loaded now have been warmed since they loaded and since this setup opened.
-    let warmDone = false;
+    // Whether the pictures loaded now have been warmed since they loaded and since this setup opened (`warmPass`: each
+    // setup warms them again, as a Chromecast lets decoded pictures go; a sheet's `warmed` is the pass that drew it).
+    let warmDone = false, warmPass = 1;
     // The order to warm in: the court's photographs and the sheets `ops` (a match's first frame) draws, then the rest.
     function warmOrder(ops) {
       const first = [];
@@ -122,19 +126,23 @@
       const tall = !!ops && ops.some((op) => op.kind === "P" && op.tall);
       const rank = (name) => { const at = WARM_FIRST.findIndex((stroke) => name.includes(stroke)); return at < 0 ? WARM_FIRST.length : at; };
       const rest = [...pictures.keys()].filter((name) => !first.includes(name)).sort((a, b) => rank(a) - rank(b));
-      return (tall ? ["tall"] : ["plate"]).concat(first.filter((name) => pictures.has(name)), rest);
+      return (tall ? ["tall"] : ["plate"]).concat(first.filter((name) => pictures.has(name)).concat(rest).slice(0, WARM_SET));
     }
     // One warm frame: the next few of `warmQueue` drawn at the size the match draws them. True while more remain.
     function warmSome(t) {
       sizeCanvas();
       const k = canvas.width / core.STAGE.width;
-      // On time since the last frame: those were cheap (already on the GPU), so more go in this one.
-      warmEach = warmLast !== null && t - warmLast <= WARM_ON_TIME ? Math.min(WARM_MOST, warmEach * 2) : WARM_EACH;
+      // On time since the last frame: those were cheap (already on the GPU), so one more goes in this one.
+      warmEach = warmLast !== null && t - warmLast <= WARM_ON_TIME ? Math.min(WARM_MOST, warmEach + 1) : WARM_EACH;
       warmLast = t;
       canvas.style.visibility = "visible";
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.setTransform(k, 0, 0, k, 0, 0);
+      // Through a small patch in the corner: the whole picture is decoded and uploaded at the match's size all the same,
+      // and almost nothing of it is painted.
+      ctx.save();
+      ctx.beginPath(); ctx.rect(0, 0, WARM_PATCH, WARM_PATCH); ctx.clip();
       ctx.globalAlpha = WARM_ALPHA;
       for (let n = 0; n < warmEach && warmQueue.length; n += 1) {
         const name = warmQueue.shift();
@@ -147,12 +155,12 @@
             if (!entry || !entry.image) continue;
             const scale = (/Opponent/.test(name) ? FAR_SCALE : NEAR_SCALE) / (entry.scale || 1);
             ctx.drawImage(entry.image, 0, 0, entry.image.width * scale, entry.image.height * scale);
-            entry.warmed = true;
+            entry.warmed = warmPass;
           }
         } catch (error) { /* a picture the canvas can't draw */ }
       }
-      ctx.globalAlpha = 1;
-      stats.warmed = [...pictures.values()].filter((entry) => entry.warmed).length;
+      ctx.restore();
+      stats.warmed = [...pictures.values()].filter((entry) => entry.warmed === warmPass).length;
       return warmQueue.length > 0;
     }
     function clearWarm() {
@@ -165,6 +173,7 @@
       // Only under the ready card: a canvas that is not shown warms nothing (a match's start has its own, `stepStart`).
       if (view !== "ready" || warmMode === "none") return;
       warmDone = false;
+      warmPass += 1;
       warmQueue = warmOrder(null);
       warmLast = null;
       warmStarted = now();
@@ -209,7 +218,7 @@
     function loadSheet(name) {
       if (pictures.has(name)) return pictures.get(name).wait;
       const spec = manifest && manifest.sheets && manifest.sheets[name];
-      const entry = { image: null, scale: spec ? spec.scale : 1, wait: null, warmed: false };
+      const entry = { image: null, scale: spec ? spec.scale : 1, wait: null, warmed: 0 };
       entry.wait = spec ? loadImage(base + name + ".webp?v=" + RECEIVER_VERSION).then((image) => { entry.image = image; return image; }) : Promise.resolve(null);
       pictures.set(name, entry);
       return entry.wait;
@@ -321,9 +330,11 @@
         const waitsTall = !!ops && ops.some((op) => op.kind === "P" && op.tall) && !tallSettled;
         if (since < START.cap && (loading > 0 || waitsTall || (!ops && since < START.firstFrame))) return false;
         s.phase = "warm"; s.load = since;
-        // Warmed through the setup: only what the first frame draws, again (the TV may have let its copies go since).
-        const order = warmOrder(ops);
-        warmQueue = warmMode === "none" ? [] : warmDone ? order.slice(0, 1 + (ops ? new Set(ops.filter((op) => op.kind === "p").map((op) => op.sheet)).size : 0)) : order;
+        // What the first frame draws, always (the TV may have let its copies go since the setup warmed them), then the
+        // sheets the setup's warm-up had not reached.
+        const firstSheets = new Set(ops ? ops.filter((op) => op.kind === "p").map((op) => op.sheet) : []);
+        warmQueue = warmMode === "none" ? [] : warmOrder(ops).filter((name) => name === "plate" || name === "tall" || firstSheets.has(name)
+          || !pictures.get(name) || pictures.get(name).warmed !== warmPass);
         warmLast = null; s.flush = warmQueue.length ? START.flushFrames : 0;
         placeFirst(ops);
       }
@@ -339,6 +350,7 @@
         stats.warmMs = Math.round(since - s.load);
         clearWarm();
         canvas.style.visibility = "hidden";
+        playout.forgetLateness();
         s.phase = "steady"; s.shown = since; s.last = null; s.steady = 0;
         resetStats(t);
         return true;
