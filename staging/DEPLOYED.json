@@ -1,19 +1,25 @@
 {
   "environment": "staging",
-  "commit": "c058e4d01dd251eb0a64c7cefa6234d3e8bad9d5",
-  "subject": "Pickleball Side by Side on a Chromecast: each half is a box that clips its court, not a clip-path on each photograph",
-  "receiverTree": "2074d72ca67b4bea2151771eb6c5ca210aec5f07",
+  "commit": "03273f635d5e13b2e917da9c69aaf74d4f12c673",
+  "subject": "Pickleball on a Chromecast: the sheets are decoded bitmaps, and the warm-up really puts them on the GPU",
+  "receiverTree": "1ebead2eea9647ae878ba2bf2c8b284ddf6edbfb",
   "revision": 97,
-  "deployedAt": "2026-11-14T18:31:59Z",
+  "deployedAt": "2026-11-14T19:04:37Z",
   "previous": {
-    "tree": "b617b28718f613d1c6a2225e202a945990d2b365",
+    "tree": "2074d72ca67b4bea2151771eb6c5ca210aec5f07",
     "changed": [
-      "index.html",
-      "receiver-pickleball.js",
-      "receiver.css"
+      "receiver-pickleball.js"
     ]
   },
   "earlier": [
+    {
+      "tree": "b617b28718f613d1c6a2225e202a945990d2b365",
+      "changed": [
+        "index.html",
+        "receiver-pickleball.js",
+        "receiver.css"
+      ]
+    },
     {
       "tree": "e8b5ac83a0d9c20694de2696e8163d49f0985004",
       "changed": [
@@ -36,21 +42,6 @@
     },
     {
       "tree": "8ca044438a6e4af491bea47465fff7cf9f08cb26",
-      "changed": [
-        "index.html",
-        "pickleball/PickleballCourtTall.webp",
-        "pickleball/manifest.json",
-        "receiver-pickleball-core.js",
-        "receiver-pickleball.js",
-        "receiver.css",
-        "receiver.js",
-        "scene-images/kit-masks-bowler-end-0-1280x1576.png",
-        "scene-images/kit-masks-bowler-end-1-1272x1668.png",
-        "scene-images/kit-masks-bowler-end-2-1264x1560.png"
-      ]
-    },
-    {
-      "tree": "63ef02641af20c8d4cd69438f3b1277393bfc635",
       "changed": [
         "index.html",
         "pickleball/PickleballCourtTall.webp",

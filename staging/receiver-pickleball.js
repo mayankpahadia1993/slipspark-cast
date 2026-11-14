@@ -86,86 +86,159 @@
       });
     }
 
-    // The match's pictures warmed while the ready card is up, so its first frames draw nothing for the first time
-    // (receiver 79). On the owner's Ultra the match drew 7–10 frames a second for its first ~2 s: a sheet first drawn at
-    // a size makes its decode at that size there and then. Each loaded sheet is drawn whole at the size the match draws
-    // it (the player's ~0.62 of the sheet, the opponent's ~0.17; scripts' recorded match), over `WARM_FRAMES` animation
-    // frames, the canvas cleared only on the last: a draw cleared away in the same frame is dropped unrun, as a 2 x 2
-    // draw is decoded at 2 x 2. Never read back (a one-pixel getImageData left the Ultra at ~15 fps all match).
-    // `warmMode` (the hello's `warm`, for benches): "frames" (default: drawn in the hidden canvas), "visible" (the canvas
-    // shown under the ready card, drawn at 2% alpha, the court photograph placed where the match puts it), "hud" (as
-    // "visible", the HUD shown at 1% too), "none". The owner's Ultra, a recorded match after a 10 s setup, its first 2 s:
-    // none 17 fps, frames 21, hud 20; all three at 30 by 2–4 s, the delay ~65 ms by 4 s (78 in dznf8p20: ~20 s to settle).
-    const WARM_FRAMES = 4;
+    // The match's pictures warmed while the ready card is up, so its first frames draw nothing for the first time.
+    //
+    // Receiver 79 drew every loaded sheet whole in the hidden canvas over a few animation frames. Nov 14 2026, traced on
+    // the owner's Chromecast Ultra through its debugging port: that warmed nothing. A canvas that is not shown is never
+    // flushed, and clearing it drops what was drawn (0 decodes and 0 texture uploads before the match; every sheet was
+    // decoded on the page's thread, 30–140 ms each, in the frame that first drew it, and the court photograph too, 135–
+    // 145 ms, for the net's band). Drawing all of them in one shown frame is no better: more than the canvas's picture
+    // cache holds at once, decoded and dropped again. And when the TV runs short of memory it empties that cache (a
+    // "critical" memory pressure notice, seen 1–3 times around a start), so every sheet decoded again on its next use.
+    //
+    // Receiver 97: the sheets are decoded bitmaps (`loadSheet`), so nothing is ever decoded in a frame, and the warm-up
+    // draws them a few an animation frame in the shown canvas (under the ready card, all but transparent), so each one's
+    // texture is on the GPU before the match: the first frame's sheets first (`warmOrder`), `WARM_EACH` a frame, twice
+    // as many after a frame that came on time. `warmMode` (the hello's `warm`, for benches): "none" skips it.
+    const WARM_EACH = 2, WARM_MOST = 8, WARM_ALPHA = 0.02, WARM_ON_TIME = 45;
     const NEAR_SCALE = 0.62, FAR_SCALE = 0.17;
-    let warmMode = "frames", warmLeft = 0, warmRaf = 0, warmStarted = 0;
-    // Whether the pictures loaded now have been warmed since they loaded and since this setup opened (receiver 97).
+    let warmMode = "frames", warmRaf = 0, warmStarted = 0;
+    // What is still to warm (sheet names, "plate", "tall"), how many this frame, and when the last frame ran.
+    let warmQueue = [], warmEach = WARM_EACH, warmLast = null;
+    // Whether the pictures loaded now have been warmed since they loaded and since this setup opened.
     let warmDone = false;
+    // The order to warm in: the court's photographs and the sheets `ops` (a match's first frame) draws, then the rest.
+    function warmOrder(ops) {
+      const first = [];
+      if (ops) for (const op of ops) if (op.kind === "p" && !first.includes(op.sheet)) first.push(op.sheet);
+      const tall = !!ops && ops.some((op) => op.kind === "P" && op.tall);
+      return (tall ? ["tall"] : ["plate"]).concat(first.filter((name) => pictures.has(name)), [...pictures.keys()].filter((name) => !first.includes(name)));
+    }
+    // One warm frame: the next few of `warmQueue` drawn at the size the match draws them. True while more remain.
+    function warmSome(t) {
+      sizeCanvas();
+      const k = canvas.width / core.STAGE.width;
+      // On time since the last frame: those were cheap (already on the GPU), so more go in this one.
+      warmEach = warmLast !== null && t - warmLast <= WARM_ON_TIME ? Math.min(WARM_MOST, warmEach * 2) : WARM_EACH;
+      warmLast = t;
+      canvas.style.visibility = "visible";
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.setTransform(k, 0, 0, k, 0, 0);
+      ctx.globalAlpha = WARM_ALPHA;
+      for (let n = 0; n < warmEach && warmQueue.length; n += 1) {
+        const name = warmQueue.shift();
+        try {
+          if (name === "plate" || name === "tall") {
+            const image = name === "tall" ? canvasTall : canvasPlate;
+            if (image) ctx.drawImage(image, 0, 0, core.STAGE.width, core.STAGE.height);
+          } else {
+            const entry = pictures.get(name);
+            if (!entry || !entry.image) continue;
+            const scale = (/Opponent/.test(name) ? FAR_SCALE : NEAR_SCALE) / (entry.scale || 1);
+            ctx.drawImage(entry.image, 0, 0, entry.image.width * scale, entry.image.height * scale);
+            entry.warmed = true;
+          }
+        } catch (error) { /* a picture the canvas can't draw */ }
+      }
+      ctx.globalAlpha = 1;
+      stats.warmed = [...pictures.values()].filter((entry) => entry.warmed).length;
+      return warmQueue.length > 0;
+    }
+    function clearWarm() {
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      lastDrawn = null;
+    }
+    // The setup screen's warm-up, once the look is loaded and each time a setup opens.
     function warm() {
-      if (view === "match" || warmMode === "none") return;
+      // Only under the ready card: a canvas that is not shown warms nothing (a match's start has its own, `stepStart`).
+      if (view !== "ready" || warmMode === "none") return;
       warmDone = false;
-      warmLeft = WARM_FRAMES;
+      warmQueue = warmOrder(null);
+      warmLast = null;
       warmStarted = now();
       if (!warmRaf && !options.manualClock) warmRaf = requestAnimationFrame(warmFrame);
     }
-    function warmFrame() {
+    function warmFrame(t) {
       warmRaf = 0;
-      if (view !== "match" && warmLeft <= 0 && loading === 0) warmDone = true;
-      if (view === "match" || warmLeft <= 0) { endWarm(); return; }
-      sizeCanvas();
-      const k = canvas.width / core.STAGE.width;
-      const shown = warmMode === "visible" || warmMode === "hud";
-      if (shown) canvas.style.visibility = "visible";
-      if (warmMode === "hud" && hud) { hud.hidden = false; hud.style.visibility = "visible"; hud.style.opacity = "0.01"; }
-      // The court photograph where a match puts it (the phone's "P" op is its aspect fill, as `plateLayout`): moved there
-      // on the match's first frame, it was drawn again at its new size then.
-      if (shown && plate && plate.naturalWidth) placePlate(core.plateLayout([plate.naturalWidth, plate.naturalHeight], core.STAGE.width, core.STAGE.height));
-      ctx.setTransform(1, 0, 0, 1, 0, 0);
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      if (warmLeft > 1) drawSheets(k, shown ? 0.02 : 1);
-      warmLeft -= 1;
-      warmRaf = requestAnimationFrame(warmFrame);
-    }
-    // Every loaded sheet drawn whole at the size the match draws it.
-    function drawSheets(k, alpha) {
-      ctx.setTransform(k, 0, 0, k, 0, 0);
-      ctx.globalAlpha = alpha;
-      let count = 0;
-      for (const [name, entry] of pictures) {
-        if (!entry.image) continue;
-        const scale = (/Opponent/.test(name) ? FAR_SCALE : NEAR_SCALE) / (entry.scale || 1);
-        try { ctx.drawImage(entry.image, 0, 0, entry.image.width * scale, entry.image.height * scale); count += 1; } catch (error) { /* a picture the canvas can't draw */ }
-      }
-      ctx.globalAlpha = 1;
-      stats.warmed = count;
+      if (view !== "ready") { endWarm(); return; }
+      if (warmSome(t === undefined ? now() : t)) { warmRaf = requestAnimationFrame(warmFrame); return; }
+      if (loading === 0) warmDone = true;
+      // One more frame so the last ones are flushed before the canvas is cleared and hidden again.
+      warmRaf = requestAnimationFrame(() => { warmRaf = 0; endWarm(); });
     }
     function endWarm() {
       if (warmRaf) cancelAnimationFrame(warmRaf);
       warmRaf = 0;
-      warmLeft = 0;
-      if (hud) hud.style.opacity = "";
+      warmQueue = [];
       stats.warmMs = Math.round(now() - warmStarted);
-      // The canvas and HUD as the view has them (a match's first frame clears the canvas itself).
-      if (view !== "match") { ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, canvas.width, canvas.height); }
-      applyView();
+      // The canvas as the view has it (a match's start clears it itself).
+      if (view !== "match") { clearWarm(); canvas.style.visibility = "hidden"; }
+    }
+
+    // A sheet as a decoded bitmap (receiver 97; cricket's stadium since receiver 57, receiver-scene.js `decodePicture`):
+    // decoded once, off the page's thread, and it stays decoded, where an image is decoded again whenever the TV has let
+    // its copy go. On a 1280 canvas the far player's sheets are kept at half size (drawn at 0.30–0.50 of their pixels):
+    // 27 MB for a look's fifteen, 72 MB for a same-phone match's thirty-eight. Past `BITMAP_BUDGET`, or where a bitmap
+    // can't be made, the image as before.
+    const canBitmap = typeof window.createImageBitmap === "function" && typeof window.fetch === "function" && options.bitmaps !== false;
+    const BITMAP_BUDGET = 96e6;
+    let bitmapBytes = 0;
+    function plannedCanvasWidth() {
+      const box = stage.getBoundingClientRect();
+      const plan = sceneCore && sceneCore.canvasPlan ? sceneCore.canvasPlan({ ua: navigator.userAgent, wide: true }) : { width: 1280 };
+      return options.canvasWidth || (sceneCore && sceneCore.canvasWidth ? sceneCore.canvasWidth(box.width || 1280, window.devicePixelRatio, plan.width) : 1280);
+    }
+    // `size`: the bitmap's size when it is kept smaller than the file ([width, height]).
+    function loadBitmap(url, size) {
+      if (!canBitmap || bitmapBytes >= BITMAP_BUDGET) return Promise.resolve(null);
+      return fetch(url).then((response) => { if (!response.ok) throw new Error("fetch " + url); return response.blob(); })
+        .then((blob) => (size ? window.createImageBitmap(blob, { resizeWidth: size[0], resizeHeight: size[1], resizeQuality: "high" }).catch(() => window.createImageBitmap(blob))
+          : window.createImageBitmap(blob)))
+        .then((bitmap) => { if (!bitmap || !(bitmap.width > 0)) return null; bitmapBytes += bitmap.width * bitmap.height * 4; return bitmap; })
+        .catch(() => null);
+    }
+    function letGo(image) {
+      if (image && typeof image.close === "function") { bitmapBytes -= image.width * image.height * 4; try { image.close(); } catch (error) { /* gone already */ } }
     }
 
     function loadSheet(name) {
       if (pictures.has(name)) return pictures.get(name).wait;
       const spec = manifest && manifest.sheets && manifest.sheets[name];
-      const entry = { image: null, scale: spec ? spec.scale : 1, wait: null };
-      entry.wait = spec ? loadImage(base + name + ".webp?v=" + RECEIVER_VERSION).then((image) => { entry.image = image; return image; }) : Promise.resolve(null);
+      const entry = { image: null, scale: spec ? spec.scale : 1, wait: null, warmed: false };
+      const url = base + name + ".webp?v=" + RECEIVER_VERSION;
+      // The far player's sheets at half size on a 1280 canvas (their cells' places scale with them, `scale`).
+      const half = !!spec && /Opponent/.test(name) && Array.isArray(spec.size) && plannedCanvasWidth() <= 1280;
+      entry.wait = !spec ? Promise.resolve(null) : loadBitmap(url, half ? [Math.round(spec.size[0] / 2), Math.round(spec.size[1] / 2)] : null).then((bitmap) => {
+        if (!bitmap) return loadImage(url);
+        if (half && bitmap.width < spec.size[0]) entry.scale = spec.scale * bitmap.width / spec.size[0];
+        return bitmap;
+      }).then((image) => {
+        // Let go while it loaded (`release`): not kept.
+        if (pictures.get(name) !== entry) { letGo(image); return null; }
+        entry.image = image; return image;
+      });
       pictures.set(name, entry);
       return entry.wait;
     }
 
     // One load of the court however many ask (receiver 83: a view can ask before the look's preload does).
+    // The court photographs as the canvas draws them (the net's band over the players): decoded bitmaps the canvas's
+    // size (receiver 97; the image was decoded on the page's thread, ~140 ms, in the first frame that drew the net).
+    let canvasPlate = null, canvasTall = null;
     let plateWait = null, tallSettled = false;
     function loadPlate() {
       if (plate) return Promise.resolve(plate);
       if (plateWait) return plateWait;
       plateLoaded = true;
       plateImg.src = base + "PickleballCourt.webp?v=" + RECEIVER_VERSION;
+      const high = Math.round(plannedCanvasWidth() * 9 / 16);
+      const sized = (size) => (Array.isArray(size) && size[1] > high ? [Math.round(size[0] * high / size[1]), high] : null);
+      loadManifest().then(() => {
+        loadBitmap(plateImg.src, sized(manifest.plate && manifest.plate.size)).then((bitmap) => { canvasPlate = bitmap; });
+        if (tallImgs[0]) loadBitmap(base + "PickleballCourtTall.webp?v=" + RECEIVER_VERSION, sized(manifest.plateTall && manifest.plateTall.size)).then((bitmap) => { canvasTall = bitmap; });
+      });
       if (tallImgs[0] && !tallImgs[0].src) {
         tallImgs[0].onload = () => { tallPlate = tallImgs[0]; tallSettled = true; };
         tallImgs[0].onerror = () => { tallSettled = true; };
@@ -194,7 +267,7 @@
     let pending = null;
     function selectGame(game) {
       pickleballWanted = game === "pickleball";
-      if (!pickleballWanted) { if (warmLeft > 0) endWarm(); return; }
+      if (!pickleballWanted) { if (warmRaf) endWarm(); return; }
       if (pending) { const next = pending; pending = null; preload(next.look, next.sheets); }
     }
     function preloadWhenWanted(nextLook, sheets) {
@@ -228,19 +301,19 @@
     // shown on the match's first frame.
     //
     // Now a match that comes on is held under the ready card ("Getting the court ready"): until its pictures are loaded
-    // (`loading`) and its first frame is here; then `WARM_FRAMES` frames that draw every sheet at the match's sizes in
-    // the hidden canvas and put the court's photographs (a split screen's tall or wide pair) where that frame has them;
+    // (`loading`) and its first frame is here; then the warm-up (`warmSome`: every sheet not warmed through the setup,
+    // the first frame's first) with the court's photographs (a split screen's tall or wide pair) where that frame has them;
     // then the match is shown, and once `START.steadyFrames` of its frames have followed each other within
     // `START.steadyGap` ms (or `START.steadyCap` after it showed) the phone hears `go`. A phone that waits for it (iOS
     // and Android from the builds after 311 and 27461; the `ready`'s `go: 1` tells them this TV says it) holds its
     // first serve until then, so what stutters is a court where nobody moves yet. An older phone plays on underneath, as
     // it did while a sheet was missing. Never longer than `START.cap` from the match coming on (the phones' own cap is
     // 4 s). The hello's `hold: 0` (benches) starts as receiver 96 did. Not on a manual clock (the film, tests' own draws).
-    const START = { cap: 3500, firstFrame: 600, steadyFrames: 8, steadyGap: 45, steadyCap: 1200 };
+    const START = { cap: 3500, firstFrame: 600, flushFrames: 2, steadyFrames: 8, steadyGap: 45, steadyCap: 1200 };
     let loading = 0, holdOn = !options.manualClock, starting = null, matchAt = null, statsEvery = 2000;
     function beginStart() {
       matchAt = now();
-      starting = holdOn ? { at: matchAt, phase: "load", warmLeft: 0, load: 0, shown: 0, steady: 0, last: null } : null;
+      starting = holdOn ? { at: matchAt, phase: "load", flush: 0, load: 0, shown: 0, steady: 0, last: null } : null;
     }
     function firstFrameOps() {
       const first = playout.frames[0];
@@ -255,10 +328,24 @@
         const ops = firstFrameOps();
         const waitsTall = !!ops && ops.some((op) => op.kind === "P" && op.tall) && !tallSettled;
         if (since < START.cap && (loading > 0 || waitsTall || (!ops && since < START.firstFrame))) return false;
-        s.phase = "warm"; s.load = since; s.warmLeft = warmMode === "none" || since >= START.cap ? 0 : WARM_FRAMES;
+        s.phase = "warm"; s.load = since;
+        // Warmed through the setup: only what the first frame draws, again (the TV may have let its copies go since).
+        const order = warmOrder(ops);
+        warmQueue = warmMode === "none" ? [] : warmDone ? order.slice(0, 1 + (ops ? new Set(ops.filter((op) => op.kind === "p").map((op) => op.sheet)).size : 0)) : order;
+        warmLast = null; s.flush = warmQueue.length ? START.flushFrames : 0;
+        placeFirst(ops);
       }
       if (s.phase === "warm") {
-        if (s.warmLeft > 0 && since < START.cap) { warmStart(s); return false; }
+        if (since < START.cap) {
+          if (warmQueue.length) { warmSome(t); return false; }
+          // A frame or two more: the last ones flushed, and the photographs' layers drawn where the match has them.
+          if (s.flush > 0) { s.flush -= 1; return false; }
+        }
+        warmQueue = [];
+        if (loading === 0 && since < START.cap) warmDone = true;
+        stats.warmMs = Math.round(since - s.load);
+        clearWarm();
+        canvas.style.visibility = "hidden";
         s.phase = "steady"; s.shown = since; s.last = null; s.steady = 0;
         resetStats(t);
         return true;
@@ -272,21 +359,14 @@
       }
       return true;
     }
-    // A warm frame under the ready card: the photographs where the match's first frame has them, every sheet drawn.
-    function warmStart(s) {
-      sizeCanvas();
-      const ops = firstFrameOps();
+    // The photographs' layers where the match's first frame has them, under the ready card: shown there on the match's
+    // first frame, a split screen's tall pair was first drawn (6.3 MB each) in it.
+    function placeFirst(ops) {
       if (ops) {
         const halves = core.halves(ops);
         showSplit(!!halves);
         if (halves) halves.forEach(placeHalf); else placePlate(ops.find((op) => op.kind === "P"));
       } else if (plate && plate.naturalWidth) placePlate(core.plateLayout([plate.naturalWidth, plate.naturalHeight], core.STAGE.width, core.STAGE.height));
-      ctx.setTransform(1, 0, 0, 1, 0, 0);
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      if (s.warmLeft > 1) drawSheets(canvas.width / core.STAGE.width, 1);
-      ctx.setTransform(1, 0, 0, 1, 0, 0);
-      s.warmLeft -= 1;
-      if (s.warmLeft === 0) { stats.warmMs = Math.round(now() - s.at - s.load); warmDone = true; lastDrawn = null; }
     }
     function resetStats(t) { stats.draws = []; stats.drawMs = []; stats.frames = 0; stats.missing = 0; stats.since = t; stats.lastDraw = null; }
 
@@ -406,7 +486,7 @@
       if (clear) ctx.clearRect(Math.floor(clear.x * k) - 1, Math.floor(clear.y * k) - 1, Math.ceil(clear.w * k) + 3, Math.ceil(clear.h * k) + 3);
       else ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.setTransform(k, 0, 0, k, 0, 0);
-      const missing = core.drawOps(ctx, ops, picture, plate, false, tallPlate);
+      const missing = core.drawOps(ctx, ops, picture, plate && (canvasPlate || plate), false, tallPlate && (canvasTall || tallPlate));
       lastDrawn = union(ops.filter((op) => op.kind !== "P" && op.kind !== "V").map((op) => core.opBounds(op)));
       stats.missing += missing;
       renderHUD(core.hudView(shown.hud, shown.moment));
@@ -638,7 +718,8 @@
       get view() { return view; }, get drawn() { return drawn; }, get look() { return look; },
       get starting() { return starting ? starting.phase : null; },
       stats: () => maybeReport(true), sizeCanvas, picture, loaded: () => lookLoadedAt !== null,
-      release() { stop(); pictures.clear(); }
+      release() { stop(); for (const entry of pictures.values()) letGo(entry.image); pictures.clear(); },
+      get bitmapBytes() { return bitmapBytes; }
     };
   }
 
