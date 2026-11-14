@@ -8,8 +8,8 @@
   // "Pickleball on the TV".
   //
   // Phone -> TV: hello {v, look, sheets?, debug?}, ping {i}, sync {o}, view {v: off|ready|match|result, ready?, result?,
-  // sheets?}, f {s, o, h?, k?}.  TV -> phone: ready {pickleball, version, looks, friends?}, pong {i, r},
-  // loaded {look, ms, missing}, stats {fps, gap, frames, drawMs, queue, stale, delay, late, missing}, error {where, message}.
+  // sheets?}, f {s, o, h?, k?}.  TV -> phone: ready {pickleball, version, looks, friends?, tall?, go?}, pong {i, r},
+  // go {ms, why, load, shown} (receiver 97: the match that just came on is drawn and steady), loaded {look, ms, missing}, stats {fps, gap, frames, drawMs, queue, stale, delay, late, missing}, error {where, message}.
   // Receiver 78 (play with friends, docs/design/PICKLEBALL_FRIENDS.md): `sheets` names the pictures beyond the look's own
   // (a friend's look, each player's kit); the HUD's `nm` names the score's rows, `sp` a same-phone split screen with
   // `ban2`/`call2` for its right half; a frame's "V" ops split the court in two; `friends: 1` says this TV draws them.
@@ -25,7 +25,10 @@
   // Receiver 91: a 2.9.9 look (dyed clothes, photographed forearms, gloves and bat face) is whole, not half dressed.
   // Receiver 96: the tall court plate (a "P" with a sixth value 1): a same-phone split screen's halves filled by their
   // courts; the hello's `tall: 1` says this TV has it.
-  const RECEIVER_VERSION = 96;
+  // Receiver 97 (Nov 14 2026, xn13cprg and xy026r2m: "the game started really laggy"): a match's start is held until
+  // its pictures are loaded and warmed and its first frames draw steadily; `go` tells the phone, which holds its first
+  // serve for it (the `ready`'s `go: 1` says this TV sends one). See `beginStart`.
+  const RECEIVER_VERSION = 97;
   const core = window.RallycadePickleballCore;
   const sceneCore = window.RallycadeSceneCore;
 
@@ -96,14 +99,18 @@
     const WARM_FRAMES = 4;
     const NEAR_SCALE = 0.62, FAR_SCALE = 0.17;
     let warmMode = "frames", warmLeft = 0, warmRaf = 0, warmStarted = 0;
+    // Whether the pictures loaded now have been warmed since they loaded and since this setup opened (receiver 97).
+    let warmDone = false;
     function warm() {
       if (view === "match" || warmMode === "none") return;
+      warmDone = false;
       warmLeft = WARM_FRAMES;
       warmStarted = now();
       if (!warmRaf && !options.manualClock) warmRaf = requestAnimationFrame(warmFrame);
     }
     function warmFrame() {
       warmRaf = 0;
+      if (view !== "match" && warmLeft <= 0 && loading === 0) warmDone = true;
       if (view === "match" || warmLeft <= 0) { endWarm(); return; }
       sizeCanvas();
       const k = canvas.width / core.STAGE.width;
@@ -115,20 +122,22 @@
       if (shown && plate && plate.naturalWidth) placePlate(core.plateLayout([plate.naturalWidth, plate.naturalHeight], core.STAGE.width, core.STAGE.height));
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      if (warmLeft > 1) {
-        ctx.setTransform(k, 0, 0, k, 0, 0);
-        ctx.globalAlpha = shown ? 0.02 : 1;
-        let count = 0;
-        for (const [name, entry] of pictures) {
-          if (!entry.image) continue;
-          const scale = (/Opponent/.test(name) ? FAR_SCALE : NEAR_SCALE) / (entry.scale || 1);
-          try { ctx.drawImage(entry.image, 0, 0, entry.image.width * scale, entry.image.height * scale); count += 1; } catch (error) { /* a picture the canvas can't draw */ }
-        }
-        ctx.globalAlpha = 1;
-        stats.warmed = count;
-      }
+      if (warmLeft > 1) drawSheets(k, shown ? 0.02 : 1);
       warmLeft -= 1;
       warmRaf = requestAnimationFrame(warmFrame);
+    }
+    // Every loaded sheet drawn whole at the size the match draws it.
+    function drawSheets(k, alpha) {
+      ctx.setTransform(k, 0, 0, k, 0, 0);
+      ctx.globalAlpha = alpha;
+      let count = 0;
+      for (const [name, entry] of pictures) {
+        if (!entry.image) continue;
+        const scale = (/Opponent/.test(name) ? FAR_SCALE : NEAR_SCALE) / (entry.scale || 1);
+        try { ctx.drawImage(entry.image, 0, 0, entry.image.width * scale, entry.image.height * scale); count += 1; } catch (error) { /* a picture the canvas can't draw */ }
+      }
+      ctx.globalAlpha = 1;
+      stats.warmed = count;
     }
     function endWarm() {
       if (warmRaf) cancelAnimationFrame(warmRaf);
@@ -151,16 +160,22 @@
     }
 
     // One load of the court however many ask (receiver 83: a view can ask before the look's preload does).
-    let plateWait = null;
+    let plateWait = null, tallSettled = false;
     function loadPlate() {
       if (plate) return Promise.resolve(plate);
       if (plateWait) return plateWait;
       plateLoaded = true;
       plateImg.src = base + "PickleballCourt.webp?v=" + RECEIVER_VERSION;
       if (tallImgs[0] && !tallImgs[0].src) {
-        tallImgs[0].onload = () => { tallPlate = tallImgs[0]; };
-        for (const image of tallImgs) if (image) image.src = base + "PickleballCourtTall.webp?v=" + RECEIVER_VERSION;
-      }
+        tallImgs[0].onload = () => { tallPlate = tallImgs[0]; tallSettled = true; };
+        tallImgs[0].onerror = () => { tallSettled = true; };
+        for (const image of tallImgs) {
+          if (!image) continue;
+          image.src = base + "PickleballCourtTall.webp?v=" + RECEIVER_VERSION;
+          // Decoded ahead of its first showing (receiver 97: 6.3 MB each, first shown on a split match's first frame).
+          if (image.decode) image.decode().catch(() => {});
+        }
+      } else if (!tallImgs[0]) tallSettled = true;
       plateWait = new Promise((resolve) => {
         const done = () => { plate = plateImg.naturalWidth ? plateImg : null; resolve(plate); };
         if (plateImg.complete && plateImg.naturalWidth) done();
@@ -192,13 +207,88 @@
       look = nextLook === "woman" ? "woman" : "man";
       if (Array.isArray(sheets)) named = sheets.filter((s) => typeof s === "string").slice(0, 64);
       const started = now();
+      loading += 1;
+      warmDone = false;
       return loadManifest().then(() => Promise.all([loadPlate()].concat(core.sheetsFor(manifest, look, named).map(loadSheet)))).then((loaded) => {
+        loading -= 1;
         lookLoadedAt = now();
         const missing = loaded.filter((x) => !x).length;
         warm();
         send({ t: "loaded", look, ms: Math.round(lookLoadedAt - started), missing, warm: warmMode });
-      });
+      }, (error) => { loading -= 1; throw error; });
     }
+
+    // MARK: The match's start (receiver 97)
+
+    // Nov 14 2026 (xn13cprg, iOS 311, and xy026r2m, Android 27461, on a Chromecast: "the game started really laggy"):
+    // since receiver 83 the look's ~15 sheets and the court load only once pickleball is chosen, the setup screen's
+    // ready card, and a match that began 1–3 s later began before they were loaded (2.1–3.6 s) and never warmed them
+    // (`warm` is for the ready card): "drawMs 114.2, fps 0, missing 2, warmed 0", then 12, 25, 29 frames a second, and
+    // the phone's pace governor slowed for what it heard (up to 18 s to 29). A split screen's tall plates were first
+    // shown on the match's first frame.
+    //
+    // Now a match that comes on is held under the ready card ("Getting the court ready"): until its pictures are loaded
+    // (`loading`) and its first frame is here; then `WARM_FRAMES` frames that draw every sheet at the match's sizes in
+    // the hidden canvas and put the court's photographs (a split screen's tall or wide pair) where that frame has them;
+    // then the match is shown, and once `START.steadyFrames` of its frames have followed each other within
+    // `START.steadyGap` ms (or `START.steadyCap` after it showed) the phone hears `go`. A phone that waits for it (iOS
+    // and Android from the builds after 311 and 27461; the `ready`'s `go: 1` tells them this TV says it) holds its
+    // first serve until then, so what stutters is a court where nobody moves yet. An older phone plays on underneath, as
+    // it did while a sheet was missing. Never longer than `START.cap` from the match coming on (the phones' own cap is
+    // 4 s). The hello's `hold: 0` (benches) starts as receiver 96 did. Not on a manual clock (the film, tests' own draws).
+    const START = { cap: 3500, firstFrame: 600, steadyFrames: 8, steadyGap: 45, steadyCap: 1200 };
+    let loading = 0, holdOn = !options.manualClock, starting = null, matchAt = null, statsEvery = 2000;
+    function beginStart() {
+      matchAt = now();
+      starting = holdOn ? { at: matchAt, phase: "load", warmLeft: 0, load: 0, shown: 0, steady: 0, last: null } : null;
+    }
+    function firstFrameOps() {
+      const first = playout.frames[0];
+      return first ? first.o.map(core.decodeOp).filter(Boolean) : null;
+    }
+    // One animation frame of the start at `t`; true once the match's own frames draw.
+    function stepStart(t) {
+      const s = starting;
+      if (!s) return true;
+      const since = t - s.at;
+      if (s.phase === "load") {
+        const ops = firstFrameOps();
+        const waitsTall = !!ops && ops.some((op) => op.kind === "P" && op.tall) && !tallSettled;
+        if (since < START.cap && (loading > 0 || waitsTall || (!ops && since < START.firstFrame))) return false;
+        s.phase = "warm"; s.load = since; s.warmLeft = warmMode === "none" || since >= START.cap ? 0 : WARM_FRAMES;
+      }
+      if (s.phase === "warm") {
+        if (s.warmLeft > 0 && since < START.cap) { warmStart(s); return false; }
+        s.phase = "steady"; s.shown = since; s.last = null; s.steady = 0;
+        resetStats(t);
+        return true;
+      }
+      // Steady: the frames just drawn followed each other closely.
+      if (s.last !== null) s.steady = t - s.last <= START.steadyGap ? s.steady + 1 : 0;
+      s.last = t;
+      if (s.steady >= START.steadyFrames || since - s.shown >= START.steadyCap || since >= START.cap) {
+        starting = null;
+        send({ t: "go", ms: Math.round(since), why: s.steady >= START.steadyFrames ? "steady" : "cap", load: Math.round(s.load), shown: Math.round(s.shown), warmed: stats.warmed || 0 });
+      }
+      return true;
+    }
+    // A warm frame under the ready card: the photographs where the match's first frame has them, every sheet drawn.
+    function warmStart(s) {
+      sizeCanvas();
+      const ops = firstFrameOps();
+      if (ops) {
+        const halves = core.halves(ops);
+        showSplit(!!halves);
+        if (halves) halves.forEach(placeHalf); else placePlate(ops.find((op) => op.kind === "P"));
+      } else if (plate && plate.naturalWidth) placePlate(core.plateLayout([plate.naturalWidth, plate.naturalHeight], core.STAGE.width, core.STAGE.height));
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      if (s.warmLeft > 1) drawSheets(canvas.width / core.STAGE.width, 1);
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      s.warmLeft -= 1;
+      if (s.warmLeft === 0) { stats.warmMs = Math.round(now() - s.at - s.load); warmDone = true; lastDrawn = null; }
+    }
+    function resetStats(t) { stats.draws = []; stats.drawMs = []; stats.frames = 0; stats.missing = 0; stats.since = t; stats.lastDraw = null; }
 
     function picture(sheet) {
       const entry = pictures.get(sheet);
@@ -305,7 +395,10 @@
       if (stats.lastDraw !== null) stats.draws.push(local - stats.lastDraw);
       stats.lastDraw = local;
       stats.stale = shown.stale; stats.queue = shown.ahead;
-      if (!drawn && missing === 0 && plate) { drawn = true; applyView(); }
+      if (!drawn && missing === 0 && plate) {
+        drawn = true; applyView();
+        if (debug && matchAt !== null) send({ t: "shown", ms: Math.round(now() - matchAt) });
+      }
       return true;
     }
 
@@ -412,7 +505,9 @@
       if (message.ready) readyWords = message.ready;
       if (message.result) resultWords = message.result;
       if (next === "match" && view !== "match") { playout.reset(); if (clockOffset !== null) playout.setOffset(clockOffset); drawn = false; lastDrawn = null; ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, canvas.width, canvas.height); }
+      const began = next === "match" && view !== "match";
       view = next;
+      if (began) beginStart(); else if (view !== "match") starting = null;
       if (view !== "off") { loadPlate(); }
       // Each setup warms the pictures again: a Chromecast lets decoded pictures go (receiver 79).
       if (view === "ready") warm();
@@ -428,7 +523,7 @@
       raf = 0;
       if (!running) return;
       const t = now();
-      if (view === "match") drawAt(t);
+      if (view === "match" && stepStart(t)) drawAt(t);
       playout.settle(playout.target(averageGap()), lastTick === null ? 33 : t - lastTick);
       lastTick = t;
       maybeReport();
@@ -445,7 +540,9 @@
 
     function maybeReport(force) {
       const t = now();
-      if (!force && t - stats.since < 2000) return;
+      if (!force && t - stats.since < statsEvery) return;
+      // Nothing of the match is drawn yet (receiver 97): no report of a picture that isn't there.
+      if (!force && starting && starting.phase !== "steady") { stats.since = t; return; }
       const seconds = Math.max(0.001, (t - stats.since) / 1000);
       const message = {
         t: "stats", fps: Math.round(stats.draws.length / seconds * 10) / 10,
@@ -475,9 +572,12 @@
           helloAt = now();
           debug = message.debug === 1;
           if (["frames", "visible", "hud", "none"].includes(message.warm)) warmMode = message.warm;
+          // Benches: `hold: 0` starts a match as receiver 96 did; `stats` is the ms between reports (2000).
+          holdOn = !options.manualClock && message.hold !== 0;
+          statsEvery = Number(message.stats) >= 500 ? Number(message.stats) : 2000;
           if (chip) chip.hidden = !debug;
           preloadWhenWanted(message.look, message.sheets);
-          send({ t: "ready", pickleball: core.VERSION, version: RECEIVER_VERSION, looks: ["man", "woman"], friends: 1, tall: tallImgs[0] && tallImgs[1] ? 1 : 0 });
+          send({ t: "ready", pickleball: core.VERSION, version: RECEIVER_VERSION, looks: ["man", "woman"], friends: 1, tall: tallImgs[0] && tallImgs[1] ? 1 : 0, go: holdOn ? 1 : 0 });
           break;
         case "ping":
           send({ t: "pong", i: message.i, r: now() });
@@ -517,6 +617,7 @@
       NAMESPACE, handle, drawAt, senderLeft, report, playout, preload, setView, selectGame,
       get pickleballWanted() { return pickleballWanted; },
       get view() { return view; }, get drawn() { return drawn; }, get look() { return look; },
+      get starting() { return starting ? starting.phase : null; },
       stats: () => maybeReport(true), sizeCanvas, picture, loaded: () => lookLoadedAt !== null,
       release() { stop(); pictures.clear(); }
     };

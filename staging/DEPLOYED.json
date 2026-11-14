@@ -1,22 +1,29 @@
 {
   "environment": "staging",
-  "commit": "65067936795e9b1bf252365641762b9e2dd66fdb",
-  "subject": "Pickleball Side by Side: the tall court plate on iPhone (unbuilt: no disk for an iOS build)",
-  "receiverTree": "e8b5ac83a0d9c20694de2696e8163d49f0985004",
-  "revision": 95,
-  "deployedAt": "2026-11-13T16:49:01Z",
+  "commit": "e670fad4ea8b6c88ecce59994c617450721c8130",
+  "subject": "Pickleball on a Chromecast: receiver 97 holds a match's start until its pictures are loaded and warmed, then says go",
+  "receiverTree": "b617b28718f613d1c6a2225e202a945990d2b365",
+  "revision": 97,
+  "deployedAt": "2026-11-14T18:16:22Z",
   "previous": {
-    "tree": "94852de06c0356510e9e21939552fe2e401dd80b",
+    "tree": "e8b5ac83a0d9c20694de2696e8163d49f0985004",
     "changed": [
       "index.html",
-      "pickleball/PickleballCourtTall.webp",
-      "pickleball/manifest.json",
-      "receiver-pickleball-core.js",
-      "receiver-pickleball.js",
-      "receiver.js"
+      "receiver-pickleball.js"
     ]
   },
   "earlier": [
+    {
+      "tree": "94852de06c0356510e9e21939552fe2e401dd80b",
+      "changed": [
+        "index.html",
+        "pickleball/PickleballCourtTall.webp",
+        "pickleball/manifest.json",
+        "receiver-pickleball-core.js",
+        "receiver-pickleball.js",
+        "receiver.js"
+      ]
+    },
     {
       "tree": "8ca044438a6e4af491bea47465fff7cf9f08cb26",
       "changed": [
@@ -60,29 +67,6 @@
         "scene-images/kit-masks-bowler-end-0-1280x1576.png",
         "scene-images/kit-masks-bowler-end-1-1272x1668.png",
         "scene-images/kit-masks-bowler-end-2-1264x1560.png"
-      ]
-    },
-    {
-      "tree": "1596897f5bcd7cebace842323fc4ceddb305d773",
-      "changed": [
-        "index.html",
-        "pickleball/PickleballCourtTall.webp",
-        "pickleball/manifest.json",
-        "receiver-pickleball-core.js",
-        "receiver-pickleball.js",
-        "receiver-scene.js",
-        "receiver.css",
-        "receiver.js",
-        "scene-images/bowler-end-plate-1672x941.jpg",
-        "scene-images/ground-cauldron-bowler-end-1672x941.jpg",
-        "scene-images/ground-coral-bay-bowler-end-1672x941.jpg",
-        "scene-images/ground-hilltop-bowler-end-1672x941.jpg",
-        "scene-images/ground-ironbark-bowler-end-1672x941.jpg",
-        "scene-images/ground-pavilion-bowler-end-1672x941.jpg",
-        "scene-images/kit-masks-bowler-end-0-1280x1576.png",
-        "scene-images/kit-masks-bowler-end-1-1272x1668.png",
-        "scene-images/kit-masks-bowler-end-2-1264x1560.png",
-        "scene-images/manifest.json"
       ]
     }
   ]
