@@ -456,6 +456,7 @@ body[data-card="picture"] #app, body[data-card="waiting"] #app { visibility: hid
 }
 .pk-stage { position: absolute; left: 50%; top: 50%; width: min(100vw, 177.7778vh); height: min(56.25vw, 100vh); transform: translate(-50%, -50%); overflow: hidden; background: #0c1a17; }
 .pk-court { position: absolute; inset: 0; will-change: transform; }
+.pk-half { position: absolute; left: 0; top: 0; width: 100%; height: 100%; overflow: hidden; }
 .pk-plate { position: absolute; left: 0; top: 0; width: 100%; height: 100%; max-width: none; will-change: transform; }
 .pk-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 .pk-hud { position: absolute; left: 0; top: 0; width: 782.222px; height: 440px; transform-origin: 0 0; pointer-events: none;

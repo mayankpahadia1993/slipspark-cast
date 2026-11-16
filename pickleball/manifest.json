@@ -5,6 +5,12 @@
       941
     ]
   },
+  "plateTall" : {
+    "size" : [
+      1254,
+      1254
+    ]
+  },
   "sheets" : {
     "PickleballBackhand" : {
       "look" : "man",
