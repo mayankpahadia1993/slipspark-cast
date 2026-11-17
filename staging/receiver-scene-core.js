@@ -145,6 +145,15 @@
     for (let c = 0; c < 3; c += 1) rgb[c] = rgb[c] * (1 - share) + Math.max(0, Math.min(1, colour[c] * light)) * share;
   }
 
+  function copyAtlasFrame(source, cut, target) {
+    for (let y = 0; y < cut.h; y += 1) {
+      const from = ((cut.y + y) * source.width + cut.x) * 4;
+      const to = ((cut.oy + y) * cut.width + cut.ox) * 4;
+      target.set(source.data.subarray(from, from + cut.w * 4), to);
+    }
+    return target;
+  }
+
   // Dyes `rgba` (a frame's pixels, straight alpha, as ImageData) through
   // `mask` (the same size: red fabric, green trim, blue grip) in `look`,
   // and wears `gear` through `gearMask` (receiver 81): the kit's cloth and
@@ -153,7 +162,7 @@
   function dyeFrame(rgba, mask, look, gearMask, gear) {
     const [fabric, trim, grip] = look ? lookColours(look) : [null, null, null];
     const worn = gear && gearMask ? gearColours(gear) : { helmet: null, pads: null, bat: null };
-    const rgb = [0, 0, 0];
+    const rgb = [0, 0, 0], factor = [1, 1, 1];
     for (let i = 0; i < rgba.length; i += 4) {
       if (!rgba[i + 3]) continue;
       const f = fabric && mask ? mask[i] / 255 : 0, t = trim && mask ? mask[i + 1] / 255 : 0, g = grip && mask ? mask[i + 2] / 255 : 0;
@@ -163,8 +172,8 @@
       if (!f && !t && !g && !p && !h && !w) continue;
       let r = rgba[i] / 255, gr = rgba[i + 1] / 255, b = rgba[i + 2] / 255;
       if (f || t || p) {
-        const factor = [1, 1, 1];
         for (let c = 0; c < 3; c += 1) {
+          factor[c] = 1;
           if (f) factor[c] = factor[c] * (1 - f) + fabric[c] * f;
           if (t) factor[c] = factor[c] * (1 - t) + trim[c] * t;
           if (p) factor[c] = factor[c] * (1 - p) + worn.pads[c] * p;
@@ -1255,7 +1264,7 @@
     isWeakDongle, drawsInset, storageNames, STAGE, MAX_BLEND_GAP, MAX_STEP, CANVAS, normalizeFrame, plainFrame, expandInset, shapeKey, opShape, viewOf, matchOps, blendMatched, blendMatchedInto,
     blendFrames, blendFramesInto, cloneFrame, createTimeline, createClock,
     percentile, tracePath, cssColor, pictureSize, canvasPlan, canvasWidth, createRateWatch, STEADY, createSteadyWatch, createLiveLayer, hasLiveSlot, poseAge, poseAhead,
-    filterParts, opBounds, layerEnd, clipsWholeStage, mergeRects, overStrip, readLook, lookColours, dyeFrame, GRIP_OPACITY, GRIP_SHADE,
+    filterParts, opBounds, layerEnd, clipsWholeStage, mergeRects, overStrip, readLook, lookColours, dyeFrame, copyAtlasFrame, GRIP_OPACITY, GRIP_SHADE,
     readGear, gearColours, GEAR_HELMET_OPACITY, GEAR_FINISH_OPACITY, GEAR_STICKER, WARM_REPORT_MS, warmReport
   };
 });

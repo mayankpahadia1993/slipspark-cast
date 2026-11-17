@@ -131,6 +131,7 @@
     let lastNeed = 0;
     let readyToAnswer = false;
     let pendingHello = false;
+    let hasHello = false;
     let helloKit = null;
     // The grounds (docs/grounds.md): the plate the phone's hello names ("ground-<id>-1672x941"; nil the classic
     // stadium). Only that ground's picture loads with the stadium; the other grounds' load only if a frame draws them.
@@ -601,7 +602,7 @@
     const START_RANK = 6;
     function isStart(key) { return preloadRank(key) <= START_RANK; }
     function preloadBundled(kit, ground, views) {
-      if (typeof kit === "string" && /^[a-z0-9-]{1,40}$/.test(kit)) preloadKit = kit;
+      preloadKit = typeof kit === "string" && /^[a-z0-9-]{1,40}$/.test(kit) ? kit : null;
       preloadGround = groundKey(ground);
       preloadViews = groundViews(views);
       // A dyed kit's batter on the inset: the atlases' kit masks now (receiver 73).
@@ -610,7 +611,11 @@
       // 53): build 158's innings opened with 22–59 draws a second missing a
       // photo the TV had cached but not yet loaded.
       const byRank = (a, b) => preloadRank(a) - preloadRank(b);
-      const extra = Array.from(cached).filter((key) => !bundled.has(key)).sort(byRank).slice(0, MAX_CACHED_PRELOAD);
+      // Before hello there is no known wardrobe. A current phone names its
+      // exact pieces: older casts' kits must not occupy startup decode slots.
+      // Legacy phones without pieces retain their kit-based ordering.
+      const relevant = (key) => !isDressedPiece(key) || (hasHello && (!helloPieces.size || helloPieces.has(key)));
+      const extra = Array.from(cached).filter((key) => !bundled.has(key) && relevant(key)).sort(byRank).slice(0, MAX_CACHED_PRELOAD);
       // A weak dongle draws no bowler's-end inset (the phone leaves it out): neither the classic view nor a ground's.
       // Grounds: only the named one and its views, and then not the classic stadium's photos (a weak Chromecast keeps
       // one plate), nor the classic pictures its views stand in for (receiver 82).
@@ -1455,19 +1460,23 @@
       if (dressedKit() || requestedKitSources) maskSheet(id);
       if (dressedGear() || requestedGearSources) gearSheet(id);
     }
-    // CPU drawing from an HTMLImage can still decode its whole atlas on a new
-    // crop, even when the destination is a readback canvas. Rasterize each source
-    // once during loading. At most three atlases and their two mask sets: 70 MiB
-    // at the bundled sizes; none on receivers that omit the inset. Masks keep
-    // this canvas instead of their HTMLImage. All are zeroed at release.
+    // Read each atlas once during loading. Older Chromecast browsers ignore
+    // willReadFrequently; retaining a canvas still makes every new pose read
+    // pixels back from the GPU. Keep only its RGBA bytes and release the canvas
+    // immediately. The three photographs and six masks remain under 70 MiB.
     function readbackSource(image) {
       const source = document.createElement("canvas");
       source.width = image.naturalWidth || image.width;
       source.height = image.naturalHeight || image.height;
-      const c = source.getContext("2d", { willReadFrequently: true });
-      c.drawImage(image, 0, 0);
-      c.getImageData(0, 0, 1, 1); // Flush deferred raster work now, before a pose needs it.
-      return source;
+      try {
+        const c = source.getContext("2d", { willReadFrequently: true });
+        c.drawImage(image, 0, 0);
+        const pixels = c.getImageData(0, 0, source.width, source.height);
+        return { width: source.width, height: source.height, data: pixels.data };
+      } finally { zeroCanvas(source); }
+    }
+    function releasePixels(source) {
+      if (source) { source.data = null; source.width = 0; source.height = 0; }
     }
     const dressingSheets = new Map();
     function dressingSheet(id) {
@@ -1546,23 +1555,14 @@
         made = document.createElement("canvas");
         made.width = cut.width;
         made.height = cut.height;
-        // Every new pose reads its masks and photograph before dyeing them. Keep
-        // this scratch canvas on the CPU from its first read; a GPU readback can
-        // block the TV's draw loop. The stadium and its layers stay accelerated.
+        // Crop the retained RGBA bytes without any canvas pixel reads. This
+        // also works on older TV browsers that ignore context readback hints.
+        // The stadium and its layers retain their existing drawing settings.
         const c = made.getContext("2d", { willReadFrequently: true });
-        let shares = null, gearShares = null;
-        if (mask) {
-          c.drawImage(mask, cut.x, cut.y, cut.w, cut.h, cut.ox, cut.oy, cut.w, cut.h);
-          shares = c.getImageData(0, 0, cut.width, cut.height).data;
-          c.clearRect(0, 0, cut.width, cut.height);
-        }
-        if (gearMask) {
-          c.drawImage(gearMask, cut.x, cut.y, cut.w, cut.h, cut.ox, cut.oy, cut.w, cut.h);
-          gearShares = c.getImageData(0, 0, cut.width, cut.height).data;
-          c.clearRect(0, 0, cut.width, cut.height);
-        }
-        c.drawImage(dressingSheet(cut.atlas), cut.x, cut.y, cut.w, cut.h, cut.ox, cut.oy, cut.w, cut.h);
-        const pixels = c.getImageData(0, 0, cut.width, cut.height);
+        const pixels = c.createImageData(cut.width, cut.height);
+        const shares = mask ? core.copyAtlasFrame(mask, cut, new Uint8ClampedArray(pixels.data.length)) : null;
+        const gearShares = gearMask ? core.copyAtlasFrame(gearMask, cut, new Uint8ClampedArray(pixels.data.length)) : null;
+        core.copyAtlasFrame(dressingSheet(cut.atlas), cut, pixels.data);
         const readAt = performance.now();
         core.dyeFrame(pixels.data, shares, look || null, gearShares, gearShares ? gear : null);
         const dyedAt = performance.now();
@@ -2954,6 +2954,7 @@
       if (!message || typeof message !== "object") return;
       switch (message.t) {
         case "hello":
+          hasHello = true;
           debug = message.debug === 1;
           // A width the phone or the bench asks for is kept as asked; else
           // the device's own plan, and a wide canvas is measured afresh.
@@ -3148,6 +3149,7 @@
     function release() {
       if (released) return;
       released = true;
+      hasHello = false;
       on = false;
       bitmaps.forEach((bitmap) => { try { if (bitmap.close) bitmap.close(); } catch (error) { /* gone */ } });
       bitmaps.clear();
@@ -3165,11 +3167,11 @@
       tinted.clear();
       dressed.forEach(empty);
       dressed.clear();
-      dressingSheets.forEach(empty);
+      dressingSheets.forEach(releasePixels);
       dressingSheets.clear();
-      maskSheets.forEach((entry) => empty(entry.image));
+      maskSheets.forEach((entry) => releasePixels(entry.image));
       maskSheets.clear();
-      gearSheets.forEach((entry) => empty(entry.image));
+      gearSheets.forEach((entry) => releasePixels(entry.image));
       gearSheets.clear();
       requestedKitSources = false; requestedGearSources = false;
       images.forEach(empty);
