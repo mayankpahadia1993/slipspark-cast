@@ -1564,7 +1564,10 @@
         const gearShares = gearMask ? core.copyAtlasFrame(gearMask, cut, new Uint8ClampedArray(pixels.data.length)) : null;
         core.copyAtlasFrame(dressingSheet(cut.atlas), cut, pixels.data);
         const readAt = performance.now();
-        core.dyeFrame(pixels.data, shares, look || null, gearShares, gearShares ? gear : null);
+        // The tiny CPU kernel avoids long JS pixel loops on older TV browsers.
+        // Unsupported/blocked WebAssembly keeps the identical JS recipe.
+        const fast = window.RallycadeDye && window.RallycadeDye.dyeFrame(pixels.data, shares, look || null, gearShares, gearShares ? gear : null);
+        if (!fast) core.dyeFrame(pixels.data, shares, look || null, gearShares, gearShares ? gear : null);
         const dyedAt = performance.now();
         c.putImageData(pixels, 0, 0);
         counters.dressMax = Math.max(counters.dressMax, performance.now() - started);
@@ -2955,6 +2958,7 @@
       switch (message.t) {
         case "hello":
           hasHello = true;
+          if (window.RallycadeDye) window.RallycadeDye.prepare();
           debug = message.debug === 1;
           // A width the phone or the bench asks for is kept as asked; else
           // the device's own plan, and a wide canvas is measured afresh.
@@ -3150,6 +3154,7 @@
       if (released) return;
       released = true;
       hasHello = false;
+      if (window.RallycadeDye) window.RallycadeDye.release();
       on = false;
       bitmaps.forEach((bitmap) => { try { if (bitmap.close) bitmap.close(); } catch (error) { /* gone */ } });
       bitmaps.clear();

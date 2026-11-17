@@ -1,23 +1,36 @@
 {
   "environment": "staging",
-  "commit": "3aa33904b99ef6d3c10db97776b117efb3bf656e",
-  "subject": "Avoid repeated pixel readbacks and unrelated kit decoding on Cast TVs",
-  "receiverTree": "b3a99dfdd26f6e11a99a1a4c6ec5181b0b2b1d67",
-  "revision": 102,
-  "deployedAt": "2026-11-17T18:09:00Z",
+  "commit": "2406bf335de80451bc8031d36102c60c74f5e1d9",
+  "subject": "Compile Cast kit colouring to avoid long JavaScript frame stalls",
+  "receiverTree": "0db5a4232e64ab7a68fb37f8a103fb2a75b969ba",
+  "revision": 103,
+  "deployedAt": "2026-11-17T18:25:36Z",
   "previous": {
-    "tree": "8f123c473309fcbb93e4d1fc6593c14b4a618acd",
+    "tree": "b3a99dfdd26f6e11a99a1a4c6ec5181b0b2b1d67",
     "changed": [
       "index.html",
-      "receiver-scene-core.js",
+      "receiver-dye.js",
+      "receiver-dye.wasm",
       "receiver-scene.js"
     ]
   },
   "earlier": [
     {
+      "tree": "8f123c473309fcbb93e4d1fc6593c14b4a618acd",
+      "changed": [
+        "index.html",
+        "receiver-dye.js",
+        "receiver-dye.wasm",
+        "receiver-scene-core.js",
+        "receiver-scene.js"
+      ]
+    },
+    {
       "tree": "480f0ca3e3db45e718505e2aadcc904da0944745",
       "changed": [
         "index.html",
+        "receiver-dye.js",
+        "receiver-dye.wasm",
         "receiver-scene-core.js",
         "receiver-scene.js"
       ]
@@ -26,6 +39,8 @@
       "tree": "79ba7528157131a90f76d9e0c6df67f7b4ccfe41",
       "changed": [
         "index.html",
+        "receiver-dye.js",
+        "receiver-dye.wasm",
         "receiver-scene-core.js",
         "receiver-scene.js"
       ]
@@ -34,14 +49,8 @@
       "tree": "945e16f06e06cf69bd049166fe922fdade72b55d",
       "changed": [
         "index.html",
-        "receiver-scene-core.js",
-        "receiver-scene.js"
-      ]
-    },
-    {
-      "tree": "cfdfa14fc52c964c5bd2c41f0d169d638991c2f1",
-      "changed": [
-        "index.html",
+        "receiver-dye.js",
+        "receiver-dye.wasm",
         "receiver-scene-core.js",
         "receiver-scene.js"
       ]
