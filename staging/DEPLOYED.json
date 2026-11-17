@@ -1,18 +1,25 @@
 {
   "environment": "staging",
-  "commit": "8197c55cb1551acfc6760c0192dc87a896573cf3",
-  "subject": "Decode Cast masks before drawing and isolate preparation cost",
-  "receiverTree": "480f0ca3e3db45e718505e2aadcc904da0944745",
-  "revision": 100,
-  "deployedAt": "2026-11-17T10:51:59Z",
+  "commit": "f5bd574bc23e1ceeaf709a3c410305caeedb3f90",
+  "subject": "Reuse decoded Cast pixel sources across batting poses",
+  "receiverTree": "8f123c473309fcbb93e4d1fc6593c14b4a618acd",
+  "revision": 101,
+  "deployedAt": "2026-11-17T11:01:36Z",
   "previous": {
-    "tree": "79ba7528157131a90f76d9e0c6df67f7b4ccfe41",
+    "tree": "480f0ca3e3db45e718505e2aadcc904da0944745",
     "changed": [
       "index.html",
       "receiver-scene.js"
     ]
   },
   "earlier": [
+    {
+      "tree": "79ba7528157131a90f76d9e0c6df67f7b4ccfe41",
+      "changed": [
+        "index.html",
+        "receiver-scene.js"
+      ]
+    },
     {
       "tree": "945e16f06e06cf69bd049166fe922fdade72b55d",
       "changed": [
@@ -31,15 +38,6 @@
       "tree": "2b0ba7b7e5727fa7a3e0308d1af7f748d52b368f",
       "changed": [
         "index.html",
-        "receiver-pickleball.js",
-        "receiver-scene.js"
-      ]
-    },
-    {
-      "tree": "f889101d2e49a77959b7a881795377b55901c8c0",
-      "changed": [
-        "index.html",
-        "receiver-pickleball-core.js",
         "receiver-pickleball.js",
         "receiver-scene.js"
       ]

@@ -459,7 +459,7 @@
         addSprites(sheet);
         warmSheet(sheet);
         // Its kit masks with it when the phone's hello named a dyed kit (receiver 73), before his first ball.
-        if (dressedKit()) maskSheet(id);
+        prepareDressingSheet(id);
       }).catch((error) => {
         // Each of its pictures from its own file, as before the atlases.
         sheet.failed = true;
@@ -605,7 +605,7 @@
       preloadGround = groundKey(ground);
       preloadViews = groundViews(views);
       // A dyed kit's batter on the inset: the atlases' kit masks now (receiver 73).
-      if (dressedKit() && !insetOff) sheets.forEach((sheet, id) => { if (sheet.image) maskSheet(id); });
+      if (!insetOff) sheets.forEach((sheet, id) => { if (sheet.image) prepareDressingSheet(id); });
       // This TV's own copies of pictures earlier casts sent too (receiver
       // 53): build 158's innings opened with 22–59 draws a second missing a
       // photo the TV had cached but not yet loaded.
@@ -1449,6 +1449,31 @@
     // Whether the phone's hello named a dyed kit: the masks load before the
     // first ball then; otherwise with the first look a command carries.
     function dressedKit() { return !!preloadKit && preloadKit !== "starter-whites"; }
+    function dressedGear() { return Array.from(helloPieces).some((key) => /(?:helmet-|pads-|bat-)/.test(key)); }
+    let requestedKitSources = false, requestedGearSources = false;
+    function prepareDressingSheet(id) {
+      if (dressedKit() || requestedKitSources) maskSheet(id);
+      if (dressedGear() || requestedGearSources) gearSheet(id);
+    }
+    // CPU drawing from an HTMLImage can still decode its whole atlas on a new
+    // crop, even when the destination is a readback canvas. Rasterize each source
+    // once during loading. At most three atlases and their two mask sets: 70 MiB
+    // at the bundled sizes; none on receivers that omit the inset. Masks keep
+    // this canvas instead of their HTMLImage. All are zeroed at release.
+    function readbackSource(image) {
+      const source = document.createElement("canvas");
+      source.width = image.naturalWidth || image.width;
+      source.height = image.naturalHeight || image.height;
+      const c = source.getContext("2d", { willReadFrequently: true });
+      c.drawImage(image, 0, 0);
+      c.getImageData(0, 0, 1, 1); // Flush deferred raster work now, before a pose needs it.
+      return source;
+    }
+    const dressingSheets = new Map();
+    function dressingSheet(id) {
+      if (!dressingSheets.has(id)) dressingSheets.set(id, readbackSource(sheets.get(id).image));
+      return dressingSheets.get(id);
+    }
     //
     // The bowler's-end inset's batter in the batting player's kit and grip
     // (core.readLook): each frame dyed once per look from its atlas and its
@@ -1473,7 +1498,7 @@
         if ((image.naturalWidth || image.width) !== sheet.width || (image.naturalHeight || image.height) !== sheet.height) {
           throw new Error("kit masks " + file + " are " + (image.naturalWidth || image.width) + "x" + (image.naturalHeight || image.height));
         }
-        if (!released) entry.image = image;
+        if (!released && maskSheets.get(id) === entry) { dressingSheet(id); entry.image = readbackSource(image); }
       }).catch((error) => { entry.failed = true; report("kit", error); });
       return null;
     }
@@ -1491,11 +1516,18 @@
         if ((image.naturalWidth || image.width) !== sheet.width || (image.naturalHeight || image.height) !== sheet.height) {
           throw new Error("gear masks " + file + " are " + (image.naturalWidth || image.width) + "x" + (image.naturalHeight || image.height));
         }
-        if (!released) entry.image = image;
+        if (!released && gearSheets.get(id) === entry) { dressingSheet(id); entry.image = readbackSource(image); }
       }).catch((error) => { entry.failed = true; report("gear", error); });
       return null;
     }
     function dress(drawn, wantedLook, wantedGear) {
+      if ((wantedLook && !requestedKitSources) || (wantedGear && !requestedGearSources)) {
+        requestedKitSources = requestedKitSources || !!wantedLook;
+        requestedGearSources = requestedGearSources || !!wantedGear;
+        // Older hellos omit the coming look. Once its first pose arrives, load
+        // every source so a later stroke does not decode another atlas mid-ball.
+        sheets.forEach((sheet, id) => { if (sheet.image) prepareDressingSheet(id); });
+      }
       // What can be worn now: the look once its masks are in, the gear once its are (each drawn as soon as it can be).
       const cut = drawn.cut, sheet = sheets.get(cut.atlas);
       const mask = wantedLook ? maskSheet(cut.atlas) : null;
@@ -1529,7 +1561,7 @@
           gearShares = c.getImageData(0, 0, cut.width, cut.height).data;
           c.clearRect(0, 0, cut.width, cut.height);
         }
-        c.drawImage(sheet.image, cut.x, cut.y, cut.w, cut.h, cut.ox, cut.oy, cut.w, cut.h);
+        c.drawImage(dressingSheet(cut.atlas), cut.x, cut.y, cut.w, cut.h, cut.ox, cut.oy, cut.w, cut.h);
         const pixels = c.getImageData(0, 0, cut.width, cut.height);
         const readAt = performance.now();
         core.dyeFrame(pixels.data, shares, look || null, gearShares, gearShares ? gear : null);
@@ -3133,7 +3165,13 @@
       tinted.clear();
       dressed.forEach(empty);
       dressed.clear();
+      dressingSheets.forEach(empty);
+      dressingSheets.clear();
+      maskSheets.forEach((entry) => empty(entry.image));
       maskSheets.clear();
+      gearSheets.forEach((entry) => empty(entry.image));
+      gearSheets.clear();
+      requestedKitSources = false; requestedGearSources = false;
       images.forEach(empty);
       images.clear();
       backdropLayers.forEach((entry) => { try { entry.element.removeAttribute("src"); } catch (error) { /* gone */ } });
