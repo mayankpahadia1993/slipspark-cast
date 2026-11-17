@@ -126,10 +126,12 @@
     // A picture arrived or the screen changed size: draw the frame again.
     let needsRedraw = false;
     let lastAck = 0;
+    let lastAcknowledgedStamp = null;
     let lastStats = 0;
     let lastNeed = 0;
     let readyToAnswer = false;
     let pendingHello = false;
+    let hasHello = false;
     let helloKit = null;
     // The grounds (docs/grounds.md): the plate the phone's hello names ("ground-<id>-1672x941"; nil the classic
     // stadium). Only that ground's picture loads with the stadium; the other grounds' load only if a frame draws them.
@@ -141,7 +143,7 @@
     // in their keys): those this TV keeps load with the stadium's first pictures, so a re-cast's look is here at once.
     let helloPieces = new Set();
     // `received` (receiver 83): the phone's pictures decoded since the last report (core.warmReport).
-    const counters = { draws: 0, blended: 0, frames: 0, late: [], drawMs: [], missing: 0, redraws: 0, gaps: [], live: 0, pose: [], ahead: [], eff: [],
+    const counters = { draws: 0, blended: 0, frames: 0, late: [], drawMs: [], dressMax: 0, dressReadMax: 0, dressDyeMax: 0, dressed: 0, missing: 0, redraws: 0, gaps: [], live: 0, pose: [], ahead: [], eff: [],
       js: 0, long: 0, lag: [], partly: 0, stale: [], received: 0 };
 
     // What the page's thread does besides drawing (Oct 19 2026): `js`, the
@@ -458,7 +460,7 @@
         addSprites(sheet);
         warmSheet(sheet);
         // Its kit masks with it when the phone's hello named a dyed kit (receiver 73), before his first ball.
-        if (dressedKit()) maskSheet(id);
+        prepareDressingSheet(id);
       }).catch((error) => {
         // Each of its pictures from its own file, as before the atlases.
         sheet.failed = true;
@@ -600,16 +602,20 @@
     const START_RANK = 6;
     function isStart(key) { return preloadRank(key) <= START_RANK; }
     function preloadBundled(kit, ground, views) {
-      if (typeof kit === "string" && /^[a-z0-9-]{1,40}$/.test(kit)) preloadKit = kit;
+      preloadKit = typeof kit === "string" && /^[a-z0-9-]{1,40}$/.test(kit) ? kit : null;
       preloadGround = groundKey(ground);
       preloadViews = groundViews(views);
       // A dyed kit's batter on the inset: the atlases' kit masks now (receiver 73).
-      if (dressedKit() && !insetOff) sheets.forEach((sheet, id) => { if (sheet.image) maskSheet(id); });
+      if (!insetOff) sheets.forEach((sheet, id) => { if (sheet.image) prepareDressingSheet(id); });
       // This TV's own copies of pictures earlier casts sent too (receiver
       // 53): build 158's innings opened with 22–59 draws a second missing a
       // photo the TV had cached but not yet loaded.
       const byRank = (a, b) => preloadRank(a) - preloadRank(b);
-      const extra = Array.from(cached).filter((key) => !bundled.has(key)).sort(byRank).slice(0, MAX_CACHED_PRELOAD);
+      // Before hello there is no known wardrobe. A current phone names its
+      // exact pieces: older casts' kits must not occupy startup decode slots.
+      // Legacy phones without pieces retain their kit-based ordering.
+      const relevant = (key) => !isDressedPiece(key) || (hasHello && (!helloPieces.size || helloPieces.has(key)));
+      const extra = Array.from(cached).filter((key) => !bundled.has(key) && relevant(key)).sort(byRank).slice(0, MAX_CACHED_PRELOAD);
       // A weak dongle draws no bowler's-end inset (the phone leaves it out): neither the classic view nor a ground's.
       // Grounds: only the named one and its views, and then not the classic stadium's photos (a weak Chromecast keeps
       // one plate), nor the classic pictures its views stand in for (receiver 82).
@@ -1448,6 +1454,35 @@
     // Whether the phone's hello named a dyed kit: the masks load before the
     // first ball then; otherwise with the first look a command carries.
     function dressedKit() { return !!preloadKit && preloadKit !== "starter-whites"; }
+    function dressedGear() { return Array.from(helloPieces).some((key) => /(?:helmet-|pads-|bat-)/.test(key)); }
+    let requestedKitSources = false, requestedGearSources = false;
+    function prepareDressingSheet(id) {
+      if (dressedKit() || requestedKitSources) maskSheet(id);
+      if (dressedGear() || requestedGearSources) gearSheet(id);
+    }
+    // Read each atlas once during loading. Older Chromecast browsers ignore
+    // willReadFrequently; retaining a canvas still makes every new pose read
+    // pixels back from the GPU. Keep only its RGBA bytes and release the canvas
+    // immediately. The three photographs and six masks remain under 70 MiB.
+    function readbackSource(image) {
+      const source = document.createElement("canvas");
+      source.width = image.naturalWidth || image.width;
+      source.height = image.naturalHeight || image.height;
+      try {
+        const c = source.getContext("2d", { willReadFrequently: true });
+        c.drawImage(image, 0, 0);
+        const pixels = c.getImageData(0, 0, source.width, source.height);
+        return { width: source.width, height: source.height, data: pixels.data };
+      } finally { zeroCanvas(source); }
+    }
+    function releasePixels(source) {
+      if (source) { source.data = null; source.width = 0; source.height = 0; }
+    }
+    const dressingSheets = new Map();
+    function dressingSheet(id) {
+      if (!dressingSheets.has(id)) dressingSheets.set(id, readbackSource(sheets.get(id).image));
+      return dressingSheets.get(id);
+    }
     //
     // The bowler's-end inset's batter in the batting player's kit and grip
     // (core.readLook): each frame dyed once per look from its atlas and its
@@ -1468,11 +1503,11 @@
       const entry = { image: null, failed: false };
       maskSheets.set(id, entry);
       const file = sheet.file.replace(/^atlas-bowler-end-/, "kit-masks-bowler-end-");
-      keptURL("scene-images/" + file).then((url) => loadImage(url, false)).then((image) => {
+      keptURL("scene-images/" + file).then((url) => loadImage(url)).then((image) => {
         if ((image.naturalWidth || image.width) !== sheet.width || (image.naturalHeight || image.height) !== sheet.height) {
           throw new Error("kit masks " + file + " are " + (image.naturalWidth || image.width) + "x" + (image.naturalHeight || image.height));
         }
-        if (!released) entry.image = image;
+        if (!released && maskSheets.get(id) === entry) { dressingSheet(id); entry.image = readbackSource(image); }
       }).catch((error) => { entry.failed = true; report("kit", error); });
       return null;
     }
@@ -1486,15 +1521,22 @@
       const entry = { image: null, failed: false };
       gearSheets.set(id, entry);
       const file = sheet.file.replace(/^atlas-bowler-end-/, "gear-masks-bowler-end-");
-      keptURL("scene-images/" + file).then((url) => loadImage(url, false)).then((image) => {
+      keptURL("scene-images/" + file).then((url) => loadImage(url)).then((image) => {
         if ((image.naturalWidth || image.width) !== sheet.width || (image.naturalHeight || image.height) !== sheet.height) {
           throw new Error("gear masks " + file + " are " + (image.naturalWidth || image.width) + "x" + (image.naturalHeight || image.height));
         }
-        if (!released) entry.image = image;
+        if (!released && gearSheets.get(id) === entry) { dressingSheet(id); entry.image = readbackSource(image); }
       }).catch((error) => { entry.failed = true; report("gear", error); });
       return null;
     }
     function dress(drawn, wantedLook, wantedGear) {
+      if ((wantedLook && !requestedKitSources) || (wantedGear && !requestedGearSources)) {
+        requestedKitSources = requestedKitSources || !!wantedLook;
+        requestedGearSources = requestedGearSources || !!wantedGear;
+        // Older hellos omit the coming look. Once its first pose arrives, load
+        // every source so a later stroke does not decode another atlas mid-ball.
+        sheets.forEach((sheet, id) => { if (sheet.image) prepareDressingSheet(id); });
+      }
       // What can be worn now: the look once its masks are in, the gear once its are (each drawn as soon as it can be).
       const cut = drawn.cut, sheet = sheets.get(cut.atlas);
       const mask = wantedLook ? maskSheet(cut.atlas) : null;
@@ -1509,25 +1551,29 @@
         return { image: made, size: drawn.size, key: id };
       }
       try {
+        const started = performance.now();
         made = document.createElement("canvas");
         made.width = cut.width;
         made.height = cut.height;
-        const c = made.getContext("2d");
-        let shares = null, gearShares = null;
-        if (mask) {
-          c.drawImage(mask, cut.x, cut.y, cut.w, cut.h, cut.ox, cut.oy, cut.w, cut.h);
-          shares = c.getImageData(0, 0, cut.width, cut.height).data;
-          c.clearRect(0, 0, cut.width, cut.height);
-        }
-        if (gearMask) {
-          c.drawImage(gearMask, cut.x, cut.y, cut.w, cut.h, cut.ox, cut.oy, cut.w, cut.h);
-          gearShares = c.getImageData(0, 0, cut.width, cut.height).data;
-          c.clearRect(0, 0, cut.width, cut.height);
-        }
-        c.drawImage(sheet.image, cut.x, cut.y, cut.w, cut.h, cut.ox, cut.oy, cut.w, cut.h);
-        const pixels = c.getImageData(0, 0, cut.width, cut.height);
-        core.dyeFrame(pixels.data, shares, look || null, gearShares, gearShares ? gear : null);
+        // Crop the retained RGBA bytes without any canvas pixel reads. This
+        // also works on older TV browsers that ignore context readback hints.
+        // The stadium and its layers retain their existing drawing settings.
+        const c = made.getContext("2d", { willReadFrequently: true });
+        const pixels = c.createImageData(cut.width, cut.height);
+        const shares = mask ? core.copyAtlasFrame(mask, cut, new Uint8ClampedArray(pixels.data.length)) : null;
+        const gearShares = gearMask ? core.copyAtlasFrame(gearMask, cut, new Uint8ClampedArray(pixels.data.length)) : null;
+        core.copyAtlasFrame(dressingSheet(cut.atlas), cut, pixels.data);
+        const readAt = performance.now();
+        // The tiny CPU kernel avoids long JS pixel loops on older TV browsers.
+        // Unsupported/blocked WebAssembly keeps the identical JS recipe.
+        const fast = window.RallycadeDye && window.RallycadeDye.dyeFrame(pixels.data, shares, look || null, gearShares, gearShares ? gear : null);
+        if (!fast) core.dyeFrame(pixels.data, shares, look || null, gearShares, gearShares ? gear : null);
+        const dyedAt = performance.now();
         c.putImageData(pixels, 0, 0);
+        counters.dressMax = Math.max(counters.dressMax, performance.now() - started);
+        counters.dressReadMax = Math.max(counters.dressReadMax, readAt - started);
+        counters.dressDyeMax = Math.max(counters.dressDyeMax, dyedAt - readAt);
+        counters.dressed += 1;
       } catch (error) {
         report("kit", error);
         return null;
@@ -2672,8 +2718,13 @@
     function housekeeping(local) {
       // Receiver 77: the start's pictures still to come (the rest waits, restWaits).
       if (preloadQueue.length && preloading < 3) pumpSome();
-      if (local - lastAck >= 250) {
+      // An ack means a new stadium frame was drawn, not merely that this
+      // page's timer is alive. A blocked sender can still receive messages:
+      // repeating the last stamp hid frozen Google TV pictures from both
+      // phones' 1.5 s timeout and let the match continue behind them.
+      if (local - lastAck >= 250 && lastStamp != null && lastStamp !== lastAcknowledgedStamp) {
         lastAck = local;
+        lastAcknowledgedStamp = lastStamp;
         send({ t: "ack", s: lastStamp, q: timeline.length });
       }
       if (wanted.size && local - lastNeed >= 300) {
@@ -2691,6 +2742,8 @@
           behind: Math.round(core.percentile(counters.late, 0.9)),
           drawMs: Number(core.percentile(counters.drawMs, 0.5).toFixed(1)),
           drawMax: Number(Math.max(0, ...counters.drawMs).toFixed(1)),
+          dressMax: Number(counters.dressMax.toFixed(1)), dressed: counters.dressed,
+          dressReadMax: Number(counters.dressReadMax.toFixed(1)), dressDyeMax: Number(counters.dressDyeMax.toFixed(1)),
           missing: counters.missing, images: images.size, warmed: warmed.size, cached: staticLayer.hits, rebuilt: staticLayer.built, bitmaps: bitmaps.size, queue: timeline.length,
           // How glows are blurred (receiver 57): as shadows, or in small canvases.
           glow: tune.blur === "filter" ? "filter" : tune.blur === "off" ? "off" : castsOffstageShadows() ? "shadow" : "scratch",
@@ -2734,7 +2787,7 @@
         if (debug) setDebug(stats);
         counters.received = 0;
         counters.draws = 0; counters.blended = 0; counters.frames = 0; counters.redraws = 0;
-        counters.late = []; counters.drawMs = []; counters.missing = 0; counters.gaps = [];
+        counters.late = []; counters.drawMs = []; counters.dressMax = 0; counters.dressReadMax = 0; counters.dressDyeMax = 0; counters.dressed = 0; counters.missing = 0; counters.gaps = [];
         counters.live = 0; counters.pose = []; counters.ahead = []; counters.eff = [];
         counters.js = 0; counters.long = 0; counters.lag = [];
         counters.partly = 0; counters.stale = [];
@@ -2794,6 +2847,8 @@
       holding = false;
       if (!!value && !on) {
         dropWarmCanvas();
+        lastStamp = null;
+        lastAcknowledgedStamp = null;
         if (rehearsal.wanted || rehearsal.canvas) endRehearsal();
         wholeSent = false;
         steadyWatch.reset();
@@ -2902,6 +2957,8 @@
       if (!message || typeof message !== "object") return;
       switch (message.t) {
         case "hello":
+          hasHello = true;
+          if (window.RallycadeDye) window.RallycadeDye.prepare();
           debug = message.debug === 1;
           // A width the phone or the bench asks for is kept as asked; else
           // the device's own plan, and a wide canvas is measured afresh.
@@ -2919,6 +2976,7 @@
           timeline.reset();
           live.clear();
           lastStamp = null;
+          lastAcknowledgedStamp = null;
           wholeSent = false;
           // Receiver 60: the phone's kit, whose cached pieces load with the batter's.
           helloKit = typeof message.kit === "string" ? message.kit : null;
@@ -3095,6 +3153,8 @@
     function release() {
       if (released) return;
       released = true;
+      hasHello = false;
+      if (window.RallycadeDye) window.RallycadeDye.release();
       on = false;
       bitmaps.forEach((bitmap) => { try { if (bitmap.close) bitmap.close(); } catch (error) { /* gone */ } });
       bitmaps.clear();
@@ -3112,7 +3172,13 @@
       tinted.clear();
       dressed.forEach(empty);
       dressed.clear();
+      dressingSheets.forEach(releasePixels);
+      dressingSheets.clear();
+      maskSheets.forEach((entry) => releasePixels(entry.image));
       maskSheets.clear();
+      gearSheets.forEach((entry) => releasePixels(entry.image));
+      gearSheets.clear();
+      requestedKitSources = false; requestedGearSources = false;
       images.forEach(empty);
       images.clear();
       backdropLayers.forEach((entry) => { try { entry.element.removeAttribute("src"); } catch (error) { /* gone */ } });
