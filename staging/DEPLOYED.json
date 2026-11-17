@@ -1,18 +1,25 @@
 {
   "environment": "staging",
-  "commit": "e7221db0c5c0e07be36dd0cfbeaaca65b425afd3",
-  "subject": "Avoid GPU readback when preparing dressed Cast poses",
-  "receiverTree": "79ba7528157131a90f76d9e0c6df67f7b4ccfe41",
-  "revision": 99,
-  "deployedAt": "2026-11-17T10:45:37Z",
+  "commit": "8197c55cb1551acfc6760c0192dc87a896573cf3",
+  "subject": "Decode Cast masks before drawing and isolate preparation cost",
+  "receiverTree": "480f0ca3e3db45e718505e2aadcc904da0944745",
+  "revision": 100,
+  "deployedAt": "2026-11-17T10:51:59Z",
   "previous": {
-    "tree": "945e16f06e06cf69bd049166fe922fdade72b55d",
+    "tree": "79ba7528157131a90f76d9e0c6df67f7b4ccfe41",
     "changed": [
       "index.html",
       "receiver-scene.js"
     ]
   },
   "earlier": [
+    {
+      "tree": "945e16f06e06cf69bd049166fe922fdade72b55d",
+      "changed": [
+        "index.html",
+        "receiver-scene.js"
+      ]
+    },
     {
       "tree": "cfdfa14fc52c964c5bd2c41f0d169d638991c2f1",
       "changed": [
@@ -30,15 +37,6 @@
     },
     {
       "tree": "f889101d2e49a77959b7a881795377b55901c8c0",
-      "changed": [
-        "index.html",
-        "receiver-pickleball-core.js",
-        "receiver-pickleball.js",
-        "receiver-scene.js"
-      ]
-    },
-    {
-      "tree": "1ebead2eea9647ae878ba2bf2c8b284ddf6edbfb",
       "changed": [
         "index.html",
         "receiver-pickleball-core.js",

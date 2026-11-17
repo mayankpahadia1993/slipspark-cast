@@ -142,7 +142,7 @@
     // in their keys): those this TV keeps load with the stadium's first pictures, so a re-cast's look is here at once.
     let helloPieces = new Set();
     // `received` (receiver 83): the phone's pictures decoded since the last report (core.warmReport).
-    const counters = { draws: 0, blended: 0, frames: 0, late: [], drawMs: [], dressMax: 0, dressed: 0, missing: 0, redraws: 0, gaps: [], live: 0, pose: [], ahead: [], eff: [],
+    const counters = { draws: 0, blended: 0, frames: 0, late: [], drawMs: [], dressMax: 0, dressReadMax: 0, dressDyeMax: 0, dressed: 0, missing: 0, redraws: 0, gaps: [], live: 0, pose: [], ahead: [], eff: [],
       js: 0, long: 0, lag: [], partly: 0, stale: [], received: 0 };
 
     // What the page's thread does besides drawing (Oct 19 2026): `js`, the
@@ -1469,7 +1469,7 @@
       const entry = { image: null, failed: false };
       maskSheets.set(id, entry);
       const file = sheet.file.replace(/^atlas-bowler-end-/, "kit-masks-bowler-end-");
-      keptURL("scene-images/" + file).then((url) => loadImage(url, false)).then((image) => {
+      keptURL("scene-images/" + file).then((url) => loadImage(url)).then((image) => {
         if ((image.naturalWidth || image.width) !== sheet.width || (image.naturalHeight || image.height) !== sheet.height) {
           throw new Error("kit masks " + file + " are " + (image.naturalWidth || image.width) + "x" + (image.naturalHeight || image.height));
         }
@@ -1487,7 +1487,7 @@
       const entry = { image: null, failed: false };
       gearSheets.set(id, entry);
       const file = sheet.file.replace(/^atlas-bowler-end-/, "gear-masks-bowler-end-");
-      keptURL("scene-images/" + file).then((url) => loadImage(url, false)).then((image) => {
+      keptURL("scene-images/" + file).then((url) => loadImage(url)).then((image) => {
         if ((image.naturalWidth || image.width) !== sheet.width || (image.naturalHeight || image.height) !== sheet.height) {
           throw new Error("gear masks " + file + " are " + (image.naturalWidth || image.width) + "x" + (image.naturalHeight || image.height));
         }
@@ -1531,9 +1531,13 @@
         }
         c.drawImage(sheet.image, cut.x, cut.y, cut.w, cut.h, cut.ox, cut.oy, cut.w, cut.h);
         const pixels = c.getImageData(0, 0, cut.width, cut.height);
+        const readAt = performance.now();
         core.dyeFrame(pixels.data, shares, look || null, gearShares, gearShares ? gear : null);
+        const dyedAt = performance.now();
         c.putImageData(pixels, 0, 0);
         counters.dressMax = Math.max(counters.dressMax, performance.now() - started);
+        counters.dressReadMax = Math.max(counters.dressReadMax, readAt - started);
+        counters.dressDyeMax = Math.max(counters.dressDyeMax, dyedAt - readAt);
         counters.dressed += 1;
       } catch (error) {
         report("kit", error);
@@ -2704,6 +2708,7 @@
           drawMs: Number(core.percentile(counters.drawMs, 0.5).toFixed(1)),
           drawMax: Number(Math.max(0, ...counters.drawMs).toFixed(1)),
           dressMax: Number(counters.dressMax.toFixed(1)), dressed: counters.dressed,
+          dressReadMax: Number(counters.dressReadMax.toFixed(1)), dressDyeMax: Number(counters.dressDyeMax.toFixed(1)),
           missing: counters.missing, images: images.size, warmed: warmed.size, cached: staticLayer.hits, rebuilt: staticLayer.built, bitmaps: bitmaps.size, queue: timeline.length,
           // How glows are blurred (receiver 57): as shadows, or in small canvases.
           glow: tune.blur === "filter" ? "filter" : tune.blur === "off" ? "off" : castsOffstageShadows() ? "shadow" : "scratch",
@@ -2747,7 +2752,7 @@
         if (debug) setDebug(stats);
         counters.received = 0;
         counters.draws = 0; counters.blended = 0; counters.frames = 0; counters.redraws = 0;
-        counters.late = []; counters.drawMs = []; counters.dressMax = 0; counters.dressed = 0; counters.missing = 0; counters.gaps = [];
+        counters.late = []; counters.drawMs = []; counters.dressMax = 0; counters.dressReadMax = 0; counters.dressDyeMax = 0; counters.dressed = 0; counters.missing = 0; counters.gaps = [];
         counters.live = 0; counters.pose = []; counters.ahead = []; counters.eff = [];
         counters.js = 0; counters.long = 0; counters.lag = [];
         counters.partly = 0; counters.stale = [];
