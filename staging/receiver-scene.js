@@ -126,6 +126,7 @@
     // A picture arrived or the screen changed size: draw the frame again.
     let needsRedraw = false;
     let lastAck = 0;
+    let lastAcknowledgedStamp = null;
     let lastStats = 0;
     let lastNeed = 0;
     let readyToAnswer = false;
@@ -2672,8 +2673,13 @@
     function housekeeping(local) {
       // Receiver 77: the start's pictures still to come (the rest waits, restWaits).
       if (preloadQueue.length && preloading < 3) pumpSome();
-      if (local - lastAck >= 250) {
+      // An ack means a new stadium frame was drawn, not merely that this
+      // page's timer is alive. A blocked sender can still receive messages:
+      // repeating the last stamp hid frozen Google TV pictures from both
+      // phones' 1.5 s timeout and let the match continue behind them.
+      if (local - lastAck >= 250 && lastStamp != null && lastStamp !== lastAcknowledgedStamp) {
         lastAck = local;
+        lastAcknowledgedStamp = lastStamp;
         send({ t: "ack", s: lastStamp, q: timeline.length });
       }
       if (wanted.size && local - lastNeed >= 300) {
@@ -2794,6 +2800,8 @@
       holding = false;
       if (!!value && !on) {
         dropWarmCanvas();
+        lastStamp = null;
+        lastAcknowledgedStamp = null;
         if (rehearsal.wanted || rehearsal.canvas) endRehearsal();
         wholeSent = false;
         steadyWatch.reset();
@@ -2919,6 +2927,7 @@
           timeline.reset();
           live.clear();
           lastStamp = null;
+          lastAcknowledgedStamp = null;
           wholeSent = false;
           // Receiver 60: the phone's kit, whose cached pieces load with the batter's.
           helloKit = typeof message.kit === "string" ? message.kit : null;

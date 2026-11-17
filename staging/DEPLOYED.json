@@ -1,45 +1,51 @@
 {
   "environment": "staging",
-  "commit": "7d73adb4469fccb4d2f6bfc3eaf6cf1f849bedf2",
-  "subject": "Pickleball on a Chromecast: a sheet refused once is asked for again; receiver 97's start written up with the Ultra's numbers",
-  "receiverTree": "cfdfa14fc52c964c5bd2c41f0d169d638991c2f1",
-  "revision": 97,
-  "deployedAt": "2026-11-14T19:54:05Z",
+  "commit": "49763b7a42f3ead7a985263ef6be283e95ffc7f6",
+  "subject": "Make Cast acknowledgements prove fresh stadium drawing",
+  "receiverTree": "945e16f06e06cf69bd049166fe922fdade72b55d",
+  "revision": 98,
+  "deployedAt": "2026-11-17T10:13:25Z",
   "previous": {
-    "tree": "2b0ba7b7e5727fa7a3e0308d1af7f748d52b368f",
+    "tree": "cfdfa14fc52c964c5bd2c41f0d169d638991c2f1",
     "changed": [
-      "receiver-pickleball.js"
+      "index.html",
+      "receiver-scene.js"
     ]
   },
   "earlier": [
     {
+      "tree": "2b0ba7b7e5727fa7a3e0308d1af7f748d52b368f",
+      "changed": [
+        "index.html",
+        "receiver-pickleball.js",
+        "receiver-scene.js"
+      ]
+    },
+    {
       "tree": "f889101d2e49a77959b7a881795377b55901c8c0",
       "changed": [
+        "index.html",
         "receiver-pickleball-core.js",
-        "receiver-pickleball.js"
+        "receiver-pickleball.js",
+        "receiver-scene.js"
       ]
     },
     {
       "tree": "1ebead2eea9647ae878ba2bf2c8b284ddf6edbfb",
       "changed": [
+        "index.html",
         "receiver-pickleball-core.js",
-        "receiver-pickleball.js"
+        "receiver-pickleball.js",
+        "receiver-scene.js"
       ]
     },
     {
       "tree": "2074d72ca67b4bea2151771eb6c5ca210aec5f07",
       "changed": [
-        "receiver-pickleball-core.js",
-        "receiver-pickleball.js"
-      ]
-    },
-    {
-      "tree": "b617b28718f613d1c6a2225e202a945990d2b365",
-      "changed": [
         "index.html",
         "receiver-pickleball-core.js",
         "receiver-pickleball.js",
-        "receiver.css"
+        "receiver-scene.js"
       ]
     }
   ]
