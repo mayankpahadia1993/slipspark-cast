@@ -1,18 +1,25 @@
 {
   "environment": "staging",
-  "commit": "49763b7a42f3ead7a985263ef6be283e95ffc7f6",
-  "subject": "Make Cast acknowledgements prove fresh stadium drawing",
-  "receiverTree": "945e16f06e06cf69bd049166fe922fdade72b55d",
-  "revision": 98,
-  "deployedAt": "2026-11-17T10:13:25Z",
+  "commit": "e7221db0c5c0e07be36dd0cfbeaaca65b425afd3",
+  "subject": "Avoid GPU readback when preparing dressed Cast poses",
+  "receiverTree": "79ba7528157131a90f76d9e0c6df67f7b4ccfe41",
+  "revision": 99,
+  "deployedAt": "2026-11-17T10:45:37Z",
   "previous": {
-    "tree": "cfdfa14fc52c964c5bd2c41f0d169d638991c2f1",
+    "tree": "945e16f06e06cf69bd049166fe922fdade72b55d",
     "changed": [
       "index.html",
       "receiver-scene.js"
     ]
   },
   "earlier": [
+    {
+      "tree": "cfdfa14fc52c964c5bd2c41f0d169d638991c2f1",
+      "changed": [
+        "index.html",
+        "receiver-scene.js"
+      ]
+    },
     {
       "tree": "2b0ba7b7e5727fa7a3e0308d1af7f748d52b368f",
       "changed": [
@@ -32,15 +39,6 @@
     },
     {
       "tree": "1ebead2eea9647ae878ba2bf2c8b284ddf6edbfb",
-      "changed": [
-        "index.html",
-        "receiver-pickleball-core.js",
-        "receiver-pickleball.js",
-        "receiver-scene.js"
-      ]
-    },
-    {
-      "tree": "2074d72ca67b4bea2151771eb6c5ca210aec5f07",
       "changed": [
         "index.html",
         "receiver-pickleball-core.js",
