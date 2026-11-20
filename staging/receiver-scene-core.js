@@ -41,7 +41,10 @@
   // backing, the plate's view, the parts, the frame and its label. Parts:
   // ["i", key, matrix, A] a picture; ["e", [cx, cy, rx, ry], C] a filled
   // ellipse; ["w", [x, y, height, gap, width, outline, bail], splay, bails]
-  // the stumps; ["o", [cx, cy, r, ring], [sx, sy]] the ball and its shadow.
+  // the stumps; ["o", [cx, cy, r, ring], [sx, sy]] the ball and its shadow. From Nov 19 2026 the phone also sends the
+  // wood wicket, ["k", [[ax, ay, bx, by, wa, wb, spike] x 3], [[ax, ay, bx, by, w] x 2], look]: each stump from its foot
+  // (or its spike's tip once knocked out) to its top, each bail from its short end on middle stump to its long end,
+  // varnished ash (look 0) or LED plastic (1); a command with it skips its "w" (core BowlersEndCommand.wood).
   // A frame whose inset is unchanged says ["n"]: the last command's drawing, kept here (frames are read in the
   // order the phone sent them; it sends the command whole after a redraw, a lost frame and every 15 frames).
   let heldInset = null;
@@ -66,6 +69,10 @@
   const INSET_PLATE_WIDTH = 660;
   const INSET_INK = [18, 43, 38];
   const INSET_CREAM = [252, 245, 222];
+  // The wood wicket's varnished ash (shared/stadium/wicket.json look.wood, warmed as core WicketArt tints it): its dark
+  // rim, its light tone, its shade and the soil on a knocked-out stump's spike; the LED look's plastic.
+  const WOOD = { rim: [128, 105, 64], light: [228, 209, 160], shade: [154, 127, 82], soil: [94, 64, 38] };
+  const PLASTIC = { rim: [14, 31, 76], light: [31, 69, 168], shade: [22, 48, 118], soil: [94, 64, 38] };
   const INSET_BALL = [[0, [255, 107, 92, 1000]], [500, [255, 92, 82, 1000]], [1000, [128, 20, 20, 1000]]];
 
   function insetEllipse(cx, cy, rx, ry) {
@@ -212,6 +219,7 @@
     const fill = (shape, color, share) => ["f", A(share == null ? 1 : share), "source-over", shape[0], shape[1], ["c", color], 0, -1, -1];
     const line = (points, color, width, cap) => ["s", A(1), "source-over", "ML", points.map(P), ["c", color], [P(width), cap, 0, P(10)], [], 0, -1, -1];
     out.push(fill(insetRounded(x - edge, y - edge, w + edge * 2, h + edge * 2, edge * 2), INSET_INK.concat(920)));
+    const wood = parts.some((part) => isArray(part) && part[0] === "k" && isArray(part[1]) && part[1].length === 3);
     if (typeof op[3] === "string") out.push(["i", A(1), "source-over", op[3], [Math.round(k * 10000), 0, 0, Math.round(k * 10000), P(x), P(y)], -1, -1]);
     for (const part of parts) {
       if (!isArray(part)) continue;
@@ -224,7 +232,35 @@
       } else if (part[0] === "e" && isArray(part[1]) && part[1].length === 4 && isArray(part[2])) {
         const [cx, cy, rx, ry] = part[1].map((v) => Number(v) / 10);
         out.push(fill(insetEllipse(cx, cy, rx, ry), part[2]));
-      } else if (part[0] === "w" && isArray(part[1]) && part[1].length === 7) {
+      } else if (part[0] === "k" && isArray(part[1]) && isArray(part[2])) {
+        // The wood wicket at the inset's few pixels a stump: the dark rim (its shadow side, so it reads on the pitch),
+        // then the wood's light tone, a shade down one side once it is wider; a knocked-out stump's spike soil-stained.
+        const tone = Number(part[3]) === 1 ? PLASTIC : WOOD;
+        part[1].forEach((stump) => {
+          if (!isArray(stump) || stump.length !== 7) return;
+          const [ax, ay, bx, by, wa, wb] = stump.slice(0, 6).map((v) => Number(v) / 10);
+          if (![ax, ay, bx, by, wa, wb].every(Number.isFinite)) return;
+          const width = Math.max(1.4 * k, wa, wb), spike = Number(stump[6]) === 1, rim = Math.max(0.6 * k, width * 0.4);
+          const foot = spike ? [ax + (bx - ax) * 0.12, ay + (by - ay) * 0.12] : [ax, ay];
+          // The sunlit wood with its dark rim beside it on the shadow side (as the phone's WicketArt draws a small stump).
+          const l = Math.hypot(bx - ax, by - ay) || 1, off = (width + rim) / 2, nx = -(by - ay) / l * off, ny = (bx - ax) / l * off;
+          out.push(line([ax - nx, ay - ny, bx - nx, by - ny], tone.rim.concat(750), rim, 0));
+          out.push(line(foot.concat([bx, by]), tone.light.concat(1000), width, 0));
+          if (width >= 3 * k) {
+            const sx = -(by - ay) / l * width * 0.3, sy = (bx - ax) / l * width * 0.3;
+            out.push(line([foot[0] - sx, foot[1] - sy, bx - sx, by - sy], tone.shade.concat(800), width * 0.3, 0));
+          }
+          if (spike) out.push(line([ax, ay].concat(foot), tone.soil.concat(900), width * 0.8, 0));
+        });
+        part[2].forEach((bail) => {
+          if (!isArray(bail) || bail.length !== 5) return;
+          const [ax, ay, bx, by, bw] = bail.map((v) => Number(v) / 10);
+          if (![ax, ay, bx, by, bw].every(Number.isFinite)) return;
+          const width = Math.max(0.9 * k, bw);
+          out.push(line([ax, ay, bx, by], tone.rim.concat(750), width + 0.8 * k, 1));
+          out.push(line([ax, ay, bx, by], tone.light.concat(1000), width, 1));
+        });
+      } else if (part[0] === "w" && !wood && isArray(part[1]) && part[1].length === 7) {
         const [bx, by, height, gap, width, outline, bail] = part[1].map((v) => Number(v) / 10);
         const splay = Number(part[2]) / 1000 || 0, bails = Number(part[3]) / 1000 || 0;
         for (let index = -1; index <= 1; index += 1) {
@@ -362,6 +398,10 @@
       else if (op[0] === "s" && index === 6 && isArray(op[6])) parts.push("g" + op[6].length + ":" + op[6][1] + ":" + op[6][2]);
       else walkShape(op[index], parts);
     }
+    // A picture drawn mirrored (Nov 19 2026: the bowler's run-on steps on the other foot, the same photograph flipped) is
+    // another one: blending it into the unmirrored one would squash it through zero width between two frames.
+    const m = op[0] === "i" ? op[4] : null;
+    if (isArray(m) && m.length >= 4 && m[0] * m[3] - m[1] * m[2] < 0) parts.push("~");
     shape = parts.join("");
     opShapes.set(op, shape);
     return shape;

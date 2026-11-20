@@ -1,20 +1,43 @@
 {
   "environment": "staging",
-  "commit": "2406bf335de80451bc8031d36102c60c74f5e1d9",
-  "subject": "Compile Cast kit colouring to avoid long JavaScript frame stalls",
-  "receiverTree": "0db5a4232e64ab7a68fb37f8a103fb2a75b969ba",
-  "revision": 103,
-  "deployedAt": "2026-11-17T18:25:36Z",
+  "commit": "f1e3b138b242f211e49b24644dd38320d5889350",
+  "subject": "Tester build: iOS 3.0.7 (364), Android 3.0.4 (27523)",
+  "receiverTree": "2e9abaeec7f31a18fbb8f21887021c9068d3a88b",
+  "revision": 104,
+  "deployedAt": "2026-11-20T22:07:56Z",
   "previous": {
-    "tree": "b3a99dfdd26f6e11a99a1a4c6ec5181b0b2b1d67",
+    "tree": "0db5a4232e64ab7a68fb37f8a103fb2a75b969ba",
     "changed": [
       "index.html",
-      "receiver-dye.js",
-      "receiver-dye.wasm",
-      "receiver-scene.js"
+      "receiver-scene-core.js",
+      "receiver-scene.js",
+      "scene-images/field-real-outfield-1672x941.jpg",
+      "scene-images/ground-cauldron-real-outfield-1672x941.jpg",
+      "scene-images/ground-coral-bay-real-outfield-1672x941.jpg",
+      "scene-images/ground-hilltop-real-outfield-1672x941.jpg",
+      "scene-images/ground-ironbark-real-outfield-1672x941.jpg",
+      "scene-images/ground-pavilion-real-outfield-1672x941.jpg",
+      "scene-images/manifest.json"
     ]
   },
   "earlier": [
+    {
+      "tree": "b3a99dfdd26f6e11a99a1a4c6ec5181b0b2b1d67",
+      "changed": [
+        "index.html",
+        "receiver-dye.js",
+        "receiver-dye.wasm",
+        "receiver-scene-core.js",
+        "receiver-scene.js",
+        "scene-images/field-real-outfield-1672x941.jpg",
+        "scene-images/ground-cauldron-real-outfield-1672x941.jpg",
+        "scene-images/ground-coral-bay-real-outfield-1672x941.jpg",
+        "scene-images/ground-hilltop-real-outfield-1672x941.jpg",
+        "scene-images/ground-ironbark-real-outfield-1672x941.jpg",
+        "scene-images/ground-pavilion-real-outfield-1672x941.jpg",
+        "scene-images/manifest.json"
+      ]
+    },
     {
       "tree": "8f123c473309fcbb93e4d1fc6593c14b4a618acd",
       "changed": [
@@ -22,7 +45,14 @@
         "receiver-dye.js",
         "receiver-dye.wasm",
         "receiver-scene-core.js",
-        "receiver-scene.js"
+        "receiver-scene.js",
+        "scene-images/field-real-outfield-1672x941.jpg",
+        "scene-images/ground-cauldron-real-outfield-1672x941.jpg",
+        "scene-images/ground-coral-bay-real-outfield-1672x941.jpg",
+        "scene-images/ground-hilltop-real-outfield-1672x941.jpg",
+        "scene-images/ground-ironbark-real-outfield-1672x941.jpg",
+        "scene-images/ground-pavilion-real-outfield-1672x941.jpg",
+        "scene-images/manifest.json"
       ]
     },
     {
@@ -32,7 +62,14 @@
         "receiver-dye.js",
         "receiver-dye.wasm",
         "receiver-scene-core.js",
-        "receiver-scene.js"
+        "receiver-scene.js",
+        "scene-images/field-real-outfield-1672x941.jpg",
+        "scene-images/ground-cauldron-real-outfield-1672x941.jpg",
+        "scene-images/ground-coral-bay-real-outfield-1672x941.jpg",
+        "scene-images/ground-hilltop-real-outfield-1672x941.jpg",
+        "scene-images/ground-ironbark-real-outfield-1672x941.jpg",
+        "scene-images/ground-pavilion-real-outfield-1672x941.jpg",
+        "scene-images/manifest.json"
       ]
     },
     {
@@ -42,17 +79,14 @@
         "receiver-dye.js",
         "receiver-dye.wasm",
         "receiver-scene-core.js",
-        "receiver-scene.js"
-      ]
-    },
-    {
-      "tree": "945e16f06e06cf69bd049166fe922fdade72b55d",
-      "changed": [
-        "index.html",
-        "receiver-dye.js",
-        "receiver-dye.wasm",
-        "receiver-scene-core.js",
-        "receiver-scene.js"
+        "receiver-scene.js",
+        "scene-images/field-real-outfield-1672x941.jpg",
+        "scene-images/ground-cauldron-real-outfield-1672x941.jpg",
+        "scene-images/ground-coral-bay-real-outfield-1672x941.jpg",
+        "scene-images/ground-hilltop-real-outfield-1672x941.jpg",
+        "scene-images/ground-ironbark-real-outfield-1672x941.jpg",
+        "scene-images/ground-pavilion-real-outfield-1672x941.jpg",
+        "scene-images/manifest.json"
       ]
     }
   ]

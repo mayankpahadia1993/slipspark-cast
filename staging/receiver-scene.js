@@ -503,11 +503,17 @@
     // classic ones they stand in for don't: a Chromecast holds one whole-ground photo, as before. An older phone
     // sends no `views` and draws the classic two at every ground, so they preload as ever. One of each kind, from the
     // list's first few entries; anything else is ignored.
+    //
+    // The real-size ground (Nov 19 2026, docs/PLATFORMS.md "Real-size ground"): a phone from then draws the whole ground on
+    // field-real-outfield-1672x941 (and each ground's "ground-<id>-real-outfield-1672x941"), the pitch at real size, and
+    // names it in `views` even at the classic ground. It preloads in field-outfield-1672x941's place, which an older phone
+    // still draws (and is then the only one preloaded: an unnamed field-real-outfield waits for a frame that draws it).
     let preloadViews = { outfield: null, inset: null };
     function groundViews(views) {
       const found = { outfield: null, inset: null };
       if (!Array.isArray(views)) return found;
       for (const key of views.slice(0, 4)) {
+        if (key === "field-real-outfield-1672x941") { if (!found.outfield) found.outfield = key; continue; }
         if (typeof key !== "string" || !/^ground-[a-z0-9-]{1,60}-\d+x\d+$/.test(key)) continue;
         const kind = /-outfield-\d+x\d+$/.test(key) ? "outfield" : /-inset-\d+x\d+$/.test(key) ? "inset" : null;
         if (kind && !found[kind]) found[kind] = key;
@@ -585,7 +591,7 @@
       if (/^bowler-11-/.test(key)) return 2;
       if (/^bowler-/.test(key)) return 3;
       if (/^fielder-[A-Za-z]+-idle-/.test(key)) return 4;
-      if (/^field-outfield-/.test(key)) return 5;
+      if (/^field-(real-)?outfield-/.test(key)) return 5;
       if (/^fielder-/.test(key)) return 6;
       // A hello that names no kit (Android): any kit's cached pieces may be the batter's.
       if (/^kit-/.test(key) && !preloadKit) return 6;
@@ -628,6 +634,7 @@
         if (/^ground-/.test(key)) return key === preloadGround || viewKind(key) !== null;
         if (preloadGround && /^stadium-(ground|backdrop)-/.test(key)) return false;
         if (preloadViews.outfield && /^field-outfield-/.test(key)) return false;
+        if (/^field-real-outfield-/.test(key)) return key === preloadViews.outfield;
         return !(preloadViews.inset && /^bowler-end-inset-/.test(key));
       };
       // An atlas once, in its first picture's place.
@@ -687,7 +694,7 @@
           // Receiver 65: the replay's outfield too (made at the first replay,
           // it cost an onn's first replay a 283 ms/s of long tasks).
           // Receiver 82: a ground's plate and outfield, never its inset (drawn small on the canvas, as the classic one).
-          if (/^(stadium-(ground|backdrop)|field-outfield|ground)-/.test(key) && !/-inset-\d+x\d+$/.test(key) && opaque.has(key)) backdropLayer(key);
+          if (/^(stadium-(ground|backdrop)|field-(real-)?outfield|ground)-/.test(key) && !/-inset-\d+x\d+$/.test(key) && opaque.has(key)) backdropLayer(key);
           warmDecode(key);
         }, () => loading.delete(key))
         .then(done, done);
