@@ -1,26 +1,33 @@
 {
   "environment": "staging",
-  "commit": "f1e3b138b242f211e49b24644dd38320d5889350",
-  "subject": "Tester build: iOS 3.0.7 (364), Android 3.0.4 (27523)",
-  "receiverTree": "2e9abaeec7f31a18fbb8f21887021c9068d3a88b",
-  "revision": 104,
-  "deployedAt": "2026-11-20T22:07:56Z",
+  "commit": "3e26908ffb9d7b58f7fa1ac9b984b8e43814a316",
+  "subject": "Merge claude/rc-keeper-gap (keeper clear of the 1.4x stumps) with the Cast lag fixes",
+  "receiverTree": "4828eee1a3d128dc9084bf83471e069ba20fc523",
+  "revision": 105,
+  "deployedAt": "2026-11-21T08:49:42Z",
   "previous": {
-    "tree": "0db5a4232e64ab7a68fb37f8a103fb2a75b969ba",
+    "tree": "2e9abaeec7f31a18fbb8f21887021c9068d3a88b",
     "changed": [
       "index.html",
-      "receiver-scene-core.js",
-      "receiver-scene.js",
-      "scene-images/field-real-outfield-1672x941.jpg",
-      "scene-images/ground-cauldron-real-outfield-1672x941.jpg",
-      "scene-images/ground-coral-bay-real-outfield-1672x941.jpg",
-      "scene-images/ground-hilltop-real-outfield-1672x941.jpg",
-      "scene-images/ground-ironbark-real-outfield-1672x941.jpg",
-      "scene-images/ground-pavilion-real-outfield-1672x941.jpg",
-      "scene-images/manifest.json"
+      "receiver-scene.js"
     ]
   },
   "earlier": [
+    {
+      "tree": "0db5a4232e64ab7a68fb37f8a103fb2a75b969ba",
+      "changed": [
+        "index.html",
+        "receiver-scene-core.js",
+        "receiver-scene.js",
+        "scene-images/field-real-outfield-1672x941.jpg",
+        "scene-images/ground-cauldron-real-outfield-1672x941.jpg",
+        "scene-images/ground-coral-bay-real-outfield-1672x941.jpg",
+        "scene-images/ground-hilltop-real-outfield-1672x941.jpg",
+        "scene-images/ground-ironbark-real-outfield-1672x941.jpg",
+        "scene-images/ground-pavilion-real-outfield-1672x941.jpg",
+        "scene-images/manifest.json"
+      ]
+    },
     {
       "tree": "b3a99dfdd26f6e11a99a1a4c6ec5181b0b2b1d67",
       "changed": [
@@ -57,23 +64,6 @@
     },
     {
       "tree": "480f0ca3e3db45e718505e2aadcc904da0944745",
-      "changed": [
-        "index.html",
-        "receiver-dye.js",
-        "receiver-dye.wasm",
-        "receiver-scene-core.js",
-        "receiver-scene.js",
-        "scene-images/field-real-outfield-1672x941.jpg",
-        "scene-images/ground-cauldron-real-outfield-1672x941.jpg",
-        "scene-images/ground-coral-bay-real-outfield-1672x941.jpg",
-        "scene-images/ground-hilltop-real-outfield-1672x941.jpg",
-        "scene-images/ground-ironbark-real-outfield-1672x941.jpg",
-        "scene-images/ground-pavilion-real-outfield-1672x941.jpg",
-        "scene-images/manifest.json"
-      ]
-    },
-    {
-      "tree": "79ba7528157131a90f76d9e0c6df67f7b4ccfe41",
       "changed": [
         "index.html",
         "receiver-dye.js",
