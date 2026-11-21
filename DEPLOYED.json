@@ -1,21 +1,43 @@
 {
   "environment": "production",
-  "commit": "d39d4f187d79d3c6bcd08bf5952066cc20d7637e",
-  "subject": "docs: audit production readiness after phone feedback",
-  "receiverTree": "0db5a4232e64ab7a68fb37f8a103fb2a75b969ba",
-  "revision": 103,
-  "deployedAt": "2026-11-17T23:52:27Z",
+  "commit": "3e26908ffb9d7b58f7fa1ac9b984b8e43814a316",
+  "subject": "Merge claude/rc-keeper-gap (keeper clear of the 1.4x stumps) with the Cast lag fixes",
+  "receiverTree": "4828eee1a3d128dc9084bf83471e069ba20fc523",
+  "revision": 105,
+  "deployedAt": "2026-11-21T23:41:14Z",
   "previous": {
-    "tree": "cfdfa14fc52c964c5bd2c41f0d169d638991c2f1",
+    "tree": "0db5a4232e64ab7a68fb37f8a103fb2a75b969ba",
     "changed": [
       "index.html",
-      "receiver-dye.js",
-      "receiver-dye.wasm",
       "receiver-scene-core.js",
-      "receiver-scene.js"
+      "receiver-scene.js",
+      "scene-images/field-real-outfield-1672x941.jpg",
+      "scene-images/ground-cauldron-real-outfield-1672x941.jpg",
+      "scene-images/ground-coral-bay-real-outfield-1672x941.jpg",
+      "scene-images/ground-hilltop-real-outfield-1672x941.jpg",
+      "scene-images/ground-ironbark-real-outfield-1672x941.jpg",
+      "scene-images/ground-pavilion-real-outfield-1672x941.jpg",
+      "scene-images/manifest.json"
     ]
   },
   "earlier": [
+    {
+      "tree": "cfdfa14fc52c964c5bd2c41f0d169d638991c2f1",
+      "changed": [
+        "index.html",
+        "receiver-dye.js",
+        "receiver-dye.wasm",
+        "receiver-scene-core.js",
+        "receiver-scene.js",
+        "scene-images/field-real-outfield-1672x941.jpg",
+        "scene-images/ground-cauldron-real-outfield-1672x941.jpg",
+        "scene-images/ground-coral-bay-real-outfield-1672x941.jpg",
+        "scene-images/ground-hilltop-real-outfield-1672x941.jpg",
+        "scene-images/ground-ironbark-real-outfield-1672x941.jpg",
+        "scene-images/ground-pavilion-real-outfield-1672x941.jpg",
+        "scene-images/manifest.json"
+      ]
+    },
     {
       "tree": "94852de06c0356510e9e21939552fe2e401dd80b",
       "changed": [
@@ -29,7 +51,14 @@
         "receiver-scene-core.js",
         "receiver-scene.js",
         "receiver.css",
-        "receiver.js"
+        "receiver.js",
+        "scene-images/field-real-outfield-1672x941.jpg",
+        "scene-images/ground-cauldron-real-outfield-1672x941.jpg",
+        "scene-images/ground-coral-bay-real-outfield-1672x941.jpg",
+        "scene-images/ground-hilltop-real-outfield-1672x941.jpg",
+        "scene-images/ground-ironbark-real-outfield-1672x941.jpg",
+        "scene-images/ground-pavilion-real-outfield-1672x941.jpg",
+        "scene-images/manifest.json"
       ]
     },
     {
@@ -46,9 +75,16 @@
         "receiver-scene.js",
         "receiver.css",
         "receiver.js",
+        "scene-images/field-real-outfield-1672x941.jpg",
+        "scene-images/ground-cauldron-real-outfield-1672x941.jpg",
+        "scene-images/ground-coral-bay-real-outfield-1672x941.jpg",
+        "scene-images/ground-hilltop-real-outfield-1672x941.jpg",
+        "scene-images/ground-ironbark-real-outfield-1672x941.jpg",
+        "scene-images/ground-pavilion-real-outfield-1672x941.jpg",
         "scene-images/kit-masks-bowler-end-0-1280x1576.png",
         "scene-images/kit-masks-bowler-end-1-1272x1668.png",
-        "scene-images/kit-masks-bowler-end-2-1264x1560.png"
+        "scene-images/kit-masks-bowler-end-2-1264x1560.png",
+        "scene-images/manifest.json"
       ]
     },
     {
@@ -66,42 +102,24 @@
         "receiver.css",
         "receiver.js",
         "scene-images/bowler-end-plate-1672x941.jpg",
+        "scene-images/field-real-outfield-1672x941.jpg",
         "scene-images/ground-cauldron-bowler-end-1672x941.jpg",
+        "scene-images/ground-cauldron-real-outfield-1672x941.jpg",
         "scene-images/ground-coral-bay-bowler-end-1672x941.jpg",
+        "scene-images/ground-coral-bay-real-outfield-1672x941.jpg",
         "scene-images/ground-hilltop-bowler-end-1672x941.jpg",
+        "scene-images/ground-hilltop-real-outfield-1672x941.jpg",
         "scene-images/ground-ironbark-bowler-end-1672x941.jpg",
+        "scene-images/ground-ironbark-real-outfield-1672x941.jpg",
         "scene-images/ground-pavilion-bowler-end-1672x941.jpg",
-        "scene-images/kit-masks-bowler-end-0-1280x1576.png",
-        "scene-images/kit-masks-bowler-end-1-1272x1668.png",
-        "scene-images/kit-masks-bowler-end-2-1264x1560.png",
-        "scene-images/manifest.json"
-      ]
-    },
-    {
-      "tree": "ee81a57f1b19d9c1786fbc65554d7eed439a0e86",
-      "changed": [
-        "index.html",
-        "pickleball/PickleballCourtTall.webp",
-        "pickleball/manifest.json",
-        "receiver-dye.js",
-        "receiver-dye.wasm",
-        "receiver-pickleball-core.js",
-        "receiver-pickleball.js",
-        "receiver-scene-core.js",
-        "receiver-scene.js",
-        "receiver.css",
-        "receiver.js",
-        "scene-images/bowler-end-plate-1672x941.jpg",
-        "scene-images/ground-cauldron-bowler-end-1672x941.jpg",
-        "scene-images/ground-coral-bay-bowler-end-1672x941.jpg",
-        "scene-images/ground-hilltop-bowler-end-1672x941.jpg",
-        "scene-images/ground-ironbark-bowler-end-1672x941.jpg",
-        "scene-images/ground-pavilion-bowler-end-1672x941.jpg",
+        "scene-images/ground-pavilion-real-outfield-1672x941.jpg",
         "scene-images/kit-masks-bowler-end-0-1280x1576.png",
         "scene-images/kit-masks-bowler-end-1-1272x1668.png",
         "scene-images/kit-masks-bowler-end-2-1264x1560.png",
         "scene-images/manifest.json"
       ]
     }
-  ]
+  ],
+  "promotedFrom": "staging",
+  "stagedAt": "2026-11-21T08:49:42Z"
 }
