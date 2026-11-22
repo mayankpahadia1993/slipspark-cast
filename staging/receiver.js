@@ -466,7 +466,9 @@
     waitForGame,
     now: () => (filmClock !== null ? filmClock : performance.now()),
     manualClock: query.get("film") === "1",
-    canvasWidth: Number(query.get("canvas")) || undefined
+    canvasWidth: Number(query.get("canvas")) || undefined,
+    // Receiver 106: `?weak=1` (or 0) draws as a 32-bit Chromecast's weak plan does (or not), for previews, films and tests.
+    weak: query.get("weak") === "1" ? true : query.get("weak") === "0" ? false : undefined
   });
   let sendPickleball = () => {};
   window.__rallycadePickleball = pickleball;
