@@ -412,6 +412,8 @@
     if (banner) view.banner = banner;
     if (banner2) view.banner2 = banner2;
     const callout = calloutView(h.call, t), callout2 = calloutView(h.call2, t);
+    // Receiver 108: the two-player split screen's words (receiver-split.js splitView reads them).
+    if (h.ss && typeof h.ss === "object") view.screen = h.ss;
     if (callout) view.callout = callout;
     if (callout2) view.callout2 = callout2;
     return view;

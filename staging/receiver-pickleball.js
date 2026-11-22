@@ -33,7 +33,7 @@
   // photograph layers, a HUD that never animates, the sheets' smaller copies (`pickleball/small/`), no decode() at load,
   // and arrivals just after the TV's own stall kept out of the delay. `ready` and `stats` say `weak: 1`; `stats` add
   // `worst`, the longest gap between draws. The hello's `x.weak` (1 or 0, benches) draws as a weak dongle does, or not.
-  const RECEIVER_VERSION = 107;
+  const RECEIVER_VERSION = 108;
   const core = window.RallycadePickleballCore;
   const sceneCore = window.RallycadeSceneCore;
 
@@ -47,6 +47,11 @@
     const tallImgs = [options.plateTall || null, options.plateTall2 || null];
     let tallPlate = null;
     const hud = options.hud, readyCard = options.ready, resultCard = options.result, chip = options.chip;
+    // Receiver 108: the two-player split screen (receiver-split.js, any game's) over a Side by Side match's halves, when
+    // the phone sends it (the HUD's `ss`).
+    const splitModule = typeof window !== "undefined" ? window.RallycadeSplit : null;
+    const splitHost = options.splitHost || (typeof document !== "undefined" && document.getElementById ? document.getElementById("pk-split-host") : null);
+    const splitScreen = splitModule && splitHost ? splitModule.createSplitScreen(splitHost) : null;
     const send = options.send || (() => {});
     const now = options.now || (() => performance.now());
     const base = options.base || "pickleball/";
@@ -484,6 +489,7 @@
       }
       // The HUD's phone-height stage scaled onto the TV's.
       if (hud) hud.style.transform = "scale(" + ((box.width || 1280) / core.HUD_STAGE.width) + ")";
+      if (splitScreen) splitScreen.fit(box.width || 1280);
     }
 
     function union(boxes) {
@@ -692,10 +698,15 @@
     // MARK: HUD
 
     const hudShown = {};
+    const set0 = (key, value, apply) => { if (hudShown[key] !== value) { hudShown[key] = value; apply(value); } };
     function renderHUD(h) {
       if (!hud) return;
       hud.hidden = !h;
+      // Receiver 108: the split screen when the phone sends one; the game's own score bug gives way to its bar.
+      const screen = h && splitModule ? splitModule.splitView(h.screen) : null;
+      if (splitScreen) splitScreen.render(screen);
       if (!h) return;
+      set0("ss", !!screen, (v) => hud.classList.toggle("pk-ss", v));
       const set = (key, value, apply) => { if (hudShown[key] !== value) { hudShown[key] = value; apply(value); } };
       set("you", h.you, (v) => setText(el("pk-you"), v));
       set("cpu", h.cpu, (v) => setText(el("pk-cpu"), v));
@@ -789,6 +800,7 @@
       // Receiver 106: a weak dongle's canvas is up whenever the overlay is, the photographs under the cards on it.
       canvas.style.visibility = view === "match" && drawn ? "visible" : weak && view !== "off" ? canvas.style.visibility : "hidden";
       if (hud) hud.style.visibility = view === "match" && drawn ? "visible" : "hidden";
+      if (splitScreen && splitScreen.layer) splitScreen.layer.style.visibility = view === "match" && drawn ? "visible" : "hidden";
       if (view === "match" || view === "result") start(); else stop();
       showStill();
     }
@@ -888,6 +900,8 @@
           preloadWhenWanted(message.look, message.sheets);
           {
             const ready = { t: "ready", pickleball: core.VERSION, version: RECEIVER_VERSION, looks: ["man", "woman"], friends: 1, tall: tallImgs[0] && tallImgs[1] ? 1 : 0, go: holdOn ? 1 : 0 };
+            // Receiver 108: draws the two-player split screen (the HUD's `ss`).
+            if (splitScreen && splitScreen.layer) ready.ss = 1;
             if (weak) ready.weak = 1;
             send(ready);
           }
