@@ -22,6 +22,14 @@
   function element(id) { return document.getElementById(id); }
   function text(id, value) { element(id).textContent = value == null ? "" : String(value); }
   function setVisible(target, visible) { target.hidden = !visible; }
+  // A line under a result or a break as the phone words it: its default only
+  // when it sends none (an older phone), nothing at all when it sends ""
+  // (a raised hand does nothing there; receiver 107).
+  function tvLine(id, value, fallback) {
+    const line = core.tvLine(value, fallback);
+    text(id, line);
+    element(id).hidden = !line;
+  }
 
   // The hold (index.html `.hold`): its words, and once both hands are up a
   // ring that fills while they stay up. No words when `label` is empty.
@@ -114,7 +122,9 @@
     // Build 123 phones send the innings' own score and words ("97/1",
     // "Raise both hands to bat again"); older ones only the number.
     if (result.scoreText) text("result-score", result.scoreText);
-    text("result-hint", result.hint || "Raise both hands to go again · Results saved on your phone");
+    // Receiver 107 (Nov 22 2026): an empty hint from the phone is no line at
+    // all, never the raise-hand default (core.tvLine).
+    tvLine("result-hint", result.hint, core.RESULT_HINT);
     // Receiver 66: a cup's next match in a card of its own, in place of the
     // reward's small last line (TestFlight 211).
     const next = element("result-next");
@@ -158,14 +168,14 @@
     text("duel-handoff-title", handoff.title || "PLAYER 2 — YOUR CHASE");
     text("duel-target", handoff.target.toLocaleString("en-US"));
     text("duel-rules", handoff.rules || `${handoff.balls} BALLS · ${handoff.wickets} WICKETS · SAME DELIVERIES`);
-    text("duel-handoff-note", handoff.note || "Raise both hands at the crease to begin");
+    tvLine("duel-handoff-note", handoff.note, core.HANDOFF_NOTE);
   }
 
   function renderDuelResult(result) {
     text("duel-result-eyebrow", result.eyebrow || "CHASE DUEL");
     text("duel-result-first-name", result.firstName || "PLAYER 1");
     text("duel-result-second-name", result.secondName || "PLAYER 2");
-    text("duel-result-note", result.note || "Raise both hands for another duel");
+    tvLine("duel-result-note", result.note, core.DUEL_RESULT_NOTE);
     // Full Match sends the winning margin both in the headline and by itself. A duel can
     // send a winner's name as its headline and supply the actual outcome in the margin.
     let headline = result.headline;
@@ -207,7 +217,7 @@
       item.textContent = line;
       return item;
     }));
-    text("timing-note", check.note);
+    tvLine("timing-note", check.note, core.TIMING_NOTE);
   }
 
   // Build 154: a result is the phone's own scorecard picture when the phone
@@ -589,8 +599,18 @@
     if (scene) options.customNamespaces[sceneModule.NAMESPACE] = window.cast.framework.system.MessageType.JSON;
     const musicModule = window.RallycadeMusic;
     if (musicModule) {
-      const audio = new Audio("music/music-theme.m4a");
-      const music = musicModule.createPlayer({ audio,
+      // Receiver 107 (Nov 22 2026, rprjrxj1: the owner's new Guest Room Chromecast Ultra, -78 dBm, "lagging a lot"): a
+      // Chromecast keeps no HTTP cache from one cast to the next, so every cast downloaded the 3.4 MB bed at page load
+      // (the Living Room Ultra's resource timing: 3.37 of the page's 4.56 MB on a cast whose pictures came from the TV),
+      // on the same Wi-Fi as the phone's setup pictures and first frames. It is kept on the TV with the stadium's
+      // pictures (`scene.keptFile`, receiver 77's IndexedDB copies under the deploy's tree) and read from there by
+      // later casts; a play waits for it. Without a kept copy (a preview, a test) the file plays from the site as before.
+      const audio = new Audio();
+      window.__rallycadeMusicAudio = audio;
+      const bed = "music/music-theme.m4a";
+      const source = scene && scene.keptFile ? scene.keptFile(bed) : Promise.resolve(bed);
+      const ready = source.then((url) => { audio.src = url || bed; }, () => { audio.src = bed; });
+      const music = musicModule.createPlayer({ audio, ready,
         send: (sender, message) => context.sendCustomMessage(musicModule.NAMESPACE, sender, message) });
       options.customNamespaces[musicModule.NAMESPACE] = window.cast.framework.system.MessageType.JSON;
       context.addCustomMessageListener(musicModule.NAMESPACE, event => music.handle(event.senderId, event.data));

@@ -33,7 +33,7 @@
   // photograph layers, a HUD that never animates, the sheets' smaller copies (`pickleball/small/`), no decode() at load,
   // and arrivals just after the TV's own stall kept out of the delay. `ready` and `stats` say `weak: 1`; `stats` add
   // `worst`, the longest gap between draws. The hello's `x.weak` (1 or 0, benches) draws as a weak dongle does, or not.
-  const RECEIVER_VERSION = 106;
+  const RECEIVER_VERSION = 107;
   const core = window.RallycadePickleballCore;
   const sceneCore = window.RallycadeSceneCore;
 

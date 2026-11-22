@@ -3270,7 +3270,8 @@
     // stadium. A slow TV on a crowded Wi-Fi must not spend that on its fonts
     // or its cache: each gets at most a couple of seconds before the answer.
     const atMost = (promise, ms) => Promise.race([promise, new Promise((ok) => window.setTimeout(ok, ms))]);
-    Promise.all([atMost(loadBundled(), 4000), atMost(openCache(), 2000), atMost(fontsReady, 1500)]).then(() => {
+    const bundledLoaded = loadBundled();
+    Promise.all([atMost(bundledLoaded, 4000), atMost(openCache(), 2000), atMost(fontsReady, 1500)]).then(() => {
       readyToAnswer = true;
       if (pendingHello) { pendingHello = false; answerHello(); }
       // Receiver 60: the pictures start loading as soon as the page is up,
@@ -3331,7 +3332,13 @@
       objectURLs.clear();
     }
 
-    return { NAMESPACE, handle, report, setOn, renderHUD, drawFrame, playRecording, playRecordingAt, snapshot, timeline, clock, live, images, bitmaps, release, selectGame,
+    // Receiver 107: another of the receiver's own files (the music bed, receiver.js) kept on the TV as its pictures are:
+    // where it loads from once the TV's copies are open (`keptURL`), the plain path if they never open.
+    function keptFile(path) {
+      return atMost(bundledLoaded, 4000).then(() => keptURL(path)).catch(() => path);
+    }
+
+    return { NAMESPACE, handle, report, setOn, renderHUD, drawFrame, keptFile, playRecording, playRecordingAt, snapshot, timeline, clock, live, images, bitmaps, release, selectGame,
       get cricketWanted() { return cricketWanted; },
       pictures, counters, tune, setTune, warmed, staticLayer, liveLayer, get dressing() { return dressingWasOn; }, holdLast, get holding() { return holding; }, get hasFrame() { return !!shownFrame; },
       // Receiver 77: how the rehearsal and the preload stand (tests and the bench's probe).

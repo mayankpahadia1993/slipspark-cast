@@ -48,6 +48,10 @@
       coins: Math.floor(clamp(value.coins, 0, 10000000)),
       memo: boundedString(value.memo, "", 80),
       note: boundedString(value.note, "", 80),
+      // Receiver 107: the way on where a raised hand ends nothing ("Continue
+      // on your phone", a full match's result); null keeps "Raise a hand to
+      // continue", "" none.
+      hint: optionalString(value.hint, 60),
       // Receiver 67: the cup's matches, for the cheque's MICR line (0 from an older phone).
       matches: Math.floor(clamp(value.matches, 0, 99)),
       colors: Array.isArray(value.colors) ? value.colors.filter((c) => typeof c === "string" && /^#[0-9A-Fa-f]{6}$/.test(c)).slice(0, 4) : [],
@@ -65,6 +69,21 @@
 
   function boundedString(value, fallback, maximumLength) {
     return String(value == null ? fallback : value).slice(0, maximumLength);
+  }
+
+  // The lines a phone sends under a result or a break, and what the TV says
+  // when an older phone sends none. Receiver 107 (Nov 22 2026, the owner:
+  // "when we are on the TV, it shows that raise your hand to bat again, but
+  // that's not true. For example, weekend cricket"): a phone sends "" where a
+  // raised hand does nothing, and the TV shows no line, never these defaults.
+  // shared/cast/tv-raise-hints.json.
+  const RESULT_HINT = "Raise both hands to go again · Results saved on your phone";
+  const HANDOFF_NOTE = "Raise both hands at the crease to begin";
+  const DUEL_RESULT_NOTE = "Raise both hands for another duel";
+  const TIMING_NOTE = "Raise both hands to play your innings";
+  function tvLine(value, fallback) {
+    if (value == null) return fallback;
+    return String(value).trim() ? String(value) : "";
   }
 
   function optionalString(value, maximumLength) {
@@ -230,7 +249,7 @@
           .map((verdict) => verdicts.has(verdict) ? verdict : "noSwing"),
         lines: (Array.isArray(check.lines) ? check.lines : []).slice(0, 6)
           .map((line) => optionalString(line, 200)).filter(Boolean),
-        note: boundedString(check.note, "Raise both hands to play your innings", 120)
+        note: boundedString(check.note, TIMING_NOTE, 120)
       };
     }
 
@@ -386,7 +405,7 @@
     return { cat: failureStages[word] || "render", code: word + "_" + code };
   }
 
-  return { failureReport, clamp, normalizeJoints, normalizeState, normalizeWelcome, normalizeCelebration, normalizeNextMatch, normalizeLevel, levelLine,
+  return { RESULT_HINT, HANDOFF_NOTE, DUEL_RESULT_NOTE, TIMING_NOTE, tvLine, failureReport, clamp, normalizeJoints, normalizeState, normalizeWelcome, normalizeCelebration, normalizeNextMatch, normalizeLevel, levelLine,
     parseMessage, sampleState, resultHeadlineSize, estimateWidth,
     wrapLines, hideTarget, TARGET_REVEAL_MS };
 });
