@@ -412,6 +412,8 @@
     if (banner) view.banner = banner;
     if (banner2) view.banner2 = banner2;
     const callout = calloutView(h.call, t), callout2 = calloutView(h.call2, t);
+    // Receiver 108: the two-player split screen's words (receiver-split.js splitView reads them).
+    if (h.ss && typeof h.ss === "object") view.screen = h.ss;
     if (callout) view.callout = callout;
     if (callout2) view.callout2 = callout2;
     return view;
@@ -456,9 +458,29 @@
     return [...want].sort();
   }
 
+  // Whether a frame handled `sinceTick` ms after the TV's last animation frame says nothing of the trip (the playout's
+  // `stalled`): handled long after that frame (`STALLED.ms`: the page was held up, receiver 79), or, on a weak dongle
+  // (receiver 106), within `STALLED.after` ms of an animation frame that ended a stall of the TV's own (`lastTickGap`, the
+  // gap before it, `STALLED.gap` or more): the frames the TV held up while it froze, handled once it drew again.
+  const STALLED = { ms: 60, gap: 400, after: 300 };
+  function arrivalStalled(sinceTick, lastTickGap, weak) {
+    if (!(sinceTick >= 0)) return false;
+    if (sinceTick > STALLED.ms) return true;
+    return !!weak && lastTickGap >= STALLED.gap && sinceTick < STALLED.after;
+  }
+
+  // Where a sheet's file is and its scale (the file's pixels per phone sheet pixel, which the drawing commands name).
+  // Receiver 106: a weak dongle (a 32-bit Chromecast, the weak plan) loads the smaller copy in small/ when the manifest
+  // has one (`small`: its scale and size); other TVs, and manifests without it, the sheet itself. Null with no spec.
+  function sheetFile(spec, weak) {
+    if (!spec) return null;
+    const small = weak && spec.small && Number(spec.small.scale) > 0 ? spec.small : null;
+    return small ? { folder: "small/", scale: Number(small.scale) } : { folder: "", scale: Number(spec.scale) || 1 };
+  }
+
   return {
     STAGE, HUD_STAGE, VERSION, DELAY, MAX_BLEND_GAP, CALLOUT_SECONDS, BALL,
     decodeOp, halves, opShape, blendOps, blendPush, percentile, createPlayout, plateLayout, opBounds, drawOps, hudView, readyView, resultView,
-    sheetsFor
+    sheetsFor, sheetFile, STALLED, arrivalStalled
   };
 });

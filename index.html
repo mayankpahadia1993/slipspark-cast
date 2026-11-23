@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800;900&family=Nunito:wght@600;700;800;900&display=swap">
-  <link rel="stylesheet" href="receiver.css?v=105">
+  <link rel="stylesheet" href="receiver.css?v=110">
   <script src="https://www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>
 </head>
 <body>
@@ -293,6 +293,8 @@
         <div id="pk-callout" class="pk-callout" hidden><strong id="pk-callout-title"></strong><span id="pk-callout-grade"></span></div>
         <div id="pk-callout2" class="pk-callout" hidden><strong id="pk-callout2-title"></strong><span id="pk-callout2-grade"></span></div>
       </div>
+      <!-- Receiver 108: the two-player split screen's layer (receiver-split.js, any game's), over the halves, under the cards. -->
+      <div id="pk-split-host" class="pk-split-host"></div>
       <div id="pk-ready" class="pk-cover" hidden>
         <div class="pk-card">
           <div class="brand-mark pk-brand" aria-label="RallyCade"><img class="brand-icon" src="rallycade-icon.png" alt=""><span>RALLYCADE</span></div>
@@ -320,18 +322,20 @@
     </div>
   </section>
   <!-- ?v= keeps a Chromecast from mixing cached files of two receiver versions. -->
-  <script src="receiver-core.js?v=105"></script>
-  <script src="receiver-card-core.js?v=105"></script>
-  <script src="receiver-video.js?v=105"></script>
-  <script src="receiver-scene-core.js?v=105"></script>
-  <script src="receiver-dye.js?v=105"></script>
-  <script src="receiver-scene.js?v=105"></script>
-  <script src="receiver-welcome.js?v=105"></script>
-  <script src="receiver-celebration.js?v=105"></script>
-  <script src="receiver-music.js?v=105"></script>
-  <script src="receiver-pickleball-core.js?v=105"></script>
-  <script src="receiver-pickleball.js?v=105"></script>
-  <script src="receiver-shared.js?v=105"></script>
-  <script src="receiver.js?v=105"></script>
+  <script src="receiver-core.js?v=110"></script>
+  <script src="receiver-card-core.js?v=110"></script>
+  <script src="receiver-video.js?v=110"></script>
+  <script src="receiver-scene-core.js?v=110"></script>
+  <script src="receiver-dye.js?v=110"></script>
+  <script src="receiver-scene.js?v=110"></script>
+  <script src="receiver-welcome.js?v=110"></script>
+  <script src="receiver-celebration.js?v=110"></script>
+  <script src="receiver-music.js?v=110"></script>
+  <script src="receiver-split.js?v=110"></script>
+  <script src="receiver-tv-game.js?v=110"></script>
+  <script src="receiver-pickleball-core.js?v=110"></script>
+  <script src="receiver-pickleball.js?v=110"></script>
+  <script src="receiver-shared.js?v=110"></script>
+  <script src="receiver.js?v=110"></script>
 </body>
 </html>

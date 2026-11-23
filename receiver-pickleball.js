@@ -28,22 +28,85 @@
   // Receiver 97 (Nov 14 2026, xn13cprg and xy026r2m: "the game started really laggy"): a match's start is held until
   // its pictures are loaded and warmed and its first frames draw steadily; `go` tells the phone, which holds its first
   // serve for it (the `ready`'s `go: 1` says this TV sends one). See `beginStart`.
-  const RECEIVER_VERSION = 97;
+  // Receiver 106 (Nov 22 2026, bzrb3cvj and e754c9zc, iOS 380 on a 32-bit Chromecast: "Delay while playing side by side",
+  // "It crashed or froze"): the weak plan (`weakDongle`): one opaque canvas that draws the courts' photographs itself, no
+  // photograph layers, a HUD that never animates, the sheets' smaller copies (`pickleball/small/`), no decode() at load,
+  // and arrivals just after the TV's own stall kept out of the delay. `ready` and `stats` say `weak: 1`; `stats` add
+  // `worst`, the longest gap between draws. The hello's `x.weak` (1 or 0, benches) draws as a weak dongle does, or not.
+  const RECEIVER_VERSION = 110;
   const core = window.RallycadePickleballCore;
   const sceneCore = window.RallycadeSceneCore;
+  // Receiver 109: cricket's canvas plan, rate watch and warm reports, through the layer every game uses
+  // (receiver-tv-game.js; docs/design/CAST_SCENE.md "Adding a game to the TV").
+  const tvGame = window.RallycadeTVGame;
 
   function createPickleball(options) {
-    const root = options.root, stage = options.stage, court = options.court, plateImg = options.plate, canvas = options.canvas;
+    const root = options.root, stage = options.stage, court = options.court, plateImg = options.plate;
+    // The match's canvas: a new element in its place when the weak plan's opaque canvas comes or goes (`setWeak`).
+    let canvas = options.canvas;
     // A same-phone split screen's right half's photograph (the left half's is `plateImg`).
     const plateImg2 = options.plate2 || null;
     // The tall plate's layers, one for each half (receiver 96).
     const tallImgs = [options.plateTall || null, options.plateTall2 || null];
     let tallPlate = null;
     const hud = options.hud, readyCard = options.ready, resultCard = options.result, chip = options.chip;
+    // Receiver 108: the two-player split screen (receiver-split.js, any game's) over a Side by Side match's halves, when
+    // the phone sends it (the HUD's `ss`).
+    const splitModule = typeof window !== "undefined" ? window.RallycadeSplit : null;
+    const splitHost = options.splitHost || (typeof document !== "undefined" && document.getElementById ? document.getElementById("pk-split-host") : null);
+    const splitScreen = splitModule && splitHost ? splitModule.createSplitScreen(splitHost) : null;
     const send = options.send || (() => {});
     const now = options.now || (() => performance.now());
     const base = options.base || "pickleball/";
-    const ctx = canvas.getContext("2d");
+    // MARK: The weak plan (receiver 106)
+    //
+    // Nov 22 2026, iOS 380 on a 32-bit Chromecast ("Family room TV", `Linux armv7l`, CrKey 1.56; bzrb3cvj, e754c9zc): a
+    // match on one court drew 10–11 a second of the 15 the phone sent, each draw 2–3 ms of script and the loop every
+    // ~100 ms (as cricket's stadium on the same class of TV: docs/design/CAST_SCENE.md, "A 32-bit Chromecast at a
+    // party"), so the TV's time went on compositing, not on the script: the court's photograph a layer of its own, a
+    // see-through canvas over it, the HUD over both. Side by Side drew 4–10 a second with freezes of 1.0–1.5 s every
+    // ten or so seconds (fps 1.4–3.2), at a point's end, a new serve or a stroke not drawn for a while: thirty-eight
+    // sheets (74 MB decoded at full size) and two tall photographs (6.3 MB each, layers of their own) on a TV with
+    // half a gigabyte, which lets decoded pictures go and decodes them again, and (by the logs) stalls as a whole meanwhile.
+    //
+    // On a weak dongle the canvas is opaque and draws the photographs itself (from the bitmaps the canvas's size,
+    // `canvasPlate`/`canvasTall`), so the TV composites one opaque layer and the HUD's few tiles; the photographs'
+    // layers are not shown or decoded (`data-weak`, receiver.css); a draw repaints only where the players and the ball
+    // were and are (`drawWeak`); the HUD never fades, lifts or casts shadows; the sheets come from `small/` (near 0.45,
+    // far 0.2 of the phone's sheet: on an 854 canvas the near player is drawn at most 0.44, the far one 0.14), a third of
+    // the decoded bytes; loading decodes nothing ahead (`decode()` fills the compositor's cache, not the canvas's, and on
+    // this TV it cost seconds of the start: "the TV loaded the man pictures in 13118 ms").
+    const weakDongle = options.weak !== undefined ? !!options.weak
+      : !!(sceneCore && sceneCore.isWeakDongle && typeof navigator !== "undefined" && sceneCore.isWeakDongle(navigator.userAgent));
+    let weak = weakDongle, opaque = false;
+    function opaqueContext(target) {
+      const context = target.getContext("2d", { alpha: false });
+      opaque = true;
+      return context;
+    }
+    let ctx = weak ? opaqueContext(canvas) : canvas.getContext("2d");
+    if (weak && root && root.dataset) root.dataset.weak = "1";
+    // Each hello starts from the TV's own plan; the bench's `x.weak` changes it. A canvas's alpha is fixed once it has a
+    // context: the other kind takes a new canvas element in the same place.
+    function setWeak(want) {
+      want = !!want;
+      if (want !== weak) { weak = want; canvasPx = 0; lastDrawn = null; weakKey = ""; stillShown = ""; }
+      if (root && root.dataset) { if (weak) root.dataset.weak = "1"; else delete root.dataset.weak; }
+      if (want === opaque) return;
+      const parent = canvas.parentNode;
+      if (parent && parent.replaceChild && typeof document !== "undefined" && document.createElement) {
+        const fresh = document.createElement("canvas");
+        fresh.id = canvas.id;
+        fresh.className = canvas.className;
+        fresh.width = canvas.width;
+        fresh.height = canvas.height;
+        fresh.style.cssText = canvas.style.cssText;
+        parent.replaceChild(fresh, canvas);
+        canvas = fresh;
+      }
+      if (want) ctx = opaqueContext(canvas);
+      else { ctx = canvas.getContext("2d"); opaque = false; }
+    }
     const playout = core.createPlayout();
     let manifest = null, manifestWait = null;
     const pictures = new Map(); // sheet -> {image, scale, loaded}
@@ -73,12 +136,13 @@
     // Decoded before it is first drawn (receiver 79): a sheet decoded on the
     // spot stalled the match's first frames (fps 10 for its first 2 s on the
     // owner's Ultra), as cricket's stadium did before receiver 57.
+    // Receiver 106: not on a weak dongle (the weak plan, above).
     function loadImage(src) {
       return new Promise((resolve) => {
         const image = new Image();
         image.decoding = "async";
         image.onload = () => {
-          if (image.decode) image.decode().then(() => resolve(image), () => resolve(image));
+          if (image.decode && !weak) image.decode().then(() => resolve(image), () => resolve(image));
           else resolve(image);
         };
         image.onerror = () => resolve(null);
@@ -106,7 +170,8 @@
     // thirty-eight (61 MB, which the TV cannot let go when it runs short) stalled the whole TV for 6 to 51 s. The sheets
     // stay images, which the TV drops and decodes again as its memory allows; only the court's two canvas copies are
     // bitmaps (`canvasPlate`).
-    const WARM_EACH = 1, WARM_MOST = 6, WARM_ALPHA = 0.02, WARM_ON_TIME = 45, WARM_PATCH = 24;
+    // Receiver 106: on a weak dongle, whose loop runs every ~100 ms whatever it draws, a frame is on time within 150 ms.
+    const WARM_EACH = 1, WARM_MOST = 6, WARM_ALPHA = 0.02, WARM_ON_TIME = 45, WEAK_WARM_ON_TIME = 150, WARM_PATCH = 24;
     // How many sheets a pass warms: about what the TV keeps at once. A same-phone match's thirty-eight took over 2 s to go
     // round on the Ultra, each one decoded again because the earlier ones had pushed it out; a look has fifteen.
     const WARM_SET = 16;
@@ -133,11 +198,13 @@
       sizeCanvas();
       const k = canvas.width / core.STAGE.width;
       // On time since the last frame: those were cheap (already on the GPU), so one more goes in this one.
-      warmEach = warmLast !== null && t - warmLast <= WARM_ON_TIME ? Math.min(WARM_MOST, warmEach + 1) : WARM_EACH;
+      warmEach = warmLast !== null && t - warmLast <= (weak ? WEAK_WARM_ON_TIME : WARM_ON_TIME) ? Math.min(WARM_MOST, warmEach + 1) : WARM_EACH;
       warmLast = t;
       canvas.style.visibility = "visible";
       ctx.setTransform(1, 0, 0, 1, 0, 0);
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      // Receiver 106: an opaque canvas keeps the photograph it shows under the card; only the patch is painted again.
+      if (weak) paintStill(warmPatch());
+      else ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.setTransform(k, 0, 0, k, 0, 0);
       // Through a small patch in the corner: the whole picture is decoded and uploaded at the match's size all the same,
       // and almost nothing of it is painted.
@@ -165,9 +232,13 @@
     }
     function clearWarm() {
       ctx.setTransform(1, 0, 0, 1, 0, 0);
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      // Receiver 106: an opaque canvas is never cleared (black); its patch shows the photograph again.
+      if (weak) paintStill(warmPatch());
+      else ctx.clearRect(0, 0, canvas.width, canvas.height);
       lastDrawn = null;
     }
+    // The warm-up's corner patch in stage points, a pixel round it.
+    function warmPatch() { return { x: -1, y: -1, w: WARM_PATCH + 2, h: WARM_PATCH + 2 }; }
     // The setup screen's warm-up, once the look is loaded and each time a setup opens.
     function warm() {
       // Only under the ready card: a canvas that is not shown warms nothing (a match's start has its own, `stepStart`).
@@ -192,8 +263,9 @@
       warmRaf = 0;
       warmQueue = [];
       stats.warmMs = Math.round(now() - warmStarted);
-      // The canvas as the view has it (a match's start clears it itself).
-      if (view !== "match") { clearWarm(); canvas.style.visibility = "hidden"; }
+      // The canvas as the view has it (a match's start clears it itself). Receiver 106: a weak dongle's stays, the
+      // photograph under the card.
+      if (view !== "match") { clearWarm(); if (weak) showStill(); else canvas.style.visibility = "hidden"; }
     }
 
     // The court's canvas copies as decoded bitmaps the canvas's size (`loadPlate`): 3.7 MB and 2 MB.
@@ -202,8 +274,7 @@
     let bitmapBytes = 0;
     function plannedCanvasWidth() {
       const box = stage.getBoundingClientRect();
-      const plan = sceneCore && sceneCore.canvasPlan ? sceneCore.canvasPlan({ ua: navigator.userAgent, wide: true }) : { width: 1280 };
-      return options.canvasWidth || (sceneCore && sceneCore.canvasWidth ? sceneCore.canvasWidth(box.width || 1280, window.devicePixelRatio, plan.width) : 1280);
+      return options.canvasWidth || (tvGame ? tvGame.width(box.width || 1280, window.devicePixelRatio, currentPlan()) : 1280);
     }
     // `size`: the bitmap's size when it is kept smaller than the file ([width, height]).
     function loadBitmap(url, size) {
@@ -218,11 +289,15 @@
     function loadSheet(name) {
       if (pictures.has(name)) return pictures.get(name).wait;
       const spec = manifest && manifest.sheets && manifest.sheets[name];
-      const entry = { image: null, scale: spec ? spec.scale : 1, wait: null, warmed: 0 };
+      // Receiver 106: a weak dongle's copy from small/ (the weak plan), the full one if that never comes.
+      const file = core.sheetFile(spec, weak);
+      const entry = { image: null, scale: file ? file.scale : 1, wait: null, warmed: 0 };
       // A sheet that did not come is asked for once more (Nov 14 2026, the Ultra just after a deploy: "loaded, missing 1";
       // a frame that draws a sheet the TV lacks is never shown).
-      const url = base + name + ".webp?v=" + RECEIVER_VERSION;
+      const url = base + (file ? file.folder : "") + name + ".webp?v=" + RECEIVER_VERSION;
+      const full = base + name + ".webp?v=" + RECEIVER_VERSION;
       entry.wait = spec ? loadImage(url).then((image) => image || new Promise((resolve) => setTimeout(resolve, 700)).then(() => loadImage(url + "&again=1")))
+        .then((image) => (image || !file.folder ? image : loadImage(full).then((fallback) => { if (fallback) entry.scale = spec.scale; return fallback; })))
         .then((image) => { entry.image = image; return image; }) : Promise.resolve(null);
       pictures.set(name, entry);
       return entry.wait;
@@ -233,6 +308,8 @@
     // size (receiver 97; the image was decoded on the page's thread, ~140 ms, in the first frame that drew the net).
     let canvasPlate = null, canvasTall = null;
     let plateWait = null, tallSettled = false;
+    // Receiver 106: whether the bitmaps have come (or failed): the weak plan draws them, so a match's start waits for them.
+    let canvasPlateSettled = false, canvasTallSettled = false;
     function loadPlate() {
       if (plate) return Promise.resolve(plate);
       if (plateWait) return plateWait;
@@ -241,21 +318,23 @@
       const high = Math.round(plannedCanvasWidth() * 9 / 16);
       const sized = (size) => (Array.isArray(size) && size[1] > high ? [Math.round(size[0] * high / size[1]), high] : null);
       loadManifest().then(() => {
-        loadBitmap(plateImg.src, sized(manifest.plate && manifest.plate.size)).then((bitmap) => { canvasPlate = bitmap; });
-        if (tallImgs[0]) loadBitmap(base + "PickleballCourtTall.webp?v=" + RECEIVER_VERSION, sized(manifest.plateTall && manifest.plateTall.size)).then((bitmap) => { canvasTall = bitmap; });
+        loadBitmap(plateImg.src, sized(manifest.plate && manifest.plate.size)).then((bitmap) => { canvasPlate = bitmap; canvasPlateSettled = true; showStill(); });
+        if (tallImgs[0]) loadBitmap(base + "PickleballCourtTall.webp?v=" + RECEIVER_VERSION, sized(manifest.plateTall && manifest.plateTall.size)).then((bitmap) => { canvasTall = bitmap; canvasTallSettled = true; showStill(); });
+        else canvasTallSettled = true;
       });
       if (tallImgs[0] && !tallImgs[0].src) {
-        tallImgs[0].onload = () => { tallPlate = tallImgs[0]; tallSettled = true; };
+        tallImgs[0].onload = () => { tallPlate = tallImgs[0]; tallSettled = true; showStill(); };
         tallImgs[0].onerror = () => { tallSettled = true; };
         for (const image of tallImgs) {
           if (!image) continue;
           image.src = base + "PickleballCourtTall.webp?v=" + RECEIVER_VERSION;
           // Decoded ahead of its first showing (receiver 97: 6.3 MB each, first shown on a split match's first frame).
-          if (image.decode) image.decode().catch(() => {});
+          // Receiver 106: not on a weak dongle, where the layers never show (the canvas draws its bitmap).
+          if (image.decode && !weak) image.decode().catch(() => {});
         }
       } else if (!tallImgs[0]) tallSettled = true;
       plateWait = new Promise((resolve) => {
-        const done = () => { plate = plateImg.naturalWidth ? plateImg : null; resolve(plate); };
+        const done = () => { plate = plateImg.naturalWidth ? plateImg : null; resolve(plate); showStill(); };
         if (plateImg.complete && plateImg.naturalWidth) done();
         else { plateImg.onload = done; plateImg.onerror = () => resolve(null); }
       });
@@ -316,9 +395,12 @@
     // 4 s). The hello's `hold: 0` (benches) starts as receiver 96 did. Not on a manual clock (the film, tests' own draws).
     const START = { cap: 3500, firstFrame: 600, warm: 1500, flushFrames: 2, steadyFrames: 8, steadyGap: 45, steadyCap: 1200 };
     let loading = 0, holdOn = !options.manualClock, starting = null, matchAt = null, statsEvery = 2000;
+    // Receiver 109: when the match's own frames began to show (warm reports count from here), null while none do.
+    let shownAt = null;
     function beginStart() {
       matchAt = now();
       starting = holdOn ? { at: matchAt, phase: "load", flush: 0, load: 0, shown: 0, steady: 0, last: null } : null;
+      shownAt = starting ? null : matchAt;
     }
     function firstFrameOps() {
       const first = playout.frames[0];
@@ -331,8 +413,11 @@
       const since = t - s.at;
       if (s.phase === "load") {
         const ops = firstFrameOps();
-        const waitsTall = !!ops && ops.some((op) => op.kind === "P" && op.tall) && !tallSettled;
-        if (since < START.cap && (loading > 0 || waitsTall || (!ops && since < START.firstFrame))) return false;
+        const tall = !!ops && ops.some((op) => op.kind === "P" && op.tall);
+        // Receiver 106: the weak plan draws the photographs' bitmaps, so it waits for those too.
+        const waitsTall = tall && (!tallSettled || (weak && !canvasTallSettled));
+        const waitsPlate = weak && !canvasPlateSettled;
+        if (since < START.cap && (loading > 0 || waitsTall || waitsPlate || (!ops && since < START.firstFrame))) return false;
         s.phase = "warm"; s.load = since;
         // What the first frame draws, always (the TV may have let its copies go since the setup warmed them), then the
         // sheets the setup's warm-up had not reached.
@@ -353,9 +438,10 @@
         warmQueue = [];
         stats.warmMs = Math.round(since - s.load);
         clearWarm();
-        canvas.style.visibility = "hidden";
+        // Receiver 106: a weak dongle's canvas stays, its photograph under the card until the match's first whole frame.
+        if (!weak) canvas.style.visibility = "hidden";
         playout.forgetLateness();
-        s.phase = "steady"; s.shown = since; s.last = null; s.steady = 0;
+        s.phase = "steady"; s.shown = since; s.last = null; s.steady = 0; shownAt = t;
         resetStats(t);
         return true;
       }
@@ -371,6 +457,13 @@
     // The photographs' layers where the match's first frame has them, under the ready card: shown there on the match's
     // first frame, a split screen's tall pair was first drawn (6.3 MB each) in it.
     function placeFirst(ops) {
+      // Receiver 106: a weak dongle paints the first frame's photographs on its canvas instead (no layers).
+      if (weak) {
+        stillOps = ops ? ops.filter((op) => op.kind === "P" || op.kind === "V") : null;
+        paintStill(null);
+        canvas.style.visibility = "visible";
+        return;
+      }
       if (ops) {
         const halves = core.halves(ops);
         showSplit(!!halves);
@@ -387,18 +480,36 @@
 
     // MARK: Canvas
 
+    // Receiver 109: cricket's plan (RallycadeTVGame.plan): a weak dongle 854, the Linux dongles 1280, an Android TV 1920
+    // watched by cricket's rate watch and narrowed to 1280 for good when it can't keep 25 a second (as the stadium since
+    // receiver 46; until 109 pickleball drew 1920 on every Android TV however it kept up), starting narrow on a TV the
+    // stadium (or pickleball) found slow before.
+    const storage = (() => { try { return window.localStorage; } catch (error) { return null; } })();
+    const perf = tvGame ? tvGame.createPerf({ game: "pickleball", ua: navigator.userAgent, storage, pathname: location.pathname }) : null;
+    let planned = null, plannedWeak = null;
+    function currentPlan() {
+      if (perf && perf.narrowed()) return perf.narrowed();
+      if (!planned || plannedWeak !== weak) {
+        plannedWeak = weak;
+        planned = tvGame ? tvGame.plan({ game: "pickleball", ua: navigator.userAgent, weak, storage, pathname: location.pathname })
+          : { width: weak ? 854 : 1280, adaptive: false, why: "fallback" };
+      }
+      return planned;
+    }
     function sizeCanvas() {
       const box = stage.getBoundingClientRect();
-      const plan = sceneCore && sceneCore.canvasPlan ? sceneCore.canvasPlan({ ua: navigator.userAgent, wide: true }) : { width: 1280 };
-      const width = options.canvasWidth || (sceneCore && sceneCore.canvasWidth ? sceneCore.canvasWidth(box.width || 1280, window.devicePixelRatio, plan.width) : 1280);
+      const width = options.canvasWidth || (tvGame ? tvGame.width(box.width || 1280, window.devicePixelRatio, currentPlan()) : 1280);
       if (width !== canvasPx || canvas.width !== width) {
         canvasPx = width;
         canvas.width = width;
         canvas.height = Math.round(width * 9 / 16);
         lastDrawn = null;
+        // Receiver 106: a resized canvas is empty (an opaque one black): the weak plan draws it whole again.
+        weakKey = ""; stillShown = ""; splitFill = null;
       }
       // The HUD's phone-height stage scaled onto the TV's.
       if (hud) hud.style.transform = "scale(" + ((box.width || 1280) / core.HUD_STAGE.width) + ")";
+      if (splitScreen) splitScreen.fit(box.width || 1280);
     }
 
     function union(boxes) {
@@ -474,6 +585,91 @@
       court.style.transform = "scale(" + scale.toFixed(4) + ")";
     }
 
+    // MARK: The weak plan's drawing (receiver 106)
+
+    // The photographs as the weak plan draws them: the canvas's bitmaps, else the images.
+    const wideSource = () => canvasPlate || (plate && plate.naturalWidth ? plate : null);
+    const tallSource = () => canvasTall || tallPlate;
+    // What a draw's photographs depend on: their ops and which pictures there are to draw them with.
+    function plateKey(plateOps) {
+      return plateOps.map((op) => [op.kind, op.x, op.y, op.w, op.h, op.tall ? 1 : 0].join(",")).join(";")
+        + "|" + (canvasPlate ? "b" : plate ? "i" : "-") + (canvasTall ? "b" : tallPlate ? "i" : "-") + "|" + canvas.width;
+    }
+    // Under the photographs, where they don't reach: the page's own background (`.pk-stage`, a split screen's
+    // `.pk-split .pk-court` gradient), in canvas pixels.
+    let splitFill = null;
+    function paintBackground(split) {
+      if (split && !splitFill) {
+        splitFill = ctx.createLinearGradient(0, 0, 0, canvas.height);
+        splitFill.addColorStop(0, "#060e0c"); splitFill.addColorStop(0.55, "#0c1a17"); splitFill.addColorStop(1, "#0c1a17");
+      }
+      ctx.fillStyle = split ? splitFill : "#0c1a17";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+    // A stage-point rectangle as the canvas pixels it touches, a pixel round it.
+    function clipTo(box, k) {
+      ctx.beginPath();
+      ctx.rect(Math.floor(box.x * k) - 1, Math.floor(box.y * k) - 1, Math.ceil(box.w * k) + 3, Math.ceil(box.h * k) + 3);
+      ctx.clip();
+    }
+    // The match's frame on the opaque canvas: whole when its photographs changed (or the canvas showed something else),
+    // else only where the players, the ball and the rest were last time and are now.
+    let weakKey = "";
+    function drawWeak(ops, split) {
+      const k = canvas.width / core.STAGE.width;
+      const key = plateKey(ops.filter((op) => op.kind === "P" || op.kind === "V"));
+      const bounds = union(ops.filter((op) => op.kind !== "P" && op.kind !== "V").map((op) => core.opBounds(op)));
+      let dirty = null;
+      if (key === weakKey) {
+        dirty = union([lastDrawn, bounds]);
+        // Nothing moves and nothing was drawn over the photographs: the canvas shows this frame already.
+        if (!dirty) return 0;
+      }
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.save();
+      if (dirty) clipTo(dirty, k);
+      paintBackground(split);
+      ctx.setTransform(k, 0, 0, k, 0, 0);
+      const missing = core.drawOps(ctx, ops, picture, wideSource(), true, tallSource());
+      ctx.restore();
+      weakKey = key; lastDrawn = bounds; stillShown = "";
+      return missing;
+    }
+    // What a weak dongle's canvas shows when no match is drawn on it (under the ready and result cards, and while a
+    // match's start warms its pictures): the photographs where they last were, with nobody on the court, as the layers
+    // show them on other TVs. `rect` (stage points) paints only there. `stillOps`: the last frame's "P" and "V" ops (or
+    // the match's first frame's), none for the wide photograph filling the stage.
+    let stillOps = null, stillShown = "";
+    function stillLayout() {
+      if (stillOps && stillOps.length) return stillOps;
+      const size = (plate && plate.naturalWidth && [plate.naturalWidth, plate.naturalHeight]) || (manifest && manifest.plate && manifest.plate.size) || [1672, 941];
+      return [Object.assign({ kind: "P", tall: false }, core.plateLayout(size, core.STAGE.width, core.STAGE.height))];
+    }
+    function paintStill(rect) {
+      if (!weak) return;
+      sizeCanvas();
+      const k = canvas.width / core.STAGE.width;
+      const ops = stillLayout();
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.save();
+      if (rect) clipTo(rect, k);
+      paintBackground(ops.some((op) => op.kind === "V"));
+      ctx.setTransform(k, 0, 0, k, 0, 0);
+      // A photograph still loading is left out (drawOps would fill its place with the court's blue): the page's
+      // background shows there, as round a layer still loading on other TVs.
+      core.drawOps(ctx, ops.filter((op) => op.kind !== "P" || (op.tall ? tallSource() : wideSource())), picture, wideSource(), true, tallSource());
+      ctx.restore();
+      if (!rect) { stillShown = plateKey(ops); weakKey = ""; lastDrawn = null; }
+    }
+    // The still painted whole where the view wants it and it is not up already; never over a match being drawn, or over
+    // the warm-up's patch while it runs (it paints its own patch, `warmSome`).
+    function showStill() {
+      if (!weak || view === "off" || (view === "match" && drawn) || warmRaf || (starting && starting.phase === "warm")) return;
+      canvas.style.visibility = "visible";
+      if (stillShown === plateKey(stillLayout())) return;
+      paintStill(null);
+    }
+
     // Draws the frame for TV time `local`; true when something was drawn.
     function drawAt(local) {
       const shown = playout.at(local);
@@ -482,21 +678,30 @@
       const ops = shown.ops.map(core.decodeOp).filter(Boolean);
       const halves = core.halves(ops);
       showSplit(!!halves);
-      if (halves) {
+      // Receiver 106: a weak dongle's photographs are on its canvas, not layers.
+      if (weak) {
+        // Nothing to place.
+      } else if (halves) {
         halves.forEach(placeHalf);
       } else {
         placePlate(ops.find((op) => op.kind === "P"));
       }
       applyPush(halves ? null : shown.push);
-      const k = canvas.width / core.STAGE.width;
-      ctx.setTransform(1, 0, 0, 1, 0, 0);
-      // Clear only where the last frame drew (the photograph is its own layer).
-      const clear = lastDrawn;
-      if (clear) ctx.clearRect(Math.floor(clear.x * k) - 1, Math.floor(clear.y * k) - 1, Math.ceil(clear.w * k) + 3, Math.ceil(clear.h * k) + 3);
-      else ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.setTransform(k, 0, 0, k, 0, 0);
-      const missing = core.drawOps(ctx, ops, picture, plate && (canvasPlate || plate), false, tallPlate && (canvasTall || tallPlate));
-      lastDrawn = union(ops.filter((op) => op.kind !== "P" && op.kind !== "V").map((op) => core.opBounds(op)));
+      let missing;
+      if (weak) {
+        stillOps = ops.filter((op) => op.kind === "P" || op.kind === "V");
+        missing = drawWeak(ops, !!halves);
+      } else {
+        const k = canvas.width / core.STAGE.width;
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        // Clear only where the last frame drew (the photograph is its own layer).
+        const clear = lastDrawn;
+        if (clear) ctx.clearRect(Math.floor(clear.x * k) - 1, Math.floor(clear.y * k) - 1, Math.ceil(clear.w * k) + 3, Math.ceil(clear.h * k) + 3);
+        else ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.setTransform(k, 0, 0, k, 0, 0);
+        missing = core.drawOps(ctx, ops, picture, plate && (canvasPlate || plate), false, tallPlate && (canvasTall || tallPlate));
+        lastDrawn = union(ops.filter((op) => op.kind !== "P" && op.kind !== "V").map((op) => core.opBounds(op)));
+      }
       stats.missing += missing;
       renderHUD(core.hudView(shown.hud, shown.moment));
       stats.drawMs.push(now() - started);
@@ -513,10 +718,15 @@
     // MARK: HUD
 
     const hudShown = {};
+    const set0 = (key, value, apply) => { if (hudShown[key] !== value) { hudShown[key] = value; apply(value); } };
     function renderHUD(h) {
       if (!hud) return;
       hud.hidden = !h;
+      // Receiver 108: the split screen when the phone sends one; the game's own score bug gives way to its bar.
+      const screen = h && splitModule ? splitModule.splitView(h.screen) : null;
+      if (splitScreen) splitScreen.render(screen);
       if (!h) return;
+      set0("ss", !!screen, (v) => hud.classList.toggle("pk-ss", v));
       const set = (key, value, apply) => { if (hudShown[key] !== value) { hudShown[key] = value; apply(value); } };
       set("you", h.you, (v) => setText(el("pk-you"), v));
       set("cpu", h.cpu, (v) => setText(el("pk-cpu"), v));
@@ -536,8 +746,9 @@
           const words = el("pk-banner" + suffix + "-text");
           words.style.fontSize = b.fontSize + "px";
           setText(words, b.text);
-          // A new line fades in (the phone's .transition(.opacity)).
-          banner.classList.remove("pk-in"); void banner.offsetWidth; banner.classList.add("pk-in");
+          // A new line fades in (the phone's .transition(.opacity)). Receiver 106: not on a weak dongle, where the fade
+          // repaints the HUD every frame for its 0.2 s and the restart forces a layout.
+          if (!weak) { banner.classList.remove("pk-in"); void banner.offsetWidth; banner.classList.add("pk-in"); }
         });
       }
       for (const [suffix, c, leading] of [["", h.callout, null], ["2", h.callout2, false]]) {
@@ -554,8 +765,11 @@
             callout.classList.toggle("good", c.good);
             callout.classList.toggle("leading", lead);
           });
-          callout.style.opacity = c.alpha.toFixed(3);
-          callout.style.transform = "translateY(" + c.lift.toFixed(1) + "px)";
+          // Receiver 106: a weak dongle shows the callout whole for its 1.2 s, without the fade and lift that repaint the
+          // HUD every frame.
+          const alpha = weak ? "" : c.alpha.toFixed(3), lift = weak ? "" : "translateY(" + c.lift.toFixed(1) + "px)";
+          if (callout.style.opacity !== alpha) callout.style.opacity = alpha;
+          if (callout.style.transform !== lift) callout.style.transform = lift;
         } else hudShown["callout" + suffix] = "";
       }
     }
@@ -603,19 +817,27 @@
       resultCard.hidden = view !== "result";
       if (showReady) renderReady();
       if (view === "result") renderResult();
-      canvas.style.visibility = view === "match" && drawn ? "visible" : "hidden";
+      // Receiver 106: a weak dongle's canvas is up whenever the overlay is, the photographs under the cards on it.
+      canvas.style.visibility = view === "match" && drawn ? "visible" : weak && view !== "off" ? canvas.style.visibility : "hidden";
       if (hud) hud.style.visibility = view === "match" && drawn ? "visible" : "hidden";
+      if (splitScreen && splitScreen.layer) splitScreen.layer.style.visibility = view === "match" && drawn ? "visible" : "hidden";
       if (view === "match" || view === "result") start(); else stop();
+      showStill();
     }
 
     function setView(message) {
       const next = ["off", "ready", "match", "result"].includes(message.v) ? message.v : "off";
       if (message.ready) readyWords = message.ready;
       if (message.result) resultWords = message.result;
-      if (next === "match" && view !== "match") { playout.reset(); if (clockOffset !== null) playout.setOffset(clockOffset); drawn = false; lastDrawn = null; ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, canvas.width, canvas.height); }
+      if (next === "match" && view !== "match") {
+        playout.reset(); if (clockOffset !== null) playout.setOffset(clockOffset); drawn = false; lastDrawn = null;
+        // Receiver 106: an opaque canvas keeps its photograph (cleared, it would be black under the card).
+        if (!weak) { ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, canvas.width, canvas.height); }
+        weakKey = "";
+      }
       const began = next === "match" && view !== "match";
       view = next;
-      if (began) beginStart(); else if (view !== "match") starting = null;
+      if (began) beginStart(); else if (view !== "match") { starting = null; shownAt = null; }
       if (view !== "off") { loadPlate(); }
       // Each setup warms the pictures again: a Chromecast lets decoded pictures go (receiver 79).
       if (view === "ready") warm();
@@ -626,13 +848,23 @@
 
     // When the last animation frame ran: an arrival handled long after it was held up by the page, not the trip.
     let lastTick = null;
-    const STALLED_MS = 60;
+    // Receiver 106, the weak plan: frames handled just after the animation frame that ended one of the TV's own stalls
+    // are kept out of the delay too (core.arrivalStalled). In e754c9zc and bzrb3cvj each freeze of the 32-bit TV (gap
+    // 1000–1505) was followed by "late" arrivals that took the delay from ~130 to 205–220 ms for ~10 s (the TV's picture
+    // and the phone's sounds that much further behind): frames held up by the TV itself, handled after its first
+    // animation frame back, which receiver 79's rule (60 ms since the last animation frame) did not catch.
+    let lastTickGap = 0;
     function frame() {
       raf = 0;
       if (!running) return;
       const t = now();
-      if (view === "match" && stepStart(t)) drawAt(t);
+      // Receiver 109: cricket's rate watch on the match's own frames (not its start's), as the stadium's.
+      if (view === "match" && stepStart(t)) {
+        const drew = drawAt(t);
+        if (!starting && perf && !options.canvasWidth && perf.frame(t, drew, currentPlan(), canvas.width)) { sizeCanvas(); drawAt(t); }
+      }
       playout.settle(playout.target(averageGap()), lastTick === null ? 33 : t - lastTick);
+      lastTickGap = lastTick === null ? 0 : t - lastTick;
       lastTick = t;
       maybeReport();
       raf = requestAnimationFrame(frame);
@@ -657,12 +889,19 @@
         gap: Math.round(core.percentile(stats.draws, 0.9)), frames: stats.frames,
         drawMs: Math.round(core.percentile(stats.drawMs, 0.5) * 10) / 10, queue: stats.queue || 0,
         stale: Math.round(stats.stale || 0), delay: Math.round(playout.delay), late: playout.counts.late, missing: stats.missing,
-        warmed: stats.warmed || 0, warmMs: stats.warmMs || 0
+        warmed: stats.warmed || 0, warmMs: stats.warmMs || 0,
+        // Receiver 106: the longest gap between draws (`gap` is the 90th percentile: one freeze in a report hides there).
+        worst: Math.round(stats.draws.length ? Math.max(...stats.draws) : 0)
       };
-      if (view === "match") send(message);
+      // Receiver 109: cricket's warm reports (RallycadeTVGame.report, core.warmReport): one in the match's first 8 s while
+      // its pictures still load or a sprite was missing says `warm`, its rate as `wfps`/`wgap`, so no phone paces from
+      // the decoding. `weak: 1` on the weak plan (receiver 106).
+      const sent = tvGame ? tvGame.report(message, { sinceOn: shownAt !== null ? t - shownAt : null, loading, missing: message.missing }, weak)
+        : Object.assign(message, weak ? { weak: 1 } : {});
+      if (view === "match") send(sent);
       stats.draws = []; stats.drawMs = []; stats.frames = 0; stats.missing = 0; stats.since = t;
       if (debug && chip) { chip.hidden = false; chip.textContent = "fps " + message.fps + " · stale " + message.stale + " ms · delay " + message.delay + " ms"; }
-      return message;
+      return sent;
     }
 
     function report(where, error) {
@@ -684,8 +923,16 @@
           holdOn = !options.manualClock && message.hold !== 0;
           statsEvery = Number(message.stats) >= 500 ? Number(message.stats) : 2000;
           if (chip) chip.hidden = !debug;
+          // Receiver 106: the TV's own plan, or the bench's `x.weak` (1: draw as a 32-bit Chromecast does; 0: not).
+          setWeak(message.x && typeof message.x === "object" && (message.x.weak === 0 || message.x.weak === 1) ? message.x.weak === 1 : weakDongle);
           preloadWhenWanted(message.look, message.sheets);
-          send({ t: "ready", pickleball: core.VERSION, version: RECEIVER_VERSION, looks: ["man", "woman"], friends: 1, tall: tallImgs[0] && tallImgs[1] ? 1 : 0, go: holdOn ? 1 : 0 });
+          {
+            const ready = { t: "ready", pickleball: core.VERSION, version: RECEIVER_VERSION, looks: ["man", "woman"], friends: 1, tall: tallImgs[0] && tallImgs[1] ? 1 : 0, go: holdOn ? 1 : 0 };
+            // Receiver 108: draws the two-player split screen (the HUD's `ss`).
+            if (splitScreen && splitScreen.layer) ready.ss = 1;
+            if (weak) ready.weak = 1;
+            send(ready);
+          }
           break;
         case "ping":
           send({ t: "pong", i: message.i, r: now() });
@@ -701,7 +948,7 @@
           break;
         case "f": {
           const local = now();
-          const stalled = running && lastTick !== null && local - lastTick > STALLED_MS;
+          const stalled = running && lastTick !== null && core.arrivalStalled(local - lastTick, lastTickGap, weak);
           if (playout.add(message, local, stalled)) {
             stats.frames += 1;
             arrivals.push(local); if (arrivals.length > 20) arrivals.shift();
@@ -726,6 +973,11 @@
       get pickleballWanted() { return pickleballWanted; },
       get view() { return view; }, get drawn() { return drawn; }, get look() { return look; },
       get starting() { return starting ? starting.phase : null; },
+      get weak() { return weak; }, get canvas() { return canvas; },
+      // Receiver 109: the canvas plan (cricket's, RallycadeTVGame) and its rate watch.
+      get canvasPlan() { return currentPlan(); }, perf,
+      // Tests: the next draw is whole (receiver 106's weak plan otherwise paints only where things moved).
+      drawWhole() { weakKey = ""; lastDrawn = null; },
       stats: () => maybeReport(true), sizeCanvas, picture, loaded: () => lookLoadedAt !== null,
       release() { stop(); pictures.clear(); },
       get bitmapBytes() { return bitmapBytes; }

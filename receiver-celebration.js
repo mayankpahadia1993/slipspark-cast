@@ -400,6 +400,12 @@
       e.eyebrow.textContent = celebration.eyebrow;
       e.title.textContent = celebration.title;
       e.subtitle.textContent = celebration.subtitle;
+      // Receiver 107: the phone's way on where a raised hand ends nothing (a
+      // full match's result: "Continue on your phone"); an older phone's
+      // celebration is the scorecard's, which a raised hand ends.
+      const hint = celebration.hint == null ? WORDS.skipTV : String(celebration.hint);
+      e.hint.textContent = hint;
+      e.hint.hidden = !hint.trim();
       e.cheque.innerHTML = chequeMarkup(celebration, id + "q", today());
       sheet = e.cheque.querySelector ? e.cheque.querySelector(".cq-sheet") : null;
       if (sheet) sheet.style.transform = `scale(${layoutNow.cheque[0] / CHEQUE.size[0]})`;

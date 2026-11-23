@@ -833,6 +833,21 @@
     };
   }
 
+  // The test builds' status line on the TV (`debug: 1` hellos), from a `stats` report. Receiver 110 (Nov 23 2026,
+  // tbvfx4s3): it read "scene 27 fps · draw 3.8/24.7 ms", and the owner read that as "drawing at 3 or 4 out of 30". Each
+  // number now says what it is: draws a second, the phone's frames arriving a second, and each draw's milliseconds.
+  function debugLine(stats) {
+    const seconds = 2; // `stats` go every 2 s (receiver-scene.js housekeeping)
+    const parts = [stats.fps + " draws a second", Math.round((stats.frames || 0) / seconds) + " frames a second in",
+      "each draw " + stats.drawMs + " ms (longest " + stats.drawMax + ")", "frames late " + stats.behind + " ms"];
+    if (stats.pose != null) {
+      parts.push("batter's pose " + stats.pose + "/" + stats.pose90 + " ms old"
+        + (stats.ahead ? ", drawn " + stats.ahead + " ahead = " + stats.eff + "/" + stats.eff90 + " ms" : ""));
+    }
+    parts.push("queue " + stats.queue, "images " + stats.images, stats.w + " wide (" + stats.canvas + ")");
+    return parts.join(" · ") + (stats.synced ? "" : " · not synced");
+  }
+
   // The p-th percentile (0..1) of a list of numbers.
   function percentile(values, p) {
     if (!values.length) return 0;
@@ -1303,7 +1318,7 @@
   return {
     isWeakDongle, drawsInset, storageNames, STAGE, MAX_BLEND_GAP, MAX_STEP, CANVAS, normalizeFrame, plainFrame, expandInset, shapeKey, opShape, viewOf, matchOps, blendMatched, blendMatchedInto,
     blendFrames, blendFramesInto, cloneFrame, createTimeline, createClock,
-    percentile, tracePath, cssColor, pictureSize, canvasPlan, canvasWidth, createRateWatch, STEADY, createSteadyWatch, createLiveLayer, hasLiveSlot, poseAge, poseAhead,
+    percentile, debugLine, tracePath, cssColor, pictureSize, canvasPlan, canvasWidth, createRateWatch, STEADY, createSteadyWatch, createLiveLayer, hasLiveSlot, poseAge, poseAhead,
     filterParts, opBounds, layerEnd, clipsWholeStage, mergeRects, overStrip, readLook, lookColours, dyeFrame, copyAtlasFrame, GRIP_OPACITY, GRIP_SHADE,
     readGear, gearColours, GEAR_HELMET_OPACITY, GEAR_FINISH_OPACITY, GEAR_STICKER, WARM_REPORT_MS, warmReport
   };

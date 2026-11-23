@@ -6,7 +6,9 @@
   "use strict";
   const NAMESPACE = "urn:x-cast:com.slipspark.music", LEASE_MS = 3000;
   // Only the bundled original bed: a sender cannot make the TV fetch a URL.
-  function createPlayer({ audio, send, now = Date.now, setTimer = setTimeout, clearTimer = clearTimeout }) {
+  // `ready` (receiver 107, optional): a promise settled once `audio` has its source (the TV's own copy of the bed,
+  // receiver.js); a play waits for it.
+  function createPlayer({ audio, send, ready = null, now = Date.now, setTimer = setTimeout, clearTimer = clearTimeout }) {
     let owner = null, id = null, sequence = -1, deadline = 0, lease, ramp, target = 0, version = 0, ownerVersion = 0, playPending = false;
     audio.loop = true; audio.preload = "auto"; audio.volume = 0;
     function stop() {
@@ -50,13 +52,17 @@
       if (shouldRamp) ++version;
       if (volume === 0) { ownerVersion++; playPending = false; }
       if (volume === 0 && !(Number(message.fade) > 0)) { audio.volume = 0; audio.pause(); }
-      if (volume > 0 && audio.paused) {
+      if (volume > 0 && audio.paused && !playPending) {
         try {
-          if (Number.isFinite(audio.duration) && audio.duration > 0) audio.currentTime = position % audio.duration;
-          else audio.currentTime = position;
           const token = ownerVersion;
+          const start = () => {
+            if (Number.isFinite(audio.duration) && audio.duration > 0) audio.currentTime = position % audio.duration;
+            else audio.currentTime = position;
+            return audio.play();
+          };
           playPending = true;
-          const playing = audio.play();
+          // Receiver 107: a bed still coming from the TV's own copy plays once it is there (a stop meanwhile wins).
+          const playing = ready ? Promise.resolve(ready).then(() => (token === ownerVersion ? start() : undefined)) : start();
           Promise.resolve(playing).then(() => {
             if (token !== ownerVersion) return;
             playPending = false;

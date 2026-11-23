@@ -515,3 +515,40 @@ body[data-card="picture"] #app, body[data-card="waiting"] #app { visibility: hid
 .pk-split .pk-court { background: linear-gradient(#060e0c, #0c1a17 55%); }
 .pk-hud.pk-split .pk-scorebug { left: 50%; transform: translateX(-50%); }
 .pk-hud.pk-split .pk-band { display: none; }
+/* Receiver 106: the weak plan (a 32-bit Chromecast, receiver-pickleball.js `weakDongle`). The court's photographs are drawn
+   in the opaque canvas, so their layers neither show nor decode; the court is no layer of its own; the HUD never animates,
+   fades or casts a shadow, so it is painted only when its words change. */
+.pickleball[data-weak="1"] .pk-half, .pickleball[data-weak="1"] .pk-plate { display: none !important; }
+.pickleball[data-weak="1"] .pk-court { will-change: auto; }
+.pickleball[data-weak="1"] .pk-hud, .pickleball[data-weak="1"] .pk-hud * { animation: none !important; transition: none !important; box-shadow: none !important; }
+/* Receiver 108: the two-player split screen any game can use (receiver-split.js): a 1280 x 720 layer over the game's
+   halves, scaled to the TV. One top bar, a thin divider, each half edged in its player's colour with their name tag at its
+   inner bottom corner, a prompt only in its own half. Nothing animates or casts a shadow (a weak dongle paints it once). */
+.ss { position: absolute; left: 0; top: 0; width: 1280px; height: 720px; transform-origin: 0 0; pointer-events: none;
+  font-family: Nunito, "Varela Round", "Google Sans", sans-serif; color: #fcf5de; }
+.ss[hidden] { display: none; }
+.ss-frame { position: absolute; top: 0; bottom: 0; width: 640px; box-sizing: border-box; border: 5px solid transparent; }
+.ss-frame.ss-l { left: 0; border-right-width: 0; }
+.ss-frame.ss-r { left: 640px; border-left-width: 0; }
+.ss-divider { position: absolute; left: 638px; top: 0; width: 4px; height: 720px; background: #f4efe3; }
+.ss-bar { position: absolute; left: 0; top: 0; width: 1280px; height: 62px; display: flex; align-items: center;
+  background: rgba(8, 24, 20, .82); border-bottom: 2px solid rgba(255, 255, 255, .14); }
+.ss-side { flex: 1; display: flex; align-items: center; gap: 12px; padding: 0 26px; font-size: 24px; font-weight: 900; letter-spacing: 1px; white-space: nowrap; }
+.ss-side.ss-l { justify-content: flex-end; }
+.ss-side.ss-r { justify-content: flex-start; }
+.ss-chip { width: 18px; height: 18px; border-radius: 4px; }
+.ss-score { min-width: 40px; text-align: center; font-size: 40px; font-weight: 900; font-variant-numeric: tabular-nums; }
+.ss-serve { width: 12px; height: 12px; border-radius: 50%; background: #f6c542; visibility: hidden; }
+.ss-serve.on { visibility: visible; }
+.ss-mid { min-width: 96px; text-align: center; font-size: 14px; font-weight: 800; letter-spacing: 2px; color: #bcd3cb; }
+.ss-tag { position: absolute; bottom: 18px; padding: 5px 12px; border-radius: 9px; font-size: 16px; font-weight: 900; letter-spacing: 1px; color: #fff; white-space: nowrap; }
+.ss-tag.ss-l { right: 662px; }
+.ss-tag.ss-r { left: 662px; }
+.ss-prompt { position: absolute; bottom: 64px; width: max-content; max-width: 400px; transform: translateX(-50%); box-sizing: border-box;
+  padding: 8px 16px; border-radius: 12px; border: 2px solid; background: rgba(8, 24, 20, .9); font-size: 19px; font-weight: 800; line-height: 1.2; text-align: center; }
+.ss-prompt[hidden] { display: none; }
+.ss-prompt.ss-l { left: 320px; }
+.ss-prompt.ss-r { left: 960px; }
+/* Pickleball under the split screen: its own score bug gives way to the bar. */
+.pk-hud.pk-ss .pk-scorebug { display: none; }
+.pk-split-host { position: absolute; inset: 0; pointer-events: none; }
