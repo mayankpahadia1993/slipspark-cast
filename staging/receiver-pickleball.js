@@ -33,9 +33,12 @@
   // photograph layers, a HUD that never animates, the sheets' smaller copies (`pickleball/small/`), no decode() at load,
   // and arrivals just after the TV's own stall kept out of the delay. `ready` and `stats` say `weak: 1`; `stats` add
   // `worst`, the longest gap between draws. The hello's `x.weak` (1 or 0, benches) draws as a weak dongle does, or not.
-  const RECEIVER_VERSION = 108;
+  const RECEIVER_VERSION = 109;
   const core = window.RallycadePickleballCore;
   const sceneCore = window.RallycadeSceneCore;
+  // Receiver 109: cricket's canvas plan, rate watch and warm reports, through the layer every game uses
+  // (receiver-tv-game.js; docs/design/CAST_SCENE.md "Adding a game to the TV").
+  const tvGame = window.RallycadeTVGame;
 
   function createPickleball(options) {
     const root = options.root, stage = options.stage, court = options.court, plateImg = options.plate;
@@ -271,8 +274,7 @@
     let bitmapBytes = 0;
     function plannedCanvasWidth() {
       const box = stage.getBoundingClientRect();
-      const plan = sceneCore && sceneCore.canvasPlan ? sceneCore.canvasPlan({ ua: navigator.userAgent, wide: true, weak }) : { width: weak ? 854 : 1280 };
-      return options.canvasWidth || (sceneCore && sceneCore.canvasWidth ? sceneCore.canvasWidth(box.width || 1280, window.devicePixelRatio, plan.width) : 1280);
+      return options.canvasWidth || (tvGame ? tvGame.width(box.width || 1280, window.devicePixelRatio, currentPlan()) : 1280);
     }
     // `size`: the bitmap's size when it is kept smaller than the file ([width, height]).
     function loadBitmap(url, size) {
@@ -393,9 +395,12 @@
     // 4 s). The hello's `hold: 0` (benches) starts as receiver 96 did. Not on a manual clock (the film, tests' own draws).
     const START = { cap: 3500, firstFrame: 600, warm: 1500, flushFrames: 2, steadyFrames: 8, steadyGap: 45, steadyCap: 1200 };
     let loading = 0, holdOn = !options.manualClock, starting = null, matchAt = null, statsEvery = 2000;
+    // Receiver 109: when the match's own frames began to show (warm reports count from here), null while none do.
+    let shownAt = null;
     function beginStart() {
       matchAt = now();
       starting = holdOn ? { at: matchAt, phase: "load", flush: 0, load: 0, shown: 0, steady: 0, last: null } : null;
+      shownAt = starting ? null : matchAt;
     }
     function firstFrameOps() {
       const first = playout.frames[0];
@@ -436,7 +441,7 @@
         // Receiver 106: a weak dongle's canvas stays, its photograph under the card until the match's first whole frame.
         if (!weak) canvas.style.visibility = "hidden";
         playout.forgetLateness();
-        s.phase = "steady"; s.shown = since; s.last = null; s.steady = 0;
+        s.phase = "steady"; s.shown = since; s.last = null; s.steady = 0; shownAt = t;
         resetStats(t);
         return true;
       }
@@ -475,10 +480,25 @@
 
     // MARK: Canvas
 
+    // Receiver 109: cricket's plan (RallycadeTVGame.plan): a weak dongle 854, the Linux dongles 1280, an Android TV 1920
+    // watched by cricket's rate watch and narrowed to 1280 for good when it can't keep 25 a second (as the stadium since
+    // receiver 46; until 109 pickleball drew 1920 on every Android TV however it kept up), starting narrow on a TV the
+    // stadium (or pickleball) found slow before.
+    const storage = (() => { try { return window.localStorage; } catch (error) { return null; } })();
+    const perf = tvGame ? tvGame.createPerf({ game: "pickleball", ua: navigator.userAgent, storage, pathname: location.pathname }) : null;
+    let planned = null, plannedWeak = null;
+    function currentPlan() {
+      if (perf && perf.narrowed()) return perf.narrowed();
+      if (!planned || plannedWeak !== weak) {
+        plannedWeak = weak;
+        planned = tvGame ? tvGame.plan({ game: "pickleball", ua: navigator.userAgent, weak, storage, pathname: location.pathname })
+          : { width: weak ? 854 : 1280, adaptive: false, why: "fallback" };
+      }
+      return planned;
+    }
     function sizeCanvas() {
       const box = stage.getBoundingClientRect();
-      const plan = sceneCore && sceneCore.canvasPlan ? sceneCore.canvasPlan({ ua: navigator.userAgent, wide: true, weak }) : { width: weak ? 854 : 1280 };
-      const width = options.canvasWidth || (sceneCore && sceneCore.canvasWidth ? sceneCore.canvasWidth(box.width || 1280, window.devicePixelRatio, plan.width) : 1280);
+      const width = options.canvasWidth || (tvGame ? tvGame.width(box.width || 1280, window.devicePixelRatio, currentPlan()) : 1280);
       if (width !== canvasPx || canvas.width !== width) {
         canvasPx = width;
         canvas.width = width;
@@ -817,7 +837,7 @@
       }
       const began = next === "match" && view !== "match";
       view = next;
-      if (began) beginStart(); else if (view !== "match") starting = null;
+      if (began) beginStart(); else if (view !== "match") { starting = null; shownAt = null; }
       if (view !== "off") { loadPlate(); }
       // Each setup warms the pictures again: a Chromecast lets decoded pictures go (receiver 79).
       if (view === "ready") warm();
@@ -838,7 +858,11 @@
       raf = 0;
       if (!running) return;
       const t = now();
-      if (view === "match" && stepStart(t)) drawAt(t);
+      // Receiver 109: cricket's rate watch on the match's own frames (not its start's), as the stadium's.
+      if (view === "match" && stepStart(t)) {
+        const drew = drawAt(t);
+        if (!starting && perf && !options.canvasWidth && perf.frame(t, drew, currentPlan(), canvas.width)) { sizeCanvas(); drawAt(t); }
+      }
       playout.settle(playout.target(averageGap()), lastTick === null ? 33 : t - lastTick);
       lastTickGap = lastTick === null ? 0 : t - lastTick;
       lastTick = t;
@@ -869,11 +893,15 @@
         // Receiver 106: the longest gap between draws (`gap` is the 90th percentile: one freeze in a report hides there).
         worst: Math.round(stats.draws.length ? Math.max(...stats.draws) : 0)
       };
-      if (weak) message.weak = 1;
-      if (view === "match") send(message);
+      // Receiver 109: cricket's warm reports (RallycadeTVGame.report, core.warmReport): one in the match's first 8 s while
+      // its pictures still load or a sprite was missing says `warm`, its rate as `wfps`/`wgap`, so no phone paces from
+      // the decoding. `weak: 1` on the weak plan (receiver 106).
+      const sent = tvGame ? tvGame.report(message, { sinceOn: shownAt !== null ? t - shownAt : null, loading, missing: message.missing }, weak)
+        : Object.assign(message, weak ? { weak: 1 } : {});
+      if (view === "match") send(sent);
       stats.draws = []; stats.drawMs = []; stats.frames = 0; stats.missing = 0; stats.since = t;
       if (debug && chip) { chip.hidden = false; chip.textContent = "fps " + message.fps + " · stale " + message.stale + " ms · delay " + message.delay + " ms"; }
-      return message;
+      return sent;
     }
 
     function report(where, error) {
@@ -946,6 +974,8 @@
       get view() { return view; }, get drawn() { return drawn; }, get look() { return look; },
       get starting() { return starting ? starting.phase : null; },
       get weak() { return weak; }, get canvas() { return canvas; },
+      // Receiver 109: the canvas plan (cricket's, RallycadeTVGame) and its rate watch.
+      get canvasPlan() { return currentPlan(); }, perf,
       // Tests: the next draw is whole (receiver 106's weak plan otherwise paints only where things moved).
       drawWhole() { weakKey = ""; lastDrawn = null; },
       stats: () => maybeReport(true), sizeCanvas, picture, loaded: () => lookLoadedAt !== null,
