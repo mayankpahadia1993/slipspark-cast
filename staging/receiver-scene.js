@@ -2937,9 +2937,7 @@
         debugLine.id = "scene-status";
         root.appendChild(debugLine);
       }
-      debugLine.textContent = "scene " + stats.fps + " fps · draw " + stats.drawMs + "/" + stats.drawMax + " ms · late "
-        + stats.behind + " ms" + (stats.pose != null ? " · pose " + stats.pose + "/" + stats.pose90 + " ms" + (stats.ahead ? " − ahead " + stats.ahead + " = " + stats.eff + "/" + stats.eff90 + " ms" : "") : "") + " · queue " + stats.queue + " · images " + stats.images + " · " + stats.w + " wide (" + stats.canvas + ")"
-        + (stats.synced ? "" : " · not synced");
+      debugLine.textContent = core.debugLine(stats);
     }
 
     function noteArrival(frame) {
