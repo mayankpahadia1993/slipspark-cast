@@ -369,7 +369,7 @@
   function selectGame(next) {
     if (next === game) return;
     game = next;
-    app.dataset.game = next;
+    if (next) app.dataset.game = next; else delete app.dataset.game;
     if (window.__rallycadeScene && window.__rallycadeScene.selectGame) window.__rallycadeScene.selectGame(next);
     if (window.__rallycadePickleball && window.__rallycadePickleball.selectGame) window.__rallycadePickleball.selectGame(next);
   }
@@ -452,6 +452,9 @@
       if (!covered) cardView.release();
     },
     heldKeep: cardView ? cardCore.KEEP : 0,
+    // Receiver 111: the stadium coming on is an innings (the game state's cricket screen), not a full match's bowling
+    // (its result card): only an innings' cold stadium waits under the phone's picture.
+    innings: () => !!lastState && PLAY_SCREENS.has(lastState.screen),
     // ?canvas=1920 draws previews and films that wide (a Mac counts as a dongle).
     canvasWidth: Number(query.get("canvas")) || undefined
   });
@@ -627,8 +630,10 @@
         pickleballSender = event.senderId;
         window.clearTimeout(pickleballGone);
         // Receiver 83: a pickleball view (its setup's ready card, the match, its result) or frame is pickleball selected.
+        // Receiver 111: its view off while pickleball is on is no game chosen again (core.gameAfterPickleball).
         const data = event.data;
-        if (data && ((data.t === "view" && data.v && data.v !== "off") || data.t === "f")) selectGame("pickleball");
+        const next = core.gameAfterPickleball(game, data);
+        if (next !== game) selectGame(next);
         try { pickleball.handle(event.data); } catch (error) { pickleball.report("handle", error); }
       });
       context.addEventListener(window.cast.framework.system.EventType.SENDER_DISCONNECTED, (event) => {
