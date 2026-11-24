@@ -405,7 +405,19 @@
     return { cat: failureStages[word] || "render", code: word + "_" + code };
   }
 
+  // Receiver 83: the game a message on pickleball's channel leaves the TV on, from `current` ("cricket", "pickleball" or
+  // null for none chosen): a view other than off, or a frame, is pickleball. Receiver 111 (Nov 23 2026, hpk8jqqg): its
+  // view going off while pickleball is on is the player leaving pickleball (its results, then its home, then the
+  // games), so the TV is back to no game chosen and the stadium's pictures it keeps load again; never while cricket is
+  // on (a phone's channels say hello, and pickleball's view off, at every cast).
+  function gameAfterPickleball(current, message) {
+    if (!message || typeof message !== "object") return current;
+    if ((message.t === "view" && message.v && message.v !== "off") || message.t === "f") return "pickleball";
+    if (message.t === "view" && message.v === "off" && current === "pickleball") return null;
+    return current;
+  }
+
   return { RESULT_HINT, HANDOFF_NOTE, DUEL_RESULT_NOTE, TIMING_NOTE, tvLine, failureReport, clamp, normalizeJoints, normalizeState, normalizeWelcome, normalizeCelebration, normalizeNextMatch, normalizeLevel, levelLine,
     parseMessage, sampleState, resultHeadlineSize, estimateWidth,
-    wrapLines, hideTarget, TARGET_REVEAL_MS };
+    wrapLines, hideTarget, TARGET_REVEAL_MS, gameAfterPickleball };
 });

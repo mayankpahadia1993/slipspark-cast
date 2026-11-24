@@ -541,8 +541,16 @@
     // TV already keeps (receiver 77's copies, its picture cache) load from the TV itself, so nothing is downloaded
     // before cricket is chosen and nothing waits for Play; the rest come from the site once it is. Pickleball chosen:
     // none of them.
+    //
+    // Receiver 111 (Nov 23 2026, hpk8jqqg, af3vk9bt: "a little bit lag at the start for Cricket in both Android and
+    // iOS"): no game chosen is a game too. When the player leaves pickleball (its view goes off, receiver.js) the TV is
+    // back to no game chosen, so the stadium's pictures it keeps load from its own copies again (iOS 394 left
+    // pickleball for a full match and the Ultra loaded nothing of cricket until the bowling's stadium came on, 12 s
+    // later; `preloadMs` 115748), and the rehearsal draws as soon as they are all in (`rehearse`).
     let cricketWanted = !options.waitForGame;
     let selectedGame = options.waitForGame ? null : "cricket";
+    // When cricket was last chosen (performance.now()): the rehearsal's REHEARSAL_WAIT counts from then at the earliest.
+    let cricketAt = 0;
     // The receiver's own pictures a phone's picture asked for before cricket was (a 3.0 phone composes its grip at the
     // cast's start): fetched once it is.
     const deferredEnsure = new Set();
@@ -557,11 +565,15 @@
     // Before a game is chosen, only the TV's own copies; once cricket is, everything; pickleball, nothing.
     function mayLoad(key) { return cricketWanted || (selectedGame === null && onThisTV(key)); }
     function selectGame(game) {
-      selectedGame = game;
-      const wanted = game === "cricket";
-      if (wanted === cricketWanted) return;
+      const before = selectedGame;
+      selectedGame = game === "cricket" || game === "pickleball" ? game : null;
+      const wanted = selectedGame === "cricket";
+      const changed = wanted !== cricketWanted;
       cricketWanted = wanted;
-      if (!wanted) return;
+      // Receiver 111: back to no game chosen (pickleball left): the TV's own copies load again.
+      if (selectedGame === null && before !== null) pumpSome();
+      if (!changed || !wanted) return;
+      cricketAt = performance.now();
       const waiting = Array.from(deferredEnsure);
       deferredEnsure.clear();
       waiting.forEach(ensure);
@@ -802,7 +814,34 @@
     // A frame older than this when drawn is a pause's held frame, not a stale picture (stats `stale`).
     const STALE_FLOWING = 250;
     const rehearsal = { data: null, wanted: false, timeline: null, canvas: null, ctx: null, moment: 0, end: 0, draws: 0, ms: [], firstMs: 0, lastAt: -Infinity,
-      askedAt: 0, startedAt: 0, own: false };
+      askedAt: 0, startedAt: 0, own: false, waitFrom: 0, resumed: false };
+
+    // MARK: How warm the stadium's drawing is (receiver 111)
+    //
+    // Nov 23 2026 (the owner on build L, iOS 394 and Android 27560 on the Living Room TV's Chromecast Ultra: "There was a
+    // little bit lag at the start for Cricket in both Android and iOS"): the TV drew the stadium unsteadily for 7.5 s
+    // (iOS: every picture in 107 ms after it came on, 4-17 draws a second, `gap90` 752, the picture 954 ms behind) and
+    // 3.8 s (Android: 7 a second), the walk-out waiting meanwhile. Neither TV had drawn its rehearsal: iOS `rehearsed 0`,
+    // Android 55 of 200. iOS came from pickleball, so cricket stayed unchosen until a full match's bowling stadium came
+    // on, for 0.6 s while the bowling was skipped, and that ended the rehearsal for good (nothing asked for it again until
+    // the next hello). Android cast from cricket's home; its pictures were in from the TV's own copies at the hello, but
+    // the rehearsal waited for cricket to be chosen, at the setup, 2.8 s before the stadium.
+    //
+    // Now: the rehearsal draws before any game is chosen once every one of the start's pictures is in from the TV's own
+    // copies (nothing downloaded: receiver 83's rule); a stadium that goes off before the drawing is warm (the bowling's)
+    // asks for the rest of it again, its draws so far kept; REHEARSAL_WAIT counts from when cricket was chosen or the
+    // rehearsal asked for again, not from a hello long before. And a stadium that still comes on cold keeps the phone's
+    // picture over it ("You're ready") while it draws beneath, until a rehearsal's worth of draws is done, COVER_MS at
+    // most; the steady watch then starts on the stadium itself, as receiver 70 has it.
+    // Warm: a rehearsal drew all its draws on this page, or a stadium drew steadily, or the rehearsal's and the stadium's
+    // own draws come to a rehearsal's worth. A page stays warm across hellos (a reconnect is not a cold start).
+    let rehearsedFully = false;
+    let drewSteadily = false;
+    let stadiumDraws = 0;
+    function rehearsalTarget() { return plan && plan.weak ? WEAK_REHEARSAL_DRAWS : REHEARSAL_DRAWS; }
+    function drawingWarm() { return rehearsedFully || drewSteadily || rehearsal.draws + stadiumDraws >= rehearsalTarget(); }
+    // The receiver judges warmth by its rehearsal (a preview or a test page with none keeps receiver 70's cover).
+    function judgesWarmth() { return !!tune.warm && !!tune.early && !!rehearsal.data && !options.noRehearsal; }
 
     function loadRehearsal() {
       return fetch("rehearsal.json").then((response) => (response && response.ok && typeof response.json === "function" ? response.json() : null))
@@ -816,11 +855,19 @@
 
     // Due after each hello (the phone's innings is coming) once the
     // pictures are in; the weak plan's own canvas and tune with it.
-    function wantRehearsal(askedAt) {
-      rehearsal.asked = true;
-      rehearsal.askedAt = askedAt == null ? performance.now() : askedAt;
+    // Receiver 111: `resume`, a stadium went off before the drawing was warm: the rest of the rehearsal, its draws so far
+    // kept, REHEARSAL_WAIT from now.
+    function wantRehearsal(askedAt, resume) {
+      const at = askedAt == null ? performance.now() : askedAt;
+      if (!resume) {
+        rehearsal.asked = true;
+        rehearsal.askedAt = at;
+      }
+      rehearsal.waitFrom = at;
       if (!rehearsal.data || options.noRehearsal) return;
       rehearsal.wanted = true;
+      rehearsal.resumed = !!resume;
+      if (resume) return;
       rehearsal.draws = 0;
       rehearsal.ms = [];
       rehearsal.firstMs = 0;
@@ -830,9 +877,12 @@
     // Receiver 77: due once the start's pictures are in, or REHEARSAL_WAIT
     // after the hello whatever is in (a load that never ends waits on no
     // rehearsal). `x.early: 0`: once the whole preload is done, as before.
+    // Receiver 111: with no game chosen, only once the start's pictures are all in (from the TV's own copies: nothing
+    // else loads then); REHEARSAL_WAIT from cricket chosen or the rehearsal asked for again, whichever came last.
     function rehearsalReady(local) {
       if (!tune.early) return !preloadQueue.length && !preloading;
-      return startPicturesIn() || local - rehearsal.askedAt >= REHEARSAL_WAIT;
+      if (startPicturesIn()) return true;
+      return cricketWanted && local - Math.max(rehearsal.waitFrom, cricketAt) >= REHEARSAL_WAIT;
     }
 
     // The rest of the preload waits while a rehearsal is due and while the stadium is on.
@@ -855,7 +905,8 @@
     }
 
     function rehearse(local) {
-      if (!rehearsal.wanted || !cricketWanted || on || released || !rehearsalReady(local)) return;
+      // Receiver 111: with cricket chosen, or no game yet (`rehearsalReady`); never while pickleball is on.
+      if (!rehearsal.wanted || (!cricketWanted && selectedGame !== null) || on || released || !rehearsalReady(local)) return;
       if (plan.weak && local - rehearsal.lastAt < WEAK_REHEARSAL_GAP) return;
       // Receiver 77: the stadium's own canvas while no stadium has been shown
       // on this page (hidden: nothing on it to keep, no held frame); else one
@@ -902,7 +953,8 @@
       rehearsal.ms.push(ms);
       if (rehearsal.ms.length === 10) rehearsal.firstMs = Number(core.percentile(rehearsal.ms, 0.5).toFixed(1));
       if (rehearsal.ms.length > 40) rehearsal.ms.splice(10, rehearsal.ms.length - 40);
-      if (rehearsal.draws >= (plan.weak ? WEAK_REHEARSAL_DRAWS : REHEARSAL_DRAWS)) endRehearsal();
+      // Receiver 111: asked for again after a stadium, it is done once its draws and the stadium's make a rehearsal's worth.
+      if (rehearsal.draws >= rehearsalTarget()) { rehearsedFully = true; endRehearsal(); } else if (rehearsal.resumed && drawingWarm()) endRehearsal();
     }
 
     // Done, or the stadium came on: the canvas let go, and the static layer
@@ -959,6 +1011,8 @@
     let onAt = 0;
     function noteSteady(verdict, local) {
       if (!verdict) return;
+      // Receiver 111: a stadium that drew steadily has warm drawing (no rehearsal asked for when it goes off).
+      drewSteadily = true;
       send({ t: "steady", fps: verdict.fps, why: verdict.why, ms: verdict.after, on: Math.round(local - onAt) });
     }
 
@@ -974,8 +1028,22 @@
       if (want !== warmingShown) { node.hidden = !want; warmingShown = want; }
       if (want && local - warmingDrawnAt >= 100 && window.RallycadeHold) {
         warmingDrawnAt = local;
-        window.RallycadeHold(node, steadyWatch.progress(local), "Getting the TV ready");
+        window.RallycadeHold(node, coldOn ? warmProgress(local) : steadyWatch.progress(local), "Getting the TV ready");
       }
+    }
+
+    // Receiver 111: the stadium came on cold (`judgesWarmth`, a phone that holds its first ball for steady, the drawing
+    // not warm): the phone's picture stays over it while it draws beneath until the drawing is warm, COVER_MS at most
+    // (frameStep). Its ring fills with the warming and the time, never going back (receiver 70: "the circle keeps on
+    // restarting"). `wasCold` and `uncoveredAt` for the stats (`cold`, `cover`).
+    let coldOn = false;
+    let wasCold = false;
+    let coldProgress = 0;
+    let uncoveredAt = 0;
+    function warmProgress(local) {
+      const drawn = Math.min(1, (rehearsal.draws + stadiumDraws) / rehearsalTarget());
+      coldProgress = Math.max(coldProgress, drawn, Math.min(1, Math.max(0, local - onAt) / COVER_MS));
+      return coldProgress;
     }
 
     // Receiver 60: as the stadium comes on, the phone's picture (its setup,
@@ -998,6 +1066,8 @@
     function uncover() {
       // Receiver 70: the page hears the stadium has drawn over the phone's picture (or gone off).
       if (root.dataset.warming && options.onCover) options.onCover(false);
+      if (root.dataset.warming && on) uncoveredAt = performance.now();
+      coldOn = false;
       if (root.dataset.warming) delete root.dataset.warming;
       if (warmingShown) { const node = document.getElementById("card-warming"); if (node) node.hidden = true; warmingShown = false; }
       settleLayers();
@@ -1737,8 +1807,10 @@
     // `own` 0 always rehearses off screen, as receivers 65-76 did.
     // Receiver 105: `live` 0 draws a standing batter's pieces every draw (no liveLayer), `edge` 0 draws on the canvas a
     // first photo that doesn't reach every edge (the bowled hold's pushed-in camera), as receiver 104 did.
+    // `warm` (receiver 111): a cold stadium held under the phone's picture and the rehearsal resumed after a cold one;
+    // `warm: 0` draws as receiver 110 did.
     const TUNED = Object.freeze({ blur: "shadow", layers: "bounded", cover: "clip", bitmaps: 0, shade: "thirds", blend: 1, cache: 1, photo: "layer", opaque: 0,
-      match: 1, dirty: 1, early: 1, own: 1, live: 1, edge: 1 });
+      match: 1, dirty: 1, early: 1, own: 1, live: 1, edge: 1, warm: 1 });
     // A weak dongle (core.isWeakDongle): no redraw only to blend between
     // frames (each draw costs it ~30 ms of its page's thread) and glows
     // drawn plain, never blurred.
@@ -2796,9 +2868,15 @@
       // ~20 a second, hitching every second or two, so the ring restarted and the steady verdict came at 20 (plateau)
       // after 3-4 s or past the phone's 8 s cap; the stadium uncovered draws 28-30. Steadiness is now watched on the
       // stadium itself while the phone holds its first ball (CastSceneStreamer.steadyLimit).
+      // Receiver 111: a stadium that came on cold stays under the picture until its drawing is warm too (COVER_MS at most,
+      // as ever), and is watched for steady from the moment it shows: drawn under the picture it hitched (receiver 70).
       if (root.dataset.warming && (local >= coverUntil
         || (wholeSent && (!framePhoto || (!photoPending && layerShownAt && local - layerShownAt >= 30))
-          && (document.body.dataset.card !== "picture" || layersWarm())))) uncover();
+          && (document.body.dataset.card !== "picture" || (layersWarm() && (!coldOn || drawingWarm())))))) {
+        const cold = coldOn;
+        uncover();
+        if (cold && wholeSent && !steadyWatch.verdict) steadyWatch.start(local);
+      }
       if (root.dataset.warming) { warmLayers(local); showWarming(local); }
       if (lastLoop) counters.gaps.push(local - lastLoop);
       lastLoop = local;
@@ -2813,11 +2891,13 @@
         noteWhole(missingBefore);
         shownFrame = result.frame;
         drew = true;
+        stadiumDraws += 1;
         needsRedraw = false;
         if (result.blended) counters.blended += 1;
         if (result.partly) counters.partly += 1;
         lastStamp = result.stamp;
-        if (steadyWatch.started && !steadyWatch.verdict) {
+        // Receiver 111: not under a cold stadium's cover (watched again once it shows).
+        if (steadyWatch.started && !steadyWatch.verdict && !coldOn) {
           // Receiver 87 (w34kr8dq, iOS 294 after a reconnect: "it bowled me because I couldn't even see the ball coming on
           // the TV"): a plateau verdict while the stadium's pictures were still loading (397 draws missing one 2 s before)
           // said steady at 18 a second and let the first ball go. While pictures are still loading the watch starts again
@@ -2903,6 +2983,11 @@
         // Receiver 77: when the rehearsal began and the preload ran dry, ms from the hello.
         if (rehearsal.startedAt) stats.rehearseAt = Math.round(rehearsal.startedAt - rehearsal.askedAt);
         if (preloadDoneAt !== null && rehearsal.asked) stats.preloadMs = Math.max(0, Math.round(preloadDoneAt - rehearsal.askedAt));
+        // Receiver 111: the drawing's warm-up so far (draws rehearsed and drawn, up to a rehearsal's worth); a stadium that
+        // came on cold (`cold`) and how long the phone's picture stayed over it (`cover`, ms from it coming on).
+        if (judgesWarmth()) stats.warmth = drawingWarm() ? rehearsalTarget() : rehearsal.draws + stadiumDraws;
+        if (on && wasCold) stats.cold = 1;
+        if (on && uncoveredAt) stats.cover = Math.max(0, Math.round(uncoveredAt - onAt));
         // The receiver's own files read from the TV and fetched this page (receiver 77, keptURL);
         // numbers, not a list: a phone's log writes each field on one line.
         if (keptDb) { stats.kept = keptCounts.read; stats.fetched = keptCounts.fetched; if (keptCounts.carried) stats.carried = keptCounts.carried; }
@@ -2994,9 +3079,20 @@
         // waits for steady, up to STEADY_COVER_MS (noteWhole).
         coverUntil = onAt + COVER_MS;
         layerShownAt = 0;
+        // Receiver 111: and on a cold page, until its drawing is warm (COVER_MS at most all the same). Only an innings
+        // (`options.innings`, receiver.js: the game state's cricket screen), whose first ball the phone holds for steady:
+        // a full match's bowling (the game state's result card) starts as it comes on, on both phones.
+        coldOn = judgesWarmth() && phoneWaitsSteady && !drawingWarm() && (!options.innings || !!options.innings());
+        wasCold = coldOn;
+        coldProgress = 0;
+        uncoveredAt = 0;
       }
       if (!value) uncover();
+      // Receiver 111: a stadium that goes off before its drawing is warm (a full match's bowling, skipped 0.6 s in) asks
+      // for the rest of the rehearsal, so the innings' stadium after it does not come on cold.
+      const wentOff = on && !value;
       on = !!value;
+      if (wentOff && hasHello && !released && judgesWarmth() && !drawingWarm()) wantRehearsal(performance.now(), true);
       root.hidden = !on;
       document.body.dataset.scene = on ? "on" : "off";
       // Measured once it is on screen: hidden, the stage has no size.
@@ -3341,6 +3437,9 @@
       pictures, counters, tune, setTune, warmed, staticLayer, liveLayer, get dressing() { return dressingWasOn; }, holdLast, get holding() { return holding; }, get hasFrame() { return !!shownFrame; },
       // Receiver 77: how the rehearsal and the preload stand (tests and the bench's probe).
       get rehearsal() { return { draws: rehearsal.draws, wanted: rehearsal.wanted, own: rehearsal.own, startedAt: rehearsal.startedAt, askedAt: rehearsal.askedAt }; },
+      // Receiver 111: how warm the stadium's drawing is, and whether this stadium came on cold.
+      get warmth() { return { warm: drawingWarm(), draws: rehearsal.draws + stadiumDraws, rehearsedFully, drewSteadily, cold: coldOn, wasCold, uncoveredAt }; },
+      get selectedGame() { return selectedGame; },
       get preload() { return { left: preloadQueue.length, loading: preloading, doneAt: preloadDoneAt }; } };
   }
 
