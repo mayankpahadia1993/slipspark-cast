@@ -9,6 +9,8 @@
     return function (rgba, mask, look, gearMask, gear) {
       const size = rgba.length;
       if (!size || size % 4 || size > MAX_BYTES || (mask && mask.length !== size) || (gearMask && gearMask.length !== size)) return false;
+      // The kernel knows the tints only: the Creator kit's polish and stripes (Nov 25 2026) are the JS recipe's.
+      if (gear && gearMask && core.wearsCreatorKit && core.wearsCreatorKit(gear)) return false;
       const need = pixelsAt + size * 3;
       if (memory.buffer.byteLength < need) memory.grow(Math.ceil((need - memory.buffer.byteLength) / 65536));
       const bytes = new Uint8Array(memory.buffer), config = new Float64Array(memory.buffer, configAt, 28);

@@ -19,7 +19,7 @@
       </div>
       <div class="ready-status"><span class="status-dot"></span> TV READY</div>
       <h1>Your stadium<br>is ready</h1>
-      <p>Tap Play innings on your phone. Keep it below the TV, facing you.</p>
+      <p>Tap Play on your phone. Keep it below the TV, facing you.</p>
     </section>
 
     <section id="positioning-screen" class="screen positioning-screen" hidden>
@@ -196,6 +196,8 @@
             <span class="hud-overs"><small id="hud-level-card-title">BOWLING</small><b id="hud-level-card-value"></b></span>
           </div>
           <div id="hud-friend" class="hud-friend" hidden></div>
+          <!-- Can you beat my score? (docs/design/CHALLENGES.md "TV message"): "{name}'s {setter} · {text}" under the scorebug. -->
+          <div id="hud-challenge" class="hud-challenge tone-start" hidden><i id="hud-challenge-initial" aria-hidden="true"></i><b id="hud-challenge-setter"></b><span class="hud-challenge-dot" aria-hidden="true">·</span><span id="hud-challenge-text"></span><small id="hud-challenge-suffix" hidden></small></div>
         </div>
         <div id="hud-status" class="hud-status">
           <strong id="hud-status-title"></strong>

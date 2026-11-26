@@ -1649,9 +1649,11 @@
         core.copyAtlasFrame(dressingSheet(cut.atlas), cut, pixels.data);
         const readAt = performance.now();
         // The tiny CPU kernel avoids long JS pixel loops on older TV browsers.
-        // Unsupported/blocked WebAssembly keeps the identical JS recipe.
+        // Unsupported/blocked WebAssembly keeps the identical JS recipe. The
+        // Creator kit (its polish, and the helmet's stripes, which need the
+        // frame's width) is always the JS recipe's: the kernel says no to it.
         const fast = window.RallycadeDye && window.RallycadeDye.dyeFrame(pixels.data, shares, look || null, gearShares, gearShares ? gear : null);
-        if (!fast) core.dyeFrame(pixels.data, shares, look || null, gearShares, gearShares ? gear : null);
+        if (!fast) core.dyeFrame(pixels.data, shares, look || null, gearShares, gearShares ? gear : null, cut.width);
         const dyedAt = performance.now();
         c.putImageData(pixels, 0, 0);
         counters.dressMax = Math.max(counters.dressMax, performance.now() - started);
@@ -2694,6 +2696,8 @@
     };
     // Where the level can show (receiver 71): the scorebug, the Nets / timing check card, its own card.
     const LEVEL_SLOTS = ["hud-level", "hud-check-level", "hud-level-card"];
+    // A challenge chip's tones (shared/challenges/reference.mjs chip()); anything else is drawn as level (neutral).
+    const CHALLENGE_TONES = ["start", "ahead", "behind", "level", "target", "passed", "chased"];
     // Up to this many chips and rings at full size in THIS OVER's card (6
     // balls and two wides); more and they are drawn smaller (`is-many`).
     const OVER_ROOM = 8;
@@ -2761,6 +2765,23 @@
       setText("hud-check-title", h.check && h.check.title === "NETS PRACTICE" ? "NETS PRACTICE" : "TIMING CHECK");
       show("hud-friend", !!h.friend);
       setText("hud-friend", h.friend);
+      // Can you beat my score? (docs/design/CHALLENGES.md "TV message"): the phone's optional `challenge` {name, setter,
+      // text, suffix?, tone} as "{name}'s {setter} · {text}" under the scorebug (shared/challenges/copy.json tv.chip),
+      // coloured by tone. Older phones send none, and half a chip is none: nothing shows.
+      const challenge = h.challenge && typeof h.challenge.name === "string" && h.challenge.name && typeof h.challenge.text === "string"
+        && (typeof h.challenge.setter === "string" || typeof h.challenge.setter === "number") ? h.challenge : null;
+      show("hud-challenge", !!challenge);
+      if (challenge) {
+        const chip = el("hud-challenge");
+        const tone = "hud-challenge tone-" + (CHALLENGE_TONES.indexOf(challenge.tone) >= 0 ? challenge.tone : "level");
+        if (chip && chip.className !== tone) chip.className = tone;
+        setText("hud-challenge-initial", (Array.from(challenge.name)[0] || "").toUpperCase());
+        setText("hud-challenge-setter", challenge.name + "'s " + challenge.setter);
+        setText("hud-challenge-text", challenge.text);
+        const suffix = typeof challenge.suffix === "string" ? challenge.suffix : "";
+        show("hud-challenge-suffix", !!suffix);
+        setText("hud-challenge-suffix", suffix);
+      }
       // The status card hides while the pause or lost card is up.
       const status = h.status || {};
       setStyle(el("hud-status"), "opacity", status.hidden ? "0" : "1");

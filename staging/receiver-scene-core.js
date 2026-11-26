@@ -136,20 +136,136 @@
     if (!parts.some(Boolean)) return null;
     return "g" + parts.map((part) => (part ? part.join(",") : "-")).join("|");
   }
-  // {helmet, pads, bat} as 0-1 numbers (null for the classic one).
+  // MARK: The Creator kit on the bowler's-end batter (Nov 25 2026, docs/creator-kit.md)
+  //
+  // gear-art.json's helmet-creator and bat-creator (career-rules.json `creatorKit`: never sold, granted for an approved
+  // creator clip, or worn for one recorded game). The phones send gear as numbers, never ids (receiver 81's wire, above),
+  // and the kit's numbers are its own: no other helmet or bat in gear-art.json has them (receiver-creator-kit.test.cjs). So
+  // the receiver knows the kit by them and wears, on its own bowler's-end frames, what gear-art.json gives small
+  // pictures: the `polish` (polished gold) without the blur, in place of the shell's and the finish's tint, and the
+  // helmet's `far` black stripes down the crown. The rim, visor and crest, the bat's edges and stripes, and its black
+  // sticker's crest and CREATOR are the batting end's: the phones draw those into their own dressed pictures and send
+  // them (`kit-…helmet-creator-head-…`, `stroke-blade-face-bat-creator-…`), as every Locker look is sent. A receiver
+  // before this one, or numbers that aren't exactly the kit's, wear the plain tints (a gold helmet, a gold bat with a
+  // black sticker), and anything else the gear carries is ignored as before. Nothing new goes over the channel.
+  const CREATOR_STOPS = [[0.25, [0.259, 0.149, 0.024]], [0.55, [0.525, 0.329, 0.063]], [0.8, [0.776, 0.541, 0.141]],
+    [1.0, [0.925, 0.706, 0.259]], [1.22, [0.98, 0.824, 0.439]], [1.5, [1.0, 0.902, 0.627]], [1.85, [1.0, 0.957, 0.824]]];
+  const CREATOR_INK = [0.063, 0.063, 0.071];
+  const CREATOR_KIT = {
+    // shell + shade in thousandths, as the phones send it; `polish` and `far` as gear-art.json has them.
+    helmet: {
+      id: "helmet-creator", value: [880, 640, 180, 300, 3200],
+      polish: { stops: CREATOR_STOPS, contrast: 1.8 },
+      far: { rows: 0.62, shade: [0.6, 1.4], minWidth: 1.0, lines: [
+        { at: 0.0, width: 0.16, colour: CREATOR_INK }, { at: -0.24, width: 0.04, colour: CREATOR_INK }, { at: 0.24, width: 0.04, colour: CREATOR_INK }] }
+    },
+    // sticker + finish + finish shade in thousandths; `polish` without the sheen and the edges' darkening, which need the
+    // batting end's blade line (trim.blade) the bowler's-end frames don't have.
+    bat: {
+      id: "bat-creator", value: [60, 60, 70, 860, 620, 160, -800, 2200],
+      polish: { stops: CREATOR_STOPS, contrast: 1.7, clamp: [0.8, 1.3], offset: -0.04 }
+    }
+  };
+  const CREATOR_VALUES = { helmet: CREATOR_KIT.helmet.value.join(","), bat: CREATOR_KIT.bat.value.join(",") };
+
+  // {helmet, pads, bat} as 0-1 numbers (null for the classic one). The Creator kit's parts also carry their `item`,
+  // `polish` and (the helmet) `far`.
   function gearColours(gear) {
-    const parts = String(gear || "").replace(/^g/, "").split("|")
-      .map((part) => (part === "-" || part === "" ? null : part.split(",").map((v) => Number(v) / 1000)));
+    const raw = String(gear || "").replace(/^g/, "").split("|");
+    const parts = raw.map((part) => (part === "-" || part === "" ? null : part.split(",").map((v) => Number(v) / 1000)));
     const [helmet, pads, bat] = [parts[0] || null, parts[1] || null, parts[2] || null];
+    const creatorHelmet = helmet && raw[0] === CREATOR_VALUES.helmet ? CREATOR_KIT.helmet : null;
+    const creatorBat = bat && raw[2] === CREATOR_VALUES.bat ? CREATOR_KIT.bat : null;
     return {
-      helmet: helmet && { shell: helmet.slice(0, 3), shade: helmet.slice(3, 5) },
+      helmet: helmet && Object.assign({ shell: helmet.slice(0, 3), shade: helmet.slice(3, 5) },
+        creatorHelmet ? { item: creatorHelmet.id, polish: creatorHelmet.polish, far: creatorHelmet.far } : null),
       pads,
-      bat: bat && { sticker: bat.slice(0, 3), finish: bat.slice(3, 6).some((v) => v !== 0) ? bat.slice(3, 6) : null, shade: bat.slice(6, 8) }
+      bat: bat && Object.assign({ sticker: bat.slice(0, 3), finish: bat.slice(3, 6).some((v) => v !== 0) ? bat.slice(3, 6) : null, shade: bat.slice(6, 8) },
+        creatorBat ? { item: creatorBat.id, polish: creatorBat.polish } : null)
     };
+  }
+  // Whether `gear` (a readGear string) wears any of the Creator kit (the compiled kernel has only the tints).
+  function wearsCreatorKit(gear) {
+    const worn = gearColours(gear);
+    return !!((worn.helmet && worn.helmet.polish) || (worn.bat && worn.bat.polish));
   }
   function tintPixel(rgb, colour, share, shade) {
     const light = shade[0] + shade[1] * (0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2]);
     for (let c = 0; c < 3; c += 1) rgb[c] = rgb[c] * (1 - share) + Math.max(0, Math.min(1, colour[c] * light)) * share;
+  }
+  // gear-art.json `polish` (scripts/creators/kit-art.py `ramp`): the pixel's light `k` (its luminance over the mean of its
+  // part's) clamped to `clamp` plus `offset` (a bat's), pushed by `contrast` about 1, clamped to the first and last stop
+  // and read off `stops`, linear between them, into `out` (0-1 sRGB).
+  function polishColour(polish, k, out) {
+    const stops = polish.stops;
+    let x = Number.isFinite(k) ? k : 1;
+    if (polish.clamp) x = Math.max(polish.clamp[0], Math.min(polish.clamp[1], x)) + (polish.offset || 0);
+    x = Math.max(stops[0][0], Math.min(stops[stops.length - 1][0], 1 + (x - 1) * polish.contrast));
+    let n = 1;
+    while (n < stops.length - 1 && x > stops[n][0]) n += 1;
+    const a = stops[n - 1], b = stops[n];
+    const u = b[0] > a[0] ? (x - a[0]) / (b[0] - a[0]) : 0;
+    for (let c = 0; c < 3; c += 1) out[c] = a[1][c] + (b[1][c] - a[1][c]) * u;
+    return out;
+  }
+  // The polish's luminance (kit-art.py's: Rec. 601) of the frame's own pixel at byte `i`, 0-1.
+  function polishLuminance(rgba, i) { return (0.299 * rgba[i] + 0.587 * rgba[i + 1] + 0.114 * rgba[i + 2]) / 255; }
+  // The mean polish luminance of a frame's helmet shell (red where blue is 0) or willow (blue): over its pixels whose share
+  // is above half, else over any of them; 1 when it has none.
+  function partLuminance(rgba, gearMask, willow) {
+    let sum = 0, count = 0, anySum = 0, anyCount = 0;
+    for (let i = 0; i < rgba.length; i += 4) {
+      if (!rgba[i + 3]) continue;
+      const share = willow ? gearMask[i + 2] : gearMask[i + 2] ? 0 : gearMask[i];
+      if (!share) continue;
+      const l = polishLuminance(rgba, i);
+      anySum += l; anyCount += 1;
+      if (share > 127) { sum += l; count += 1; }
+    }
+    return Math.max(1 / 255, count ? sum / count : anyCount ? anySum / anyCount : 1);
+  }
+  // A thin line's centre on one pixel's centre (iOS StadiumGearTrim.snapped, Android GearTrim): the pixel `centre` falls
+  // in; on a pixel edge, the side nearer the row above's, so the line runs straight down.
+  function snappedCentre(centre, previous) {
+    if (Math.abs(centre - Math.floor(centre)) < 1e-9 && previous != null) {
+      return Math.abs(centre - 0.5 - previous) <= Math.abs(centre + 0.5 - previous) ? centre - 0.5 : centre + 0.5;
+    }
+    return Math.floor(centre) + 0.5;
+  }
+  // gear-art.json's helmet `far` over a frame `width` wide (iOS StadiumGearTrim.farHelmetShares, Android GearTrim.Far):
+  // down the crown's middle row by row, each line `at` x the row's half width from its middle and `width` x the half
+  // width wide (at least `minWidth` pixels), over the top `rows` of the shell; one share (0-255) a pixel per line. Null
+  // without a usable width.
+  function farStripes(far, gearMask, width, length) {
+    if (!far || !isArray(far.lines) || !(width > 0) || width !== Math.floor(width) || length % (width * 4)) return null;
+    const height = length / 4 / width, n = width * height;
+    const shell = new Uint8Array(n);
+    for (let k = 0; k < n; k += 1) shell[k] = gearMask[k * 4 + 2] ? 0 : gearMask[k * 4];
+    const marks = far.lines.map(() => new Uint8Array(n));
+    let top = -1, bottom = -1;
+    for (let j = 0; j < height; j += 1) {
+      for (let i = 0; i < width; i += 1) if (shell[j * width + i] > 127) { if (top < 0) top = j; bottom = j; break; }
+    }
+    if (top < 0) return marks;
+    const limit = Math.floor(top + far.rows * (bottom - top));
+    const previous = far.lines.map(() => null);
+    for (let j = top; j <= limit; j += 1) {
+      let left = -1, last = -1;
+      for (let i = 0; i < width; i += 1) if (shell[j * width + i] > 127) { if (left < 0) left = i; last = i; }
+      if (left < 0) continue;
+      const right = last + 1, cx = (left + right) / 2, half = (right - left) / 2;
+      if (half < 2) continue;
+      far.lines.forEach((line, k) => {
+        const w = Math.max(far.minWidth == null ? 1 : far.minWidth, line.width * half) / 2;
+        let centre = cx + line.at * half;
+        if (w < 1) { centre = snappedCentre(centre, previous[k]); previous[k] = centre; }
+        for (let i = 0; i < width; i += 1) {
+          const s = shell[j * width + i];
+          if (s) marks[k][j * width + i] = Math.round(Math.max(0, Math.min(1, w + 0.5 - Math.abs(i + 0.5 - centre))) * s);
+        }
+      });
+    }
+    return marks;
   }
 
   function copyAtlasFrame(source, cut, target) {
@@ -165,11 +281,22 @@
   // `mask` (the same size: red fabric, green trim, blue grip) in `look`,
   // and wears `gear` through `gearMask` (receiver 81): the kit's cloth and
   // the pads in one dye, then the helmet's shell, the bat's finish and its
-  // sticker, then the grip, in the phones' order.
-  function dyeFrame(rgba, mask, look, gearMask, gear) {
+  // sticker, then the grip, in the phones' order. The Creator kit's helmet
+  // and bat are polished instead of tinted, and its helmet takes its `far`
+  // stripes when the frame's `width` is given (optional: without it, none).
+  function dyeFrame(rgba, mask, look, gearMask, gear, width) {
     const [fabric, trim, grip] = look ? lookColours(look) : [null, null, null];
     const worn = gear && gearMask ? gearColours(gear) : { helmet: null, pads: null, bat: null };
-    const rgb = [0, 0, 0], factor = [1, 1, 1];
+    const rgb = [0, 0, 0], factor = [1, 1, 1], polished = [0, 0, 0];
+    const helmetKit = worn.helmet && worn.helmet.polish ? worn.helmet : null;
+    const batKit = worn.bat && worn.bat.polish ? worn.bat : null;
+    const shellLight = helmetKit ? partLuminance(rgba, gearMask, false) : 1;
+    const willowLight = batKit ? partLuminance(rgba, gearMask, true) : 1;
+    const stripes = helmetKit ? farStripes(helmetKit.far, gearMask, width, rgba.length) : null;
+    const polish = (part, k, share) => {
+      polishColour(part.polish, k, polished);
+      for (let c = 0; c < 3; c += 1) rgb[c] = rgb[c] * (1 - share) + polished[c] * share;
+    };
     for (let i = 0; i < rgba.length; i += 4) {
       if (!rgba[i + 3]) continue;
       const f = fabric && mask ? mask[i] / 255 : 0, t = trim && mask ? mask[i + 1] / 255 : 0, g = grip && mask ? mask[i + 2] / 255 : 0;
@@ -189,8 +316,18 @@
       }
       if (h || w) {
         rgb[0] = r; rgb[1] = gr; rgb[2] = b;
-        if (h) tintPixel(rgb, worn.helmet.shell, h * GEAR_HELMET_OPACITY, worn.helmet.shade);
-        if (w && worn.bat.finish) tintPixel(rgb, worn.bat.finish, w * GEAR_FINISH_OPACITY, worn.bat.shade);
+        if (h) {
+          if (helmetKit) polish(helmetKit, polishLuminance(rgba, i) / shellLight, h * GEAR_HELMET_OPACITY);
+          else tintPixel(rgb, worn.helmet.shell, h * GEAR_HELMET_OPACITY, worn.helmet.shade);
+          if (stripes) {
+            for (let k = 0; k < stripes.length; k += 1) {
+              const m = stripes[k][i >> 2];
+              if (m) tintPixel(rgb, helmetKit.far.lines[k].colour, m / 255, helmetKit.far.shade);
+            }
+          }
+        }
+        if (w && batKit) polish(batKit, polishLuminance(rgba, i) / willowLight, w * GEAR_FINISH_OPACITY);
+        else if (w && worn.bat.finish) tintPixel(rgb, worn.bat.finish, w * GEAR_FINISH_OPACITY, worn.bat.shade);
         if (s) tintPixel(rgb, worn.bat.sticker, s * GEAR_STICKER.opacity, GEAR_STICKER.shade);
         r = rgb[0]; gr = rgb[1]; b = rgb[2];
       }
@@ -1320,6 +1457,7 @@
     blendFrames, blendFramesInto, cloneFrame, createTimeline, createClock,
     percentile, debugLine, tracePath, cssColor, pictureSize, canvasPlan, canvasWidth, createRateWatch, STEADY, createSteadyWatch, createLiveLayer, hasLiveSlot, poseAge, poseAhead,
     filterParts, opBounds, layerEnd, clipsWholeStage, mergeRects, overStrip, readLook, lookColours, dyeFrame, copyAtlasFrame, GRIP_OPACITY, GRIP_SHADE,
-    readGear, gearColours, GEAR_HELMET_OPACITY, GEAR_FINISH_OPACITY, GEAR_STICKER, WARM_REPORT_MS, warmReport
+    readGear, gearColours, GEAR_HELMET_OPACITY, GEAR_FINISH_OPACITY, GEAR_STICKER, WARM_REPORT_MS, warmReport,
+    CREATOR_KIT, wearsCreatorKit, polishColour, farStripes
   };
 });

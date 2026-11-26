@@ -1,31 +1,47 @@
 {
   "environment": "staging",
-  "commit": "c6f7ad73fe6625c21ba98f6191ef3d549d8cfa9e",
-  "subject": "Receiver 111: the innings' stadium warm from its first frame, after pickleball too",
-  "receiverTree": "bb3723822b4fd8e81d914f977855a7dab4b19c7f",
+  "commit": "d2fb1101a8d31cb8a4361c25624e7271f891e45a",
+  "subject": "Build T: split the bat stripes' cover into steps (Release type-check timeout in StadiumGearArt)",
+  "receiverTree": "ae684c9ea6fe5235d94761fe25ff171bc29a7ce8",
   "revision": 111,
-  "deployedAt": "2026-11-24T04:44:25Z",
+  "deployedAt": "2026-11-26T10:17:42Z",
   "previous": {
-    "tree": "a0e8cf5248c77fbdbbf2be51c4371de69e57ca58",
+    "tree": "bb3723822b4fd8e81d914f977855a7dab4b19c7f",
     "changed": [
       "README.md",
       "index.html",
-      "receiver-core.js",
-      "receiver-pickleball.js",
+      "receiver-dye.js",
+      "receiver-scene-core.js",
       "receiver-scene.js",
-      "receiver.js"
+      "receiver.css"
     ]
   },
   "earlier": [
+    {
+      "tree": "a0e8cf5248c77fbdbbf2be51c4371de69e57ca58",
+      "changed": [
+        "README.md",
+        "index.html",
+        "receiver-core.js",
+        "receiver-dye.js",
+        "receiver-pickleball.js",
+        "receiver-scene-core.js",
+        "receiver-scene.js",
+        "receiver.css",
+        "receiver.js"
+      ]
+    },
     {
       "tree": "a2a16fff34aa6589b845113d61d2a7f7ae80e983",
       "changed": [
         "README.md",
         "index.html",
         "receiver-core.js",
+        "receiver-dye.js",
         "receiver-pickleball.js",
         "receiver-scene-core.js",
         "receiver-scene.js",
+        "receiver.css",
         "receiver.js"
       ]
     },
@@ -35,10 +51,12 @@
         "README.md",
         "index.html",
         "receiver-core.js",
+        "receiver-dye.js",
         "receiver-pickleball.js",
         "receiver-scene-core.js",
         "receiver-scene.js",
         "receiver-tv-game.js",
+        "receiver.css",
         "receiver.js"
       ]
     },
@@ -48,24 +66,7 @@
         "README.md",
         "index.html",
         "receiver-core.js",
-        "receiver-pickleball-core.js",
-        "receiver-pickleball.js",
-        "receiver-scene-core.js",
-        "receiver-scene.js",
-        "receiver-split.js",
-        "receiver-tv-game.js",
-        "receiver.css",
-        "receiver.js"
-      ]
-    },
-    {
-      "tree": "5f35d20f5596cca122566ce8728da6fb23d07d64",
-      "changed": [
-        "README.md",
-        "index.html",
-        "receiver-celebration.js",
-        "receiver-core.js",
-        "receiver-music.js",
+        "receiver-dye.js",
         "receiver-pickleball-core.js",
         "receiver-pickleball.js",
         "receiver-scene-core.js",
