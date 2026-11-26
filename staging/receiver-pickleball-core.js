@@ -449,12 +449,30 @@
 
   // MARK: Pictures
 
+  // The Creator paddle (Nov 26 2026, docs/creator-kit.md "Creator paddle (pickleball)", shared/pickleball/paddle-looks.json):
+  // the player's sheets with the gold paddle laid on, under the sheet's name and its kit's with "Creator" after them
+  // ("PickleballDinkCreator", Player 2's "PickleballDinkCoralCreator"), marked `paddle` in the manifest. A phone whose
+  // player owns the paddle names them (`sheets`) when this TV's ready says `paddle: 1`, and draws its player with them.
+  const PADDLE_SUFFIX = "Creator";
+  // The sheet a paddle's sheet is made from ("PickleballDinkCoralCreator" -> "PickleballDinkCoral"), else the name.
+  function plainSheet(name) {
+    const text = String(name);
+    return text.length > PADDLE_SUFFIX.length && text.endsWith(PADDLE_SUFFIX) ? text.slice(0, -PADDLE_SUFFIX.length) : text;
+  }
+
   // The pictures a look needs (manifest.json `sheets`, each with its `look`).
   // Receiver 78: and the sheets the phone names (`sheets`: a friend's look, each player's kit), those the TV has.
+  // The Creator paddle: its sheets only when named, each in place of the sheet it is made from (unless that is named
+  // too), so a match in the paddle holds no more pictures than one without it.
   function sheetsFor(manifest, look, named) {
     const sheets = (manifest && manifest.sheets) || {};
-    const want = new Set(Object.keys(sheets).filter((name) => sheets[name].look === (look === "woman" ? "woman" : "man") && !sheets[name].kit));
-    if (Array.isArray(named)) for (const name of named) if (typeof name === "string" && sheets[name]) want.add(name);
+    const want = new Set(Object.keys(sheets).filter((name) => sheets[name].look === (look === "woman" ? "woman" : "man") && !sheets[name].kit && !sheets[name].paddle));
+    const asked = Array.isArray(named) ? named.filter((name) => typeof name === "string" && sheets[name]) : [];
+    for (const name of asked) want.add(name);
+    for (const name of asked) {
+      const plain = plainSheet(name);
+      if (sheets[name].paddle && plain !== name && !asked.includes(plain)) want.delete(plain);
+    }
     return [...want].sort();
   }
 
@@ -481,6 +499,6 @@
   return {
     STAGE, HUD_STAGE, VERSION, DELAY, MAX_BLEND_GAP, CALLOUT_SECONDS, BALL,
     decodeOp, halves, opShape, blendOps, blendPush, percentile, createPlayout, plateLayout, opBounds, drawOps, hudView, readyView, resultView,
-    sheetsFor, sheetFile, STALLED, arrivalStalled
+    sheetsFor, sheetFile, STALLED, arrivalStalled, PADDLE_SUFFIX, plainSheet
   };
 });

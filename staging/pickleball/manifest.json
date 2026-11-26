@@ -51,6 +51,47 @@
         941
       ]
     },
+    "PickleballBackhandCoralCreator" : {
+      "kit" : "coral",
+      "look" : "man",
+      "paddle" : "paddle-creator",
+      "scale" : 0.75,
+      "size" : [
+        1254,
+        706
+      ],
+      "small" : {
+        "scale" : 0.45000000000000001,
+        "size" : [
+          752,
+          423
+        ]
+      },
+      "source" : [
+        1672,
+        941
+      ]
+    },
+    "PickleballBackhandCreator" : {
+      "look" : "man",
+      "paddle" : "paddle-creator",
+      "scale" : 0.75,
+      "size" : [
+        1254,
+        706
+      ],
+      "small" : {
+        "scale" : 0.45000000000000001,
+        "size" : [
+          752,
+          423
+        ]
+      },
+      "source" : [
+        1672,
+        941
+      ]
+    },
     "PickleballBackhandFemale" : {
       "look" : "woman",
       "scale" : 0.75,
@@ -73,6 +114,47 @@
     "PickleballBackhandFemaleCoral" : {
       "kit" : "coral",
       "look" : "woman",
+      "scale" : 0.75,
+      "size" : [
+        1254,
+        706
+      ],
+      "small" : {
+        "scale" : 0.45000000000000001,
+        "size" : [
+          752,
+          423
+        ]
+      },
+      "source" : [
+        1672,
+        941
+      ]
+    },
+    "PickleballBackhandFemaleCoralCreator" : {
+      "kit" : "coral",
+      "look" : "woman",
+      "paddle" : "paddle-creator",
+      "scale" : 0.75,
+      "size" : [
+        1254,
+        706
+      ],
+      "small" : {
+        "scale" : 0.45000000000000001,
+        "size" : [
+          752,
+          423
+        ]
+      },
+      "source" : [
+        1672,
+        941
+      ]
+    },
+    "PickleballBackhandFemaleCreator" : {
+      "look" : "woman",
+      "paddle" : "paddle-creator",
       "scale" : 0.75,
       "size" : [
         1254,
@@ -129,6 +211,47 @@
         941
       ]
     },
+    "PickleballDinkCoralCreator" : {
+      "kit" : "coral",
+      "look" : "man",
+      "paddle" : "paddle-creator",
+      "scale" : 0.75,
+      "size" : [
+        1254,
+        706
+      ],
+      "small" : {
+        "scale" : 0.45000000000000001,
+        "size" : [
+          752,
+          423
+        ]
+      },
+      "source" : [
+        1672,
+        941
+      ]
+    },
+    "PickleballDinkCreator" : {
+      "look" : "man",
+      "paddle" : "paddle-creator",
+      "scale" : 0.75,
+      "size" : [
+        1254,
+        706
+      ],
+      "small" : {
+        "scale" : 0.45000000000000001,
+        "size" : [
+          752,
+          423
+        ]
+      },
+      "source" : [
+        1672,
+        941
+      ]
+    },
     "PickleballDinkFemale" : {
       "look" : "woman",
       "scale" : 0.75,
@@ -151,6 +274,47 @@
     "PickleballDinkFemaleCoral" : {
       "kit" : "coral",
       "look" : "woman",
+      "scale" : 0.75,
+      "size" : [
+        1254,
+        706
+      ],
+      "small" : {
+        "scale" : 0.45000000000000001,
+        "size" : [
+          752,
+          423
+        ]
+      },
+      "source" : [
+        1672,
+        941
+      ]
+    },
+    "PickleballDinkFemaleCoralCreator" : {
+      "kit" : "coral",
+      "look" : "woman",
+      "paddle" : "paddle-creator",
+      "scale" : 0.75,
+      "size" : [
+        1254,
+        706
+      ],
+      "small" : {
+        "scale" : 0.45000000000000001,
+        "size" : [
+          752,
+          423
+        ]
+      },
+      "source" : [
+        1672,
+        941
+      ]
+    },
+    "PickleballDinkFemaleCreator" : {
+      "look" : "woman",
+      "paddle" : "paddle-creator",
       "scale" : 0.75,
       "size" : [
         1254,
@@ -207,6 +371,47 @@
         941
       ]
     },
+    "PickleballForehandCoralCreator" : {
+      "kit" : "coral",
+      "look" : "man",
+      "paddle" : "paddle-creator",
+      "scale" : 0.75,
+      "size" : [
+        1254,
+        706
+      ],
+      "small" : {
+        "scale" : 0.45000000000000001,
+        "size" : [
+          752,
+          423
+        ]
+      },
+      "source" : [
+        1672,
+        941
+      ]
+    },
+    "PickleballForehandCreator" : {
+      "look" : "man",
+      "paddle" : "paddle-creator",
+      "scale" : 0.75,
+      "size" : [
+        1254,
+        706
+      ],
+      "small" : {
+        "scale" : 0.45000000000000001,
+        "size" : [
+          752,
+          423
+        ]
+      },
+      "source" : [
+        1672,
+        941
+      ]
+    },
     "PickleballForehandFemale" : {
       "look" : "woman",
       "scale" : 0.75,
@@ -229,6 +434,47 @@
     "PickleballForehandFemaleCoral" : {
       "kit" : "coral",
       "look" : "woman",
+      "scale" : 0.75,
+      "size" : [
+        1254,
+        706
+      ],
+      "small" : {
+        "scale" : 0.45000000000000001,
+        "size" : [
+          752,
+          423
+        ]
+      },
+      "source" : [
+        1672,
+        941
+      ]
+    },
+    "PickleballForehandFemaleCoralCreator" : {
+      "kit" : "coral",
+      "look" : "woman",
+      "paddle" : "paddle-creator",
+      "scale" : 0.75,
+      "size" : [
+        1254,
+        706
+      ],
+      "small" : {
+        "scale" : 0.45000000000000001,
+        "size" : [
+          752,
+          423
+        ]
+      },
+      "source" : [
+        1672,
+        941
+      ]
+    },
+    "PickleballForehandFemaleCreator" : {
+      "look" : "woman",
+      "paddle" : "paddle-creator",
       "scale" : 0.75,
       "size" : [
         1254,
@@ -909,6 +1155,47 @@
         941
       ]
     },
+    "PickleballOverheadCoralCreator" : {
+      "kit" : "coral",
+      "look" : "man",
+      "paddle" : "paddle-creator",
+      "scale" : 0.75,
+      "size" : [
+        1254,
+        706
+      ],
+      "small" : {
+        "scale" : 0.45000000000000001,
+        "size" : [
+          752,
+          423
+        ]
+      },
+      "source" : [
+        1672,
+        941
+      ]
+    },
+    "PickleballOverheadCreator" : {
+      "look" : "man",
+      "paddle" : "paddle-creator",
+      "scale" : 0.75,
+      "size" : [
+        1254,
+        706
+      ],
+      "small" : {
+        "scale" : 0.45000000000000001,
+        "size" : [
+          752,
+          423
+        ]
+      },
+      "source" : [
+        1672,
+        941
+      ]
+    },
     "PickleballOverheadFemale" : {
       "look" : "woman",
       "scale" : 0.75,
@@ -931,6 +1218,47 @@
     "PickleballOverheadFemaleCoral" : {
       "kit" : "coral",
       "look" : "woman",
+      "scale" : 0.75,
+      "size" : [
+        1254,
+        706
+      ],
+      "small" : {
+        "scale" : 0.45000000000000001,
+        "size" : [
+          752,
+          423
+        ]
+      },
+      "source" : [
+        1672,
+        941
+      ]
+    },
+    "PickleballOverheadFemaleCoralCreator" : {
+      "kit" : "coral",
+      "look" : "woman",
+      "paddle" : "paddle-creator",
+      "scale" : 0.75,
+      "size" : [
+        1254,
+        706
+      ],
+      "small" : {
+        "scale" : 0.45000000000000001,
+        "size" : [
+          752,
+          423
+        ]
+      },
+      "source" : [
+        1672,
+        941
+      ]
+    },
+    "PickleballOverheadFemaleCreator" : {
+      "look" : "woman",
+      "paddle" : "paddle-creator",
       "scale" : 0.75,
       "size" : [
         1254,
@@ -987,6 +1315,47 @@
         941
       ]
     },
+    "PickleballServeCoralCreator" : {
+      "kit" : "coral",
+      "look" : "man",
+      "paddle" : "paddle-creator",
+      "scale" : 0.75,
+      "size" : [
+        1254,
+        706
+      ],
+      "small" : {
+        "scale" : 0.45000000000000001,
+        "size" : [
+          752,
+          423
+        ]
+      },
+      "source" : [
+        1672,
+        941
+      ]
+    },
+    "PickleballServeCreator" : {
+      "look" : "man",
+      "paddle" : "paddle-creator",
+      "scale" : 0.75,
+      "size" : [
+        1254,
+        706
+      ],
+      "small" : {
+        "scale" : 0.45000000000000001,
+        "size" : [
+          752,
+          423
+        ]
+      },
+      "source" : [
+        1672,
+        941
+      ]
+    },
     "PickleballServeFemale" : {
       "look" : "woman",
       "scale" : 0.75,
@@ -1009,6 +1378,47 @@
     "PickleballServeFemaleCoral" : {
       "kit" : "coral",
       "look" : "woman",
+      "scale" : 0.75,
+      "size" : [
+        1254,
+        706
+      ],
+      "small" : {
+        "scale" : 0.45000000000000001,
+        "size" : [
+          752,
+          423
+        ]
+      },
+      "source" : [
+        1672,
+        941
+      ]
+    },
+    "PickleballServeFemaleCoralCreator" : {
+      "kit" : "coral",
+      "look" : "woman",
+      "paddle" : "paddle-creator",
+      "scale" : 0.75,
+      "size" : [
+        1254,
+        706
+      ],
+      "small" : {
+        "scale" : 0.45000000000000001,
+        "size" : [
+          752,
+          423
+        ]
+      },
+      "source" : [
+        1672,
+        941
+      ]
+    },
+    "PickleballServeFemaleCreator" : {
+      "look" : "woman",
+      "paddle" : "paddle-creator",
       "scale" : 0.75,
       "size" : [
         1254,
@@ -1065,6 +1475,47 @@
         1024
       ]
     },
+    "PickleballShuffleCoralCreator" : {
+      "kit" : "coral",
+      "look" : "man",
+      "paddle" : "paddle-creator",
+      "scale" : 0.75,
+      "size" : [
+        1152,
+        768
+      ],
+      "small" : {
+        "scale" : 0.45000000000000001,
+        "size" : [
+          691,
+          461
+        ]
+      },
+      "source" : [
+        1536,
+        1024
+      ]
+    },
+    "PickleballShuffleCreator" : {
+      "look" : "man",
+      "paddle" : "paddle-creator",
+      "scale" : 0.75,
+      "size" : [
+        1152,
+        768
+      ],
+      "small" : {
+        "scale" : 0.45000000000000001,
+        "size" : [
+          691,
+          461
+        ]
+      },
+      "source" : [
+        1536,
+        1024
+      ]
+    },
     "PickleballShuffleFemale" : {
       "look" : "woman",
       "scale" : 0.75,
@@ -1087,6 +1538,47 @@
     "PickleballShuffleFemaleCoral" : {
       "kit" : "coral",
       "look" : "woman",
+      "scale" : 0.75,
+      "size" : [
+        1152,
+        768
+      ],
+      "small" : {
+        "scale" : 0.45000000000000001,
+        "size" : [
+          691,
+          461
+        ]
+      },
+      "source" : [
+        1536,
+        1024
+      ]
+    },
+    "PickleballShuffleFemaleCoralCreator" : {
+      "kit" : "coral",
+      "look" : "woman",
+      "paddle" : "paddle-creator",
+      "scale" : 0.75,
+      "size" : [
+        1152,
+        768
+      ],
+      "small" : {
+        "scale" : 0.45000000000000001,
+        "size" : [
+          691,
+          461
+        ]
+      },
+      "source" : [
+        1536,
+        1024
+      ]
+    },
+    "PickleballShuffleFemaleCreator" : {
+      "look" : "woman",
+      "paddle" : "paddle-creator",
       "scale" : 0.75,
       "size" : [
         1152,
@@ -1143,6 +1635,47 @@
         941
       ]
     },
+    "PickleballVolleyCoralCreator" : {
+      "kit" : "coral",
+      "look" : "man",
+      "paddle" : "paddle-creator",
+      "scale" : 0.75,
+      "size" : [
+        1254,
+        706
+      ],
+      "small" : {
+        "scale" : 0.45000000000000001,
+        "size" : [
+          752,
+          423
+        ]
+      },
+      "source" : [
+        1672,
+        941
+      ]
+    },
+    "PickleballVolleyCreator" : {
+      "look" : "man",
+      "paddle" : "paddle-creator",
+      "scale" : 0.75,
+      "size" : [
+        1254,
+        706
+      ],
+      "small" : {
+        "scale" : 0.45000000000000001,
+        "size" : [
+          752,
+          423
+        ]
+      },
+      "source" : [
+        1672,
+        941
+      ]
+    },
     "PickleballVolleyFemale" : {
       "look" : "woman",
       "scale" : 0.75,
@@ -1165,6 +1698,47 @@
     "PickleballVolleyFemaleCoral" : {
       "kit" : "coral",
       "look" : "woman",
+      "scale" : 0.75,
+      "size" : [
+        1254,
+        706
+      ],
+      "small" : {
+        "scale" : 0.45000000000000001,
+        "size" : [
+          752,
+          423
+        ]
+      },
+      "source" : [
+        1672,
+        941
+      ]
+    },
+    "PickleballVolleyFemaleCoralCreator" : {
+      "kit" : "coral",
+      "look" : "woman",
+      "paddle" : "paddle-creator",
+      "scale" : 0.75,
+      "size" : [
+        1254,
+        706
+      ],
+      "small" : {
+        "scale" : 0.45000000000000001,
+        "size" : [
+          752,
+          423
+        ]
+      },
+      "source" : [
+        1672,
+        941
+      ]
+    },
+    "PickleballVolleyFemaleCreator" : {
+      "look" : "woman",
+      "paddle" : "paddle-creator",
       "scale" : 0.75,
       "size" : [
         1254,

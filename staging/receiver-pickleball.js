@@ -13,6 +13,9 @@
   // Receiver 78 (play with friends, docs/design/PICKLEBALL_FRIENDS.md): `sheets` names the pictures beyond the look's own
   // (a friend's look, each player's kit); the HUD's `nm` names the score's rows, `sp` a same-phone split screen with
   // `ban2`/`call2` for its right half; a frame's "V" ops split the court in two; `friends: 1` says this TV draws them.
+  // The Creator paddle (Nov 26 2026, docs/creator-kit.md): `paddle: 1` says this TV has the player's sheets with the gold
+  // paddle (`<sheet>Creator`, `<sheet>CoralCreator`); a phone whose player owns it names them in `sheets` and its "p" ops,
+  // and a paddle sheet the TV lacks draws as the sheet it is made from.
   const NAMESPACE = "urn:x-cast:com.slipspark.pickleball";
   // Receiver 82 (Nov 10 2026): cricket's grounds in every view (receiver-scene.js preloadViews); pickleball as 81.
   // Receiver 83 (Nov 10 2026, qnkrpct6): warm-up reports and kept files carried across deploys (receiver-scene.js).
@@ -474,8 +477,12 @@
 
     function picture(sheet) {
       const entry = pictures.get(sheet);
-      if (!entry) { if (manifest) loadSheet(sheet); return null; }
-      return entry.image ? entry : null;
+      if (entry && entry.image) return entry;
+      if (!entry && manifest) loadSheet(sheet);
+      // The Creator paddle's sheet not here (still loading, or a manifest without it): the sheet it is made from, so the
+      // player is drawn with the plain paddle rather than not at all.
+      const plain = core.plainSheet(sheet);
+      return plain !== sheet ? picture(plain) : null;
     }
 
     // MARK: Canvas
@@ -927,7 +934,9 @@
           setWeak(message.x && typeof message.x === "object" && (message.x.weak === 0 || message.x.weak === 1) ? message.x.weak === 1 : weakDongle);
           preloadWhenWanted(message.look, message.sheets);
           {
-            const ready = { t: "ready", pickleball: core.VERSION, version: RECEIVER_VERSION, looks: ["man", "woman"], friends: 1, tall: tallImgs[0] && tallImgs[1] ? 1 : 0, go: holdOn ? 1 : 0 };
+            const ready = { t: "ready", pickleball: core.VERSION, version: RECEIVER_VERSION, looks: ["man", "woman"], friends: 1, tall: tallImgs[0] && tallImgs[1] ? 1 : 0, go: holdOn ? 1 : 0,
+              // The Creator paddle: this TV has the players' sheets with it (`<sheet>Creator`, `<sheet>CoralCreator`).
+              paddle: 1 };
             // Receiver 108: draws the two-player split screen (the HUD's `ss`).
             if (splitScreen && splitScreen.layer) ready.ss = 1;
             if (weak) ready.weak = 1;
