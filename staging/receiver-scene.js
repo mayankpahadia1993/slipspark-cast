@@ -2367,9 +2367,26 @@
       const fresh = !!frame.scratch;
       const keys = new Array(frame.o.length);
       const keysNow = new Set();
+      // Receiver 112 (the Living Room TV's Ultra profiled while it drew: `opKey` 3.2% of its page's thread, every
+      // command of every blended draw written out as text): a blended frame's command is keyed from the two frames it
+      // is blended between, whose keys are made once each. The same in both, it is that command exactly (each number
+      // x + (x - x) u); different, it is on the move and has no key (never in the layer). A scratch frame without them
+      // (a test's own) is written out as before.
+      const a = fresh ? frame.__from : null, b = fresh ? frame.__to : null, pairs = fresh ? frame.__pairs : null;
+      const blendedFrom = !!(a && b && a.o.length === frame.o.length);
       for (let index = from; index < frame.o.length; index += 1) {
         const op = frame.o[index];
-        if (op[0] === "f" || op[0] === "s" || op[0] === "i") { keys[index] = opKey(op, fresh); keysNow.add(keys[index]); }
+        if (op[0] !== "f" && op[0] !== "s" && op[0] !== "i") continue;
+        if (blendedFrom) {
+          const partner = pairs ? pairs[index] : index;
+          const keyA = opKey(a.o[index], false);
+          const keyB = partner >= 0 && b.o[partner] ? opKey(b.o[partner], false) : keyA;
+          if (keyA !== keyB) continue;
+          keys[index] = keyA;
+        } else {
+          keys[index] = opKey(op, fresh);
+        }
+        keysNow.add(keys[index]);
       }
       const statics = splitStatic(frame, from, lastStaticKeys, keys);
       lastStaticKeys = keysNow;
