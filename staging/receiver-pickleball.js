@@ -877,6 +877,10 @@
         weakKey = "";
       }
       const began = next === "match" && view !== "match";
+      // Receiver 112 (the Living Room TV's Ultra under memory pressure through cricket's innings after a match): pickleball
+      // off, its 1280 x 720 canvas lets its pixels go (sizeCanvas makes them again at the next draw). Not on a weak
+      // dongle, whose opaque canvas keeps the court's photograph.
+      if (next === "off" && view !== "off" && !weak && canvas.width) { canvas.width = 0; canvas.height = 0; canvasPx = 0; lastDrawn = null; }
       view = next;
       if (began) beginStart(); else if (view !== "match") { starting = null; shownAt = null; }
       if (view !== "off") { loadPlate(); }

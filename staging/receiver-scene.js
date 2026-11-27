@@ -1721,7 +1721,7 @@
         element.className = "scene-backdrop";
         element.alt = "";
         element.style.opacity = "0";
-        entry = { element, ready: false, transform: "" };
+        entry = { element, ready: false, transform: "", session: layerSession, shownIn: -1 };
         backdropLayers.set(key, entry);
         backdrop.parentNode.insertBefore(element, backdrop);
         element.src = source.src;
@@ -1759,6 +1759,8 @@
         entry.shown = true;
         backdropKey = op[3];
       }
+      entry.shownIn = layerSession;
+      entry.shownAt = performance.now();
       backdropTransform = transform;
       return true;
     }
@@ -1766,6 +1768,40 @@
     function hideBackdrops(except) {
       backdropLayers.forEach((entry, key) => { if (key !== except) entry.element.style.opacity = "0"; });
       if (except == null) backdropKey = null;
+    }
+
+    // MARK: Photo layers the TV lets go (receiver 112, Nov 27 2026)
+    //
+    // Traced on the Living Room TV's Ultra while it drew the AA app's recorded stream: a memory-pressure notice every 5 s
+    // (V8.MemoryPressureNotification level 1, each followed by a 28-40 ms garbage collection to give memory back), and
+    // now and then a critical one (level 2): the TV emptied its picture caches and the stadium decoded its pictures again
+    // on the page's thread, 65 in 12 s at 10.6 ms each (up to 51 ms), 319 a minute, each a hitch. The page held five photo
+    // layers: stadium-ground and field-real-outfield (what the app draws), and stadium-backdrop, field-outfield and a
+    // phone's 1280 x 720 photo, made for earlier casts and never shown again: each a 1672 x 941 GPU texture and its decoded
+    // copy, ~12 MB, for the page's life (a page lives all evening, across phones, grounds and games). Now a layer goes
+    // (its element and its texture with it; made again if a frame draws it) when its picture has gone, or when it hasn't
+    // been shown since the phone's hello (a new cast, a reconnect) and the stadium has been on LAYER_GRACE_MS since. A
+    // layer this cast has shown stays, as before: the batting view's and the field view's photos swap every ball.
+    // `evict: 0` (a bench switch) keeps them all, as receiver 111 did; `grace: <ms>` (benches) waits that long instead.
+    // `stats.layers` counts the layers held.
+    const LAYER_GRACE_MS = 120000;
+    let layerSession = 0, sessionOnMs = 0, lastLayerCheck = 0;
+    function evictLayer(key, entry) {
+      if (layerWarming && layerWarming.key === key) layerWarming = null;
+      try { entry.element.removeAttribute("src"); } catch (error) { /* gone */ }
+      if (entry.element.parentNode) entry.element.parentNode.removeChild(entry.element);
+      backdropLayers.delete(key);
+    }
+    function evictLayers(local) {
+      if (!tune.evict || !on) return;
+      if (lastLayerCheck) sessionOnMs += Math.min(1000, local - lastLayerCheck);
+      lastLayerCheck = local;
+      for (const [key, entry] of Array.from(backdropLayers)) {
+        if (key === backdropKey) continue;
+        const gone = !images.has(key);
+        const stale = entry.shownIn !== layerSession && sessionOnMs >= (Number(tune.grace) > 0 ? Number(tune.grace) : LAYER_GRACE_MS);
+        if (gone || stale) evictLayer(key, entry);
+      }
     }
 
     // MARK: Cheap drawing on a Chromecast (receiver 57)
@@ -1812,9 +1848,9 @@
     // `warm` (receiver 111): a cold stadium held under the phone's picture and the rehearsal resumed after a cold one;
     // `warm: 0` draws as receiver 110 did.
     // Receiver 112: `runs: 0` draws a batter whose hands follow the player's every piece every draw (no liveRuns), as
-    // receiver 111 did.
+    // receiver 111 did. `layers: ...` is taken; `evict: 0` keeps every photo's GPU layer for the page's life (receiver 111).
     const TUNED = Object.freeze({ blur: "shadow", layers: "bounded", cover: "clip", bitmaps: 0, shade: "thirds", blend: 1, cache: 1, photo: "layer", opaque: 0,
-      match: 1, dirty: 1, early: 1, own: 1, live: 1, edge: 1, warm: 1, runs: 1 });
+      match: 1, dirty: 1, early: 1, own: 1, live: 1, edge: 1, warm: 1, runs: 1, evict: 1, grace: 0 });
     // A weak dongle (core.isWeakDongle): no redraw only to blend between
     // frames (each draw costs it ~30 ms of its page's thread) and glows
     // drawn plain, never blurred.
@@ -3113,6 +3149,8 @@
     function housekeeping(local) {
       // Receiver 77: the start's pictures still to come (the rest waits, restWaits).
       if (preloadQueue.length && preloading < 3) pumpSome();
+      // Receiver 112: photo layers no longer drawn let go, once a second.
+      if (local - lastLayerCheck >= 1000) evictLayers(local);
       // An ack means a new stadium frame was drawn, not merely that this
       // page's timer is alive. A blocked sender can still receive messages:
       // repeating the last stamp hid frozen Google TV pictures from both
@@ -3141,7 +3179,7 @@
           drawSlow: counters.drawMs.filter((ms) => ms >= 50).length,
           dressMax: Number(counters.dressMax.toFixed(1)), dressed: counters.dressed,
           dressReadMax: Number(counters.dressReadMax.toFixed(1)), dressDyeMax: Number(counters.dressDyeMax.toFixed(1)),
-          missing: counters.missing, images: images.size, warmed: warmed.size, cached: staticLayer.hits, rebuilt: staticLayer.built, batter: liveLayer.hits, batterRuns: liveRuns.hits, bitmaps: bitmaps.size, queue: timeline.length,
+          missing: counters.missing, images: images.size, layers: backdropLayers.size, warmed: warmed.size, cached: staticLayer.hits, rebuilt: staticLayer.built, batter: liveLayer.hits, batterRuns: liveRuns.hits, bitmaps: bitmaps.size, queue: timeline.length,
           // How glows are blurred (receiver 57): as shadows, or in small canvases.
           glow: tune.blur === "filter" ? "filter" : tune.blur === "off" ? "off" : castsOffstageShadows() ? "shadow" : "scratch",
           synced: clock.synced ? 1 : 0, w: canvas.width, canvas: plan.why, weak: plan.weak ? 1 : 0,
@@ -3369,6 +3407,8 @@
       switch (message.t) {
         case "hello":
           hasHello = true;
+          // Receiver 112: a new cast's photo layers are counted afresh (evictLayers).
+          layerSession += 1; sessionOnMs = 0; lastLayerCheck = 0;
           if (window.RallycadeDye) window.RallycadeDye.prepare();
           debug = message.debug === 1;
           // A width the phone or the bench asks for is kept as asked; else
