@@ -1,12 +1,12 @@
 {
   "environment": "staging",
-  "commit": "bdfadb06134a5a0f6428d2ec85388cec3112a073",
-  "subject": "Receiver 113: pictures that come in with the stadium on are warmed a frame at a time; a frame with many cold ones waits while they are",
-  "receiverTree": "fa89f32ee40bb6e4262ce79b030587b30ceff18f",
-  "revision": 113,
-  "deployedAt": "2026-11-27T22:16:42Z",
+  "commit": "7cc68bbd03a8eddfdfae9e968baabb8a276ca651",
+  "subject": "Receiver 115: ready no longer says fb, so phones that ride (AF-AH) send every live batter on its own",
+  "receiverTree": "c0e5f775579a110ec71fa30a9e5f784a421579b3",
+  "revision": 115,
+  "deployedAt": "2026-11-27T23:33:49Z",
   "previous": {
-    "tree": "836ede54e7398def7005218f67a1a796d6a1fc20",
+    "tree": "fa89f32ee40bb6e4262ce79b030587b30ceff18f",
     "changed": [
       "index.html",
       "receiver-pickleball.js",
@@ -16,10 +16,20 @@
   },
   "earlier": [
     {
+      "tree": "836ede54e7398def7005218f67a1a796d6a1fc20",
+      "changed": [
+        "index.html",
+        "receiver-pickleball.js",
+        "receiver-scene-core.js",
+        "receiver-scene.js"
+      ]
+    },
+    {
       "tree": "daac12fafcf3395eb6aa87507bab37e6c824fb16",
       "changed": [
         "index.html",
         "receiver-pickleball.js",
+        "receiver-scene-core.js",
         "receiver-scene.js"
       ]
     },
@@ -36,15 +46,6 @@
     },
     {
       "tree": "a8864d741a1d21af8b10a8467b9e904069884759",
-      "changed": [
-        "index.html",
-        "receiver-celebration.js",
-        "receiver-pickleball.js",
-        "receiver-scene.js"
-      ]
-    },
-    {
-      "tree": "b0a92b26362071084edc5b8b37738a2ac435d173",
       "changed": [
         "index.html",
         "receiver-celebration.js",
