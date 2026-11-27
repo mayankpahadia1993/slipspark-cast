@@ -803,6 +803,44 @@
     return out;
   }
 
+  // MARK: The same commands, the same arrays (receiver 114, Nov 27 2026)
+  //
+  // qqxemq6y (the owner's AB iPhone game on staging 113, the Living Room TV's Ultra): the frame loop every 41-66 ms at
+  // pace 26, drawMs 12-16 in play, the page's own script 430-510 ms a second. Each frame and live batter arrives as new
+  // arrays though most of its commands are the frame before's again (the stadium, the pitch's marks, the standing
+  // fielders; the batter's legs, pelvis, torso and head), and the receiver wrote each one out as text again (opKey),
+  // worked out its shape (opShape) and its bounds again, every frame. Now a command equal to its partner in the frame
+  // before is that very array: what is worked out from a command once (keyed by the array) is worked out once. Partners
+  // are found by place, allowing for up to two commands inserted or removed at a time (`shift`), so commands that changed in
+  // place (a fielder moving) keep the rest in step. Commands are never written to once received, so sharing is safe.
+  function sameValue(a, b) {
+    if (a === b) return true;
+    if (!isArray(a) || !isArray(b) || a.length !== b.length) return false;
+    for (let index = 0; index < a.length; index += 1) {
+      const x = a[index], y = b[index];
+      if (x === y) continue;
+      if (!isArray(x) || !isArray(y) || !sameValue(x, y)) return false;
+    }
+    return true;
+  }
+  // `ops`' commands equal to their partners in `before` replaced by those (in place); how many were.
+  const SHARE_REACH = [1, -1, 2, -2];
+  function shareOps(ops, before) {
+    if (!before || !before.length || !ops.length) return 0;
+    let shift = 0, shared = 0;
+    for (let index = 0; index < ops.length; index += 1) {
+      const at = index + shift, op = ops[index];
+      if (at >= 0 && at < before.length && sameValue(op, before[at])) { ops[index] = before[at]; shared += 1; continue; }
+      // Up to two removed here (a fielder's shadow and picture together), or inserted.
+      for (const step of SHARE_REACH) {
+        const near = at + step;
+        if (near >= 0 && near < before.length && sameValue(op, before[near])) { ops[index] = before[near]; shift += step; shared += 1; break; }
+      }
+    }
+    return shared;
+  }
+  const opsShared = { shared: 0, total: 0 };
+
   // The frames on their way to the screen, by moment. A redraw (a newer
   // epoch) replaces everything from its first moment on, and frames of an
   // older epoch still arriving are dropped.
@@ -819,6 +857,14 @@
     let scratchShape = null;
     // The HUD changes waiting for their moment, oldest first.
     let huds = [];
+    // Receiver 114: the frame that came last, whose commands the next one shares where they are the same.
+    let last = null;
+    const sharing = !(options && options.share === false);
+    function share(frame, before) {
+      if (!sharing || !before) return;
+      opsShared.shared += shareOps(frame.o, before.o);
+      opsShared.total += frame.o.length;
+    }
 
     function insert(frame) {
       let index = frames.length;
@@ -849,6 +895,9 @@
         const e = Number(frameEpoch) || 0;
         if (e < epoch) return null;
         epoch = e;
+        // Receiver 114: its commands the same as the frame before's are those arrays.
+        share(frame, last);
+        last = frame;
         insert(frame);
         return frame;
       },
@@ -860,6 +909,8 @@
         epoch = e;
         const incoming = rawFrames.map((raw) => normalize(raw)).filter(Boolean).sort((x, y) => x.s - y.s);
         if (!incoming.length) return [];
+        // Receiver 114: each frame's commands shared with the one before it (the first with the last frame that came).
+        incoming.forEach((frame) => { share(frame, last); last = frame; });
         const from = incoming[0].s;
         frames = frames.filter((frame) => frame.s < from);
         huds = huds.filter((entry) => entry.s < from);
@@ -904,10 +955,10 @@
         return latest;
       },
 
-      clear() { frames = []; huds = []; },
+      clear() { frames = []; huds = []; last = null; },
 
       // A new phone (or the same one, started again) counts epochs afresh.
-      reset() { frames = []; huds = []; epoch = 0; }
+      reset() { frames = []; huds = []; epoch = 0; last = null; }
     };
   }
 
@@ -925,6 +976,8 @@
         if (!frame) return null;
         if (current && frame.s < current.s) return null;
         frame.h = null;
+        // Receiver 114: his commands the same as the live batter before's are those arrays.
+        if (current) { opsShared.shared += shareOps(frame.o, current.o); opsShared.total += frame.o.length; }
         current = frame;
         return frame;
       },
@@ -1461,6 +1514,6 @@
     percentile, debugLine, tracePath, cssColor, pictureSize, canvasPlan, canvasWidth, createRateWatch, STEADY, createSteadyWatch, createLiveLayer, hasLiveSlot, poseAge, poseAhead,
     filterParts, opBounds, layerEnd, clipsWholeStage, mergeRects, overStrip, readLook, lookColours, dyeFrame, copyAtlasFrame, GRIP_OPACITY, GRIP_SHADE,
     readGear, gearColours, GEAR_HELMET_OPACITY, GEAR_FINISH_OPACITY, GEAR_STICKER, WARM_REPORT_MS, warmReport,
-    CREATOR_KIT, wearsCreatorKit, polishColour, farStripes
+    CREATOR_KIT, wearsCreatorKit, polishColour, farStripes, sameValue, shareOps, opsShared
   };
 });

@@ -2440,15 +2440,41 @@
     // over the layer in its own order. Anything without bounds (the live
     // batter's slot, a layer) ends the search, so nothing after it moves.
     const overlaps = (a, b) => a[0] < b[2] && b[0] < a[2] && a[1] < b[3] && b[1] < a[3];
-    function splitStatic(frame, from, previous, keys) {
+    // Receiver 114: a command's padded bounds, kept with the array (received commands are never written to, and the
+    // same command in the next frame is the same array: core.shareOps). A blended frame's own arrays are rewritten
+    // every draw: its commands the same in both frames it blends between (`same`) use their source's.
+    const paddedBoxes = new WeakMap();
+    function paddedBox(op) {
+      let padded = paddedBoxes.get(op);
+      if (padded !== undefined) return padded;
+      const box = core.opBounds(op, pictureSize);
+      padded = box ? [box[0] - 2, box[1] - 2, box[2] + 2, box[3] + 2] : null;
+      // A picture not here yet has no size: worked out again once it is.
+      if (padded || op[0] !== "i") paddedBoxes.set(op, padded);
+      return padded;
+    }
+    function boxesOf(frame, from, same) {
+      const boxes = new Array(frame.o.length);
+      for (let index = from; index < frame.o.length; index += 1) {
+        const op = frame.o[index];
+        if (op[0] === "L" || op[0] === "B" || op[0] === "l") break;
+        const source = same ? same[index] : op;
+        let box;
+        if (source) box = paddedBox(source);
+        else { const raw = core.opBounds(op, pictureSize); box = raw ? [raw[0] - 2, raw[1] - 2, raw[2] + 2, raw[3] + 2] : null; }
+        boxes[index] = box;
+        if (!box) break;
+      }
+      return boxes;
+    }
+    function splitStatic(frame, from, previous, keys, boxes) {
       const statics = [];
       const changed = [];
       for (let index = from; index < frame.o.length; index += 1) {
         const op = frame.o[index];
         if (op[0] === "L" || op[0] === "B" || op[0] === "l") break;
-        const box = core.opBounds(op, pictureSize);
-        if (!box) break;
-        const padded = [box[0] - 2, box[1] - 2, box[2] + 2, box[3] + 2];
+        const padded = boxes[index];
+        if (!padded) break;
         if (staticable(op) && previous && previous.has(keys[index]) && !changed.some((other) => overlaps(other, padded))) statics.push(index);
         else changed.push(padded);
       }
@@ -2458,7 +2484,7 @@
     // fit: each must be there in the layer's order, before anything without
     // bounds, with no other command before it overlapping it (that one
     // would be drawn above it now).
-    function layerFits(frame, from, keys) {
+    function layerFits(frame, from, keys, boxes) {
       const want = staticLayer.keys;
       if (!want || !want.length) return null;
       const at = [];
@@ -2467,9 +2493,8 @@
       for (let index = from; index < frame.o.length && next < want.length; index += 1) {
         const op = frame.o[index];
         if (op[0] === "L" || op[0] === "B" || op[0] === "l") return null;
-        const box = core.opBounds(op, pictureSize);
-        if (!box) return null;
-        const padded = [box[0] - 2, box[1] - 2, box[2] + 2, box[3] + 2];
+        const padded = boxes[index];
+        if (!padded) return null;
         if (keys[index] === want[next]) {
           if (others.some((other) => overlaps(other, padded))) return null;
           at.push(index);
@@ -2513,27 +2538,33 @@
       // (a test's own) is written out as before.
       const a = fresh ? frame.__from : null, b = fresh ? frame.__to : null, pairs = fresh ? frame.__pairs : null;
       const blendedFrom = !!(a && b && a.o.length === frame.o.length);
+      // Receiver 114: what each command's bounds come from (its own array; a blended frame's, the source command the
+      // same in both frames, else worked out from the draw's numbers).
+      const same = fresh ? new Array(frame.o.length).fill(null) : null;
       for (let index = from; index < frame.o.length; index += 1) {
         const op = frame.o[index];
         if (op[0] !== "f" && op[0] !== "s" && op[0] !== "i") continue;
         if (blendedFrom) {
           const partner = pairs ? pairs[index] : index;
-          const keyA = opKey(a.o[index], false);
-          const keyB = partner >= 0 && b.o[partner] ? opKey(b.o[partner], false) : keyA;
-          if (keyA !== keyB) continue;
+          const opA = a.o[index], opB = partner >= 0 ? b.o[partner] : null;
+          const keyA = opKey(opA, false);
+          // Receiver 114: the same array in both (core.shareOps) is the same command without comparing their text.
+          if (opB && opB !== opA && opKey(opB, false) !== keyA) continue;
           keys[index] = keyA;
+          same[index] = opA;
         } else {
           keys[index] = opKey(op, fresh);
         }
         keysNow.add(keys[index]);
       }
-      const statics = splitStatic(frame, from, lastStaticKeys, keys);
+      const boxes = boxesOf(frame, from, same);
+      const statics = splitStatic(frame, from, lastStaticKeys, keys, boxes);
       lastStaticKeys = keysNow;
       const candidateKey = statics.length >= 2 ? statics.map((index) => keys[index]).join("|") : null;
       const steady = candidateKey !== null && candidateKey === lastCandidateKey;
       lastCandidateKey = candidateKey;
       const sized = staticLayer.canvas && staticLayer.canvas.width === canvas.width && staticLayer.canvas.height === canvas.height;
-      let used = sized ? layerFits(frame, from, keys) : null;
+      let used = sized ? layerFits(frame, from, keys, boxes) : null;
       // A bigger set of unchanged commands that held for two draws: worth a
       // rebuild. A layer that no longer fits: the set now, if there is one.
       if (used && steady && statics.length >= used.length + 3) used = null;
@@ -2607,7 +2638,8 @@
         const op = batter.o[index], kind = op[0];
         if (kind !== "f" && kind !== "s" && kind !== "i") { keys = null; break; }
         const plain = !(op[2] && op[2] !== "source-over") && !(filtersOf(batter, kind === "f" ? op[7] : kind === "s" ? op[9] : op[5]).blur > 0);
-        keys[index] = plain ? JSON.stringify(op) : null;
+        // Receiver 114: written out once a command array (his unchanged pieces are the live batter before's arrays).
+        keys[index] = plain ? opKey(op, false) : null;
       }
       if (keys) keys.context = JSON.stringify([batter.fl, batter.cl]);
       liveOpKeyCache.set(batter, keys);
@@ -3456,7 +3488,8 @@
       // `held` (receiver 67): it keeps this many of the phone's pictures and
       // says which (`cards`, oldest first, [id, width] each; `held` messages
       // after each change), and asks for one it lacks (`want`).
-      const ready = { t: "ready", scene: 1, pic: 1, card: 1, live: 1, setup: 1, whole: 1, predict: 1, shared: 1, inset: insetOff ? 0 : 1, steady: 1,
+      // Receiver 114: `fb`, a live batter may ride in a frame's message (`b`).
+      const ready = { t: "ready", scene: 1, pic: 1, card: 1, live: 1, setup: 1, whole: 1, predict: 1, shared: 1, inset: insetOff ? 0 : 1, steady: 1, fb: 1,
         held: options.heldKeep || 0, cards: options.heldCards ? options.heldCards() : [], screen: screenPixels(), version: VERSION, ua: navigator.userAgent, have };
       // A weak dongle: the phone sends frames and live batters at its pace.
       if (plan.weak) ready.weak = 1;
@@ -3565,6 +3598,10 @@
         case "f": {
           const frame = timeline.add(message, message.e);
           if (frame) noteArrival(frame);
+          // Receiver 114 (`ready.fb`): a live batter that rides in the frame's message (`b`, his own "b" message), as
+          // if it had come on its own just after: one Cast message instead of two (each costs the Ultra ~3 ms: the Cast
+          // framework parses it twice and dispatches it twice).
+          if (message.b && typeof message.b === "object" && !Array.isArray(message.b)) { message.b.t = "b"; handleMessage(message.b); }
           break;
         }
         case "fs": {
