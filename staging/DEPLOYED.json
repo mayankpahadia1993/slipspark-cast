@@ -1,12 +1,12 @@
 {
   "environment": "staging",
-  "commit": "1cb46507cf7f341154c1a2d337ab84a71ded4c4e",
-  "subject": "Receiver 114: a frame's unchanged commands are the frame before's arrays (worked out once); a live batter may ride in a frame's message (fb)",
-  "receiverTree": "836ede54e7398def7005218f67a1a796d6a1fc20",
-  "revision": 114,
-  "deployedAt": "2026-11-27T21:26:27Z",
+  "commit": "bdfadb06134a5a0f6428d2ec85388cec3112a073",
+  "subject": "Receiver 113: pictures that come in with the stadium on are warmed a frame at a time; a frame with many cold ones waits while they are",
+  "receiverTree": "fa89f32ee40bb6e4262ce79b030587b30ceff18f",
+  "revision": 113,
+  "deployedAt": "2026-11-27T22:16:42Z",
   "previous": {
-    "tree": "fa89f32ee40bb6e4262ce79b030587b30ceff18f",
+    "tree": "836ede54e7398def7005218f67a1a796d6a1fc20",
     "changed": [
       "index.html",
       "receiver-pickleball.js",
@@ -20,7 +20,6 @@
       "changed": [
         "index.html",
         "receiver-pickleball.js",
-        "receiver-scene-core.js",
         "receiver-scene.js"
       ]
     },
@@ -41,7 +40,6 @@
         "index.html",
         "receiver-celebration.js",
         "receiver-pickleball.js",
-        "receiver-scene-core.js",
         "receiver-scene.js"
       ]
     },
