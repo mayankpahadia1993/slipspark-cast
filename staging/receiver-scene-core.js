@@ -888,6 +888,9 @@
             if (u <= 0) return { frame: a, stamp: a.s, blended: false };
             if (scratchShape !== shapeKey(a)) { scratch = cloneFrame(a); scratch.scratch = true; scratchShape = shapeKey(a); }
             const frame = same ? blendFramesInto(scratch, a, b, u) : blendMatchedInto(scratch, a, b, match, u);
+            // Receiver 112: the frames it is blended from, and which of b's commands each of its own is blended toward
+            // (null: the same place), so a command the same in both can be known without reading the scratch's numbers.
+            scratch.__from = a; scratch.__to = b; scratch.__pairs = same ? null : match.pairs;
             return { frame, stamp: a.s, blended: true, partly: !same };
           }
         }

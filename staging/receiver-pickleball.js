@@ -36,7 +36,7 @@
   // photograph layers, a HUD that never animates, the sheets' smaller copies (`pickleball/small/`), no decode() at load,
   // and arrivals just after the TV's own stall kept out of the delay. `ready` and `stats` say `weak: 1`; `stats` add
   // `worst`, the longest gap between draws. The hello's `x.weak` (1 or 0, benches) draws as a weak dongle does, or not.
-  const RECEIVER_VERSION = 111;
+  const RECEIVER_VERSION = 112;
   const core = window.RallycadePickleballCore;
   const sceneCore = window.RallycadeSceneCore;
   // Receiver 109: cricket's canvas plan, rate watch and warm reports, through the layer every game uses
@@ -289,19 +289,53 @@
         .catch(() => null);
     }
 
+    // Receiver 112 (Nov 27 2026, the owner on build AA: "Still lagging a bit in pickleball"; ecc04e09, qhe50p09): the
+    // Living Room TV's Ultra drew 27-28 a second but stopped for 100-170 ms in 48 of 71 two-second reports (`worst`), its
+    // draws 2 ms. That is a sheet decoded again on the page's thread (30-140 ms each on the Ultra, receiver 97's trace):
+    // a look's fifteen sheets decoded are 32.8 MB (the near player's 1254 x 706, 3.5 MB each; the far player's 669 x 376,
+    // 1 MB), more than the TV keeps decoded at once, so the one a stroke comes back to has been let go. The far player is
+    // drawn at most 0.20 of a phone sheet pixel (every recorded match), half of what his sheets hold (0.4): they load the
+    // weak plan's smaller copies (small/, 0.2, 0.25 MB each), a look's fifteen 26.8 MB. The near player keeps the full
+    // sheets (drawn up to 0.66). The hello's `x.far: 0` (benches) loads them as before.
+    let farSmall = true;
+    // Receiver 112, a bench switch only (the hello's `x.pin: 1`, off for every phone): the near player's sheets also kept
+    // as decoded bitmaps (decoded off the page's thread, never let go while the page holds them), up to PIN_BUDGET, so a
+    // TV A/B can tell whether keeping them decoded ends the gaps. Receiver 97 tried a look's sheets as bitmaps on the Ultra
+    // (27 MB: a match at full rate; a same-phone match's 61 MB stalled the whole TV), so it stays off until the TV says.
+    let pinSheets = false, pinnedBytes = 0;
+    const PIN_BUDGET = 30e6;
+    const pinned = [];
+    function pin(entry, url) {
+      if (!pinSheets || !canBitmap || weak) return;
+      fetch(url).then((response) => { if (!response.ok) throw new Error("fetch " + url); return response.blob(); })
+        .then((blob) => window.createImageBitmap(blob))
+        .then((bitmap) => {
+          const bytes = bitmap.width * bitmap.height * 4;
+          if (pinnedBytes + bytes > PIN_BUDGET || !pictures.has(entry.name)) { if (bitmap.close) bitmap.close(); return; }
+          pinnedBytes += bytes;
+          pinned.push(bitmap);
+          entry.image = bitmap;
+        }).catch(() => {});
+    }
+    function unpin() {
+      pinned.forEach((bitmap) => { try { if (bitmap.close) bitmap.close(); } catch (error) { /* gone */ } });
+      pinned.length = 0;
+      pinnedBytes = 0;
+    }
     function loadSheet(name) {
       if (pictures.has(name)) return pictures.get(name).wait;
       const spec = manifest && manifest.sheets && manifest.sheets[name];
       // Receiver 106: a weak dongle's copy from small/ (the weak plan), the full one if that never comes.
-      const file = core.sheetFile(spec, weak);
-      const entry = { image: null, scale: file ? file.scale : 1, wait: null, warmed: 0 };
+      // Receiver 112: and the far player's on every TV (`farSmall`).
+      const file = core.sheetFile(spec, weak || (farSmall && core.farSheet(name)));
+      const entry = { name, image: null, scale: file ? file.scale : 1, wait: null, warmed: 0 };
       // A sheet that did not come is asked for once more (Nov 14 2026, the Ultra just after a deploy: "loaded, missing 1";
       // a frame that draws a sheet the TV lacks is never shown).
       const url = base + (file ? file.folder : "") + name + ".webp?v=" + RECEIVER_VERSION;
       const full = base + name + ".webp?v=" + RECEIVER_VERSION;
       entry.wait = spec ? loadImage(url).then((image) => image || new Promise((resolve) => setTimeout(resolve, 700)).then(() => loadImage(url + "&again=1")))
         .then((image) => (image || !file.folder ? image : loadImage(full).then((fallback) => { if (fallback) entry.scale = spec.scale; return fallback; })))
-        .then((image) => { entry.image = image; return image; }) : Promise.resolve(null);
+        .then((image) => { entry.image = image; if (image && !core.farSheet(name)) pin(entry, image.src); return image; }) : Promise.resolve(null);
       pictures.set(name, entry);
       return entry.wait;
     }
@@ -843,6 +877,10 @@
         weakKey = "";
       }
       const began = next === "match" && view !== "match";
+      // Receiver 112 (the Living Room TV's Ultra under memory pressure through cricket's innings after a match): pickleball
+      // off, its 1280 x 720 canvas lets its pixels go (sizeCanvas makes them again at the next draw). Not on a weak
+      // dongle, whose opaque canvas keeps the court's photograph.
+      if (next === "off" && view !== "off" && !weak && canvas.width) { canvas.width = 0; canvas.height = 0; canvasPx = 0; lastDrawn = null; }
       view = next;
       if (began) beginStart(); else if (view !== "match") { starting = null; shownAt = null; }
       if (view !== "off") { loadPlate(); }
@@ -895,11 +933,15 @@
         t: "stats", fps: Math.round(stats.draws.length / seconds * 10) / 10,
         gap: Math.round(core.percentile(stats.draws, 0.9)), frames: stats.frames,
         drawMs: Math.round(core.percentile(stats.drawMs, 0.5) * 10) / 10, queue: stats.queue || 0,
+        // Receiver 112: the longest draw (a sheet decoded on the spot shows here, not in the median).
+        drawMax: Math.round((stats.drawMs.length ? Math.max(...stats.drawMs) : 0) * 10) / 10,
         stale: Math.round(stats.stale || 0), delay: Math.round(playout.delay), late: playout.counts.late, missing: stats.missing,
         warmed: stats.warmed || 0, warmMs: stats.warmMs || 0,
         // Receiver 106: the longest gap between draws (`gap` is the 90th percentile: one freeze in a report hides there).
         worst: Math.round(stats.draws.length ? Math.max(...stats.draws) : 0)
       };
+      // Receiver 112: the bench's pinned sheets (`x.pin: 1`), MB decoded.
+      if (pinSheets) message.pinned = Math.round(pinnedBytes / 1e5) / 10;
       // Receiver 109: cricket's warm reports (RallycadeTVGame.report, core.warmReport): one in the match's first 8 s while
       // its pictures still load or a sprite was missing says `warm`, its rate as `wfps`/`wgap`, so no phone paces from
       // the decoding. `weak: 1` on the weak plan (receiver 106).
@@ -932,6 +974,9 @@
           if (chip) chip.hidden = !debug;
           // Receiver 106: the TV's own plan, or the bench's `x.weak` (1: draw as a 32-bit Chromecast does; 0: not).
           setWeak(message.x && typeof message.x === "object" && (message.x.weak === 0 || message.x.weak === 1) ? message.x.weak === 1 : weakDongle);
+          // Receiver 112: the bench's `x.far: 0` loads the far player's full sheets, as receiver 111 did.
+          farSmall = !(message.x && typeof message.x === "object" && message.x.far === 0);
+          pinSheets = !!(message.x && typeof message.x === "object" && message.x.pin === 1);
           preloadWhenWanted(message.look, message.sheets);
           {
             const ready = { t: "ready", pickleball: core.VERSION, version: RECEIVER_VERSION, looks: ["man", "woman"], friends: 1, tall: tallImgs[0] && tallImgs[1] ? 1 : 0, go: holdOn ? 1 : 0,
@@ -988,8 +1033,10 @@
       // Tests: the next draw is whole (receiver 106's weak plan otherwise paints only where things moved).
       drawWhole() { weakKey = ""; lastDrawn = null; },
       stats: () => maybeReport(true), sizeCanvas, picture, loaded: () => lookLoadedAt !== null,
-      release() { stop(); pictures.clear(); },
-      get bitmapBytes() { return bitmapBytes; }
+      release() { stop(); pictures.clear(); unpin(); },
+      get bitmapBytes() { return bitmapBytes; },
+      // Receiver 112: the bench's pinned sheets (`x.pin: 1`), bytes decoded.
+      get pinnedBytes() { return pinnedBytes; }
     };
   }
 

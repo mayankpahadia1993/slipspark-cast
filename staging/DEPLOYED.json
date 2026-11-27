@@ -1,12 +1,12 @@
 {
   "environment": "staging",
-  "commit": "22f227633529c8ef1a0f1d8f4845f26bb47d7e30",
-  "subject": "Build U: iOS 3.1.1 (404) for testers; UnlimitedUITests reads Pause (no leave variable after the HUD declutter)",
-  "receiverTree": "40fec065233daa48589cb8b9c8f7860d0435dde1",
-  "revision": 111,
-  "deployedAt": "2026-11-27T20:25:53Z",
+  "commit": "07387e7fc08166774ab2fe2b1290cbef4e4d825f",
+  "subject": "Receiver 112: photo layers the cast no longer shows let go; confetti and pickleball canvases freed when idle",
+  "receiverTree": "daac12fafcf3395eb6aa87507bab37e6c824fb16",
+  "revision": 112,
+  "deployedAt": "2026-11-27T20:39:29Z",
   "previous": {
-    "tree": "daac12fafcf3395eb6aa87507bab37e6c824fb16",
+    "tree": "40fec065233daa48589cb8b9c8f7860d0435dde1",
     "changed": [
       "index.html",
       "receiver-celebration.js",
@@ -20,19 +20,17 @@
     {
       "tree": "a8864d741a1d21af8b10a8467b9e904069884759",
       "changed": [
-        "index.html",
-        "receiver-pickleball-core.js",
+        "receiver-celebration.js",
         "receiver-pickleball.js",
-        "receiver-scene-core.js",
         "receiver-scene.js"
       ]
     },
     {
       "tree": "b0a92b26362071084edc5b8b37738a2ac435d173",
       "changed": [
-        "index.html",
-        "receiver-pickleball-core.js",
+        "receiver-celebration.js",
         "receiver-pickleball.js",
+        "receiver-scene-core.js",
         "receiver-scene.js"
       ]
     },
@@ -40,6 +38,7 @@
       "tree": "ae684c9ea6fe5235d94761fe25ff171bc29a7ce8",
       "changed": [
         "README.md",
+        "index.html",
         "pickleball/PickleballBackhandCoralCreator.webp",
         "pickleball/PickleballBackhandCreator.webp",
         "pickleball/PickleballBackhandFemaleCoralCreator.webp",
@@ -97,8 +96,11 @@
         "pickleball/small/PickleballVolleyCreator.webp",
         "pickleball/small/PickleballVolleyFemaleCoralCreator.webp",
         "pickleball/small/PickleballVolleyFemaleCreator.webp",
+        "receiver-celebration.js",
         "receiver-pickleball-core.js",
-        "receiver-pickleball.js"
+        "receiver-pickleball.js",
+        "receiver-scene-core.js",
+        "receiver-scene.js"
       ]
     },
     {
@@ -163,6 +165,7 @@
         "pickleball/small/PickleballVolleyCreator.webp",
         "pickleball/small/PickleballVolleyFemaleCoralCreator.webp",
         "pickleball/small/PickleballVolleyFemaleCreator.webp",
+        "receiver-celebration.js",
         "receiver-dye.js",
         "receiver-pickleball-core.js",
         "receiver-pickleball.js",

@@ -392,6 +392,8 @@
     function start(celebration) {
       current = celebration;
       startedAt = now() - celebration.elapsed;
+      // Receiver 112: the confetti's canvas has pixels only while a celebration plays (stop() lets them go).
+      if (e.confetti && (e.confetti.width !== W || e.confetti.height !== H)) { e.confetti.width = W; e.confetti.height = H; }
       ending = 0;
       svgId += 1;
       const id = "cel" + svgId;
@@ -501,6 +503,9 @@
       current = null;
       ending = 0;
       e.root.hidden = true;
+      // Receiver 112 (the Living Room TV's Ultra under memory pressure all innings): the confetti's 1920 x 1080 canvas,
+      // 8.3 MB once drawn, is let go between celebrations; start() sizes it again.
+      if (e.confetti && e.confetti.width) { try { e.confetti.width = 0; e.confetti.height = 0; } catch (error) { /* gone */ } }
     }
 
     /** Every state from the phone: a new celebration starts where the
