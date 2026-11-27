@@ -144,7 +144,7 @@
     let helloPieces = new Set();
     // `received` (receiver 83): the phone's pictures decoded since the last report (core.warmReport).
     const counters = { draws: 0, blended: 0, frames: 0, late: [], drawMs: [], dressMax: 0, dressReadMax: 0, dressDyeMax: 0, dressed: 0, missing: 0, redraws: 0, gaps: [], live: 0, pose: [], ahead: [], eff: [],
-      js: 0, long: 0, lag: [], partly: 0, stale: [], received: 0 };
+      js: 0, long: 0, lag: [], partly: 0, stale: [], received: 0, coldHeld: 0, warmedLate: 0, coldHeldTotal: 0, warmedLateTotal: 0 };
 
     // What the page's thread does besides drawing (Oct 19 2026): `js`, the
     // script's own time in the loop and the messages; `long`, tasks of 50 ms
@@ -738,6 +738,8 @@
     const warmed = new Set();
     let warmCanvas = null;
     function warmDecode(key) {
+      // Receiver 113: with the stadium on, warmed a frame at a time in the frame's spare time (warmLate).
+      if (on && WARM_MODE !== "off" && !released && tune.cold) { queueLateWarm(key); return; }
       if (WARM_MODE === "off" || on || warmed.has(key) || released) return;
       if (backdropLayers.has(key)) return;
       const image = images.get(key);
@@ -758,6 +760,7 @@
         const side = WARM_MODE === "gpu" ? 256 : 1;
         if (!warmCanvas) { warmCanvas = document.createElement("canvas"); warmCanvas.width = side; warmCanvas.height = side; }
         warmCanvas.getContext("2d").drawImage(source, 0, 0, side, side);
+        hotSources.add(source);
         return true;
       } catch (error) { return false; /* decoded at the first frame instead */ }
     }
@@ -765,6 +768,104 @@
       if (!warmCanvas) return;
       try { warmCanvas.width = 0; warmCanvas.height = 0; } catch (error) { /* gone */ }
       warmCanvas = null;
+    }
+
+    // MARK: Cold pictures in play (receiver 113, Nov 27 2026)
+    //
+    // fgqcsp7e (the owner on Android 27580, staging 112, a match's chase on the Living Room TV's Chromecast Ultra): one
+    // stadium draw took 673 ms and the frame loop stopped for 1404 ms, frames came 2317 ms late and the phone read that as
+    // a Wi-Fi that can't carry the stream (15 a second for the next 30 s). The chase's pictures had come in with the
+    // stadium on (images 74 -> 141), where nothing warmed them (warmDecode runs with the stadium off), so the first draw
+    // that showed them decoded and uploaded them all at once, on the page's thread. On that TV (Nov 27): 26 fresh
+    // fielder pictures drawn in one frame held it 267 ms with 2 ms of script; drawn first one an animation frame into the
+    // warm-up's 256 x 256 canvas, no frame was late and the frame with all 26 took 33 ms. So with the stadium on:
+    //  - a picture that comes in is warmed so in a later animation frame, one a frame, only while that frame's own
+    //    script has been short (LATE_WARM_IDLE_MS): most come ahead of the frame that shows them;
+    //  - a frame that would still draw more than COLD_DRAW_MAX pictures never drawn before keeps the picture on screen
+    //    while they are warmed COLD_WARM_PER_FRAME a frame, COLD_HOLD_MS at most (then it draws, as before).
+    // A picture is hot once drawn on any canvas (drawPicture) or warmed. `coldHeld` and `warmedLate` in stats; `cold: 0`
+    // (a bench switch) draws as receiver 112 did; `cold: 2` only holds (nothing warmed ahead). receiver-cold-pictures.test.cjs.
+    const COLD_WARM_PER_FRAME = 2, COLD_DRAW_MAX = 2, COLD_HOLD_MS = 600, LATE_WARM_IDLE_MS = 12, LATE_WARM_SIDE = 256;
+    const hotSources = new WeakSet();
+    const lateWarm = [];
+    const lateQueued = new Set();
+    let lateWarmCanvas = null;
+    let coldHoldSince = null;
+    function queueLateWarm(key) {
+      if (lateQueued.has(key) || backdropLayers.has(key)) return;
+      lateQueued.add(key);
+      lateWarm.push(key);
+    }
+    // What a key draws from: a picture's own image or bitmap, or a sprite's atlas; null for a canvas (nothing to decode)
+    // or a picture not here.
+    function warmSource(key) {
+      const image = images.get(key);
+      if (!image) return null;
+      const source = image.sprite ? (image.sheet ? image.sheet.bitmap || image.sheet.image : null) : bitmaps.get(key) || image;
+      if (!source || (typeof HTMLCanvasElement !== "undefined" && source instanceof HTMLCanvasElement)) return null;
+      return source;
+    }
+    function warmLate(source) {
+      try {
+        if (!lateWarmCanvas) { lateWarmCanvas = document.createElement("canvas"); lateWarmCanvas.width = LATE_WARM_SIDE; lateWarmCanvas.height = LATE_WARM_SIDE; }
+        lateWarmCanvas.getContext("2d").drawImage(source, 0, 0, LATE_WARM_SIDE, LATE_WARM_SIDE);
+      } catch (error) { /* drawn cold at its first frame instead */ }
+      hotSources.add(source);
+      counters.warmedLate += 1;
+      counters.warmedLateTotal += 1;
+    }
+    function dropLateWarm() {
+      lateWarm.length = 0;
+      lateQueued.clear();
+      coldHoldSince = null;
+      zeroCanvas(lateWarmCanvas);
+      lateWarmCanvas = null;
+    }
+    // One queued picture a frame, while this frame's script has been short.
+    function warmQueued(began) {
+      while (lateWarm.length && performance.now() - began < LATE_WARM_IDLE_MS) {
+        const key = lateWarm.shift();
+        lateQueued.delete(key);
+        const source = warmSource(key);
+        if (source && !hotSources.has(source)) { warmLate(source); return; }
+      }
+    }
+    // The pictures a draw of `frame` (and the live batter) would decode for the first time. A received frame or batter
+    // found all hot isn't looked at again until a picture comes in (`artEpoch`): a blended draw looks at the two frames
+    // it blends between.
+    const hotSeen = new WeakMap();
+    function coldSources(frame, batter) {
+      const cold = [];
+      const look = (owner) => {
+        if (!owner || !owner.o || hotSeen.get(owner) === artEpoch) return;
+        const before = cold.length;
+        for (const op of owner.o) {
+          if (op[0] !== "i") continue;
+          const source = warmSource(op[3]);
+          if (source && !hotSources.has(source) && cold.indexOf(source) < 0) cold.push(source);
+        }
+        if (cold.length === before) hotSeen.set(owner, artEpoch);
+      };
+      if (frame.scratch && frame.__from) { look(frame.__from); look(frame.__to); } else look(frame);
+      if (batter && hasLiveSlot(frame)) look(batter);
+      return cold;
+    }
+    function hasLiveSlot(frame) {
+      if (frame.__slot === undefined) frame.__slot = frame.o.some((op) => op[0] === "B");
+      return frame.__slot;
+    }
+    // Whether this animation frame keeps the picture on screen while cold pictures are warmed (see above).
+    function holdsForCold(frame, local) {
+      if (!tune.cold || !shownFrame || rehearsing) { coldHoldSince = null; return false; }
+      const cold = coldSources(frame, live.current);
+      if (!cold.length) { coldHoldSince = null; return false; }
+      for (let index = 0; index < COLD_WARM_PER_FRAME && cold.length; index += 1) warmLate(cold.shift());
+      if (cold.length <= COLD_DRAW_MAX) { coldHoldSince = null; return false; }
+      if (coldHoldSince === null) coldHoldSince = local;
+      if (local - coldHoldSince >= COLD_HOLD_MS) { coldHoldSince = null; return false; }
+      counters.coldHeld += 1;
+      counters.coldHeldTotal += 1;
+      return true;
     }
 
     // MARK: The rehearsal (receiver 65)
@@ -1850,7 +1951,7 @@
     // Receiver 112: `runs: 0` draws a batter whose hands follow the player's every piece every draw (no liveRuns), as
     // receiver 111 did. `layers: ...` is taken; `evict: 0` keeps every photo's GPU layer for the page's life (receiver 111).
     const TUNED = Object.freeze({ blur: "shadow", layers: "bounded", cover: "clip", bitmaps: 0, shade: "thirds", blend: 1, cache: 1, photo: "layer", opaque: 0,
-      match: 1, dirty: 1, early: 1, own: 1, live: 1, edge: 1, warm: 1, runs: 1, evict: 1, grace: 0 });
+      match: 1, dirty: 1, early: 1, own: 1, live: 1, edge: 1, warm: 1, runs: 1, evict: 1, grace: 0, cold: 1 });
     // A weak dongle (core.isWeakDongle): no redraw only to blend between
     // frames (each draw costs it ~30 ms of its page's thread) and glows
     // drawn plain, never blurred.
@@ -2028,6 +2129,8 @@
     // pixels are the same but for rounding in where they are sampled.
     function drawPicture(c, drawn) {
       const size = drawn.size, cut = drawn.cut;
+      // Receiver 113: decoded and on the GPU from here on (coldSources).
+      hotSources.add(drawn.image);
       if (!cut) { c.drawImage(drawn.image, 0, 0, size.width, size.height); return; }
       const kx = size.width / cut.width, ky = size.height / cut.height;
       c.drawImage(drawn.image, cut.x, cut.y, cut.w, cut.h, cut.ox * kx, cut.oy * ky, cut.w * kx, cut.h * ky);
@@ -3100,7 +3203,8 @@
       const result = timeline.at(phoneNow);
       // A frame already on screen is drawn again only while blending.
       let drew = false;
-      if (result && ((result.blended && tune.blend) || result.stamp !== lastStamp || needsRedraw)) {
+      // Receiver 113: a frame with cold pictures may wait a frame or two while they are warmed (holdsForCold).
+      if (result && ((result.blended && tune.blend) || result.stamp !== lastStamp || needsRedraw) && !holdsForCold(result.frame, local)) {
         const missingBefore = counters.missing;
         drawFrame(result.frame);
         noteWhole(missingBefore);
@@ -3147,6 +3251,8 @@
     }
 
     function housekeeping(local) {
+      // Receiver 113: a picture that came in with the stadium on, warmed in this frame's spare time.
+      if (lateWarm.length && tune.cold === 1) warmQueued(local);
       // Receiver 77: the start's pictures still to come (the rest waits, restWaits).
       if (preloadQueue.length && preloading < 3) pumpSome();
       // Receiver 112: photo layers no longer drawn let go, once a second.
@@ -3196,7 +3302,9 @@
           // picture was (p50, p90 ms); the rehearsal's draws and their ms
           // (the first ten's median, the last ten's: the drawing code warming).
           partly: counters.partly, stale: Math.round(core.percentile(counters.stale, 0.5)), stale90: Math.round(core.percentile(counters.stale, 0.9)),
-          rehearsed: rehearsal.draws
+          rehearsed: rehearsal.draws,
+          // Receiver 113: draws held while cold pictures were warmed, and pictures warmed with the stadium on.
+          coldHeld: counters.coldHeld, warmedLate: counters.warmedLate
         };
         if (rehearsal.ms.length >= 20) stats.rehearseMs = [rehearsal.firstMs, Number(core.percentile(rehearsal.ms.slice(-10), 0.5).toFixed(1))];
         // Receiver 77: when the rehearsal began and the preload ran dry, ms from the hello.
@@ -3231,6 +3339,7 @@
         counters.live = 0; counters.pose = []; counters.ahead = []; counters.eff = [];
         counters.js = 0; counters.long = 0; counters.lag = [];
         counters.partly = 0; counters.stale = [];
+        counters.coldHeld = 0; counters.warmedLate = 0;
       }
     }
 
@@ -3637,6 +3746,7 @@
       empty(canvas);
       canvasDrawn = null;
       dropWarmCanvas();
+      dropLateWarm();
       endRehearsal();
       dropStaticLayer();
       // Receiver 89: the composed pictures' own layers, and every blob URL this page made.

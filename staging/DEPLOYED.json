@@ -1,25 +1,34 @@
 {
   "environment": "staging",
-  "commit": "07387e7fc08166774ab2fe2b1290cbef4e4d825f",
-  "subject": "Receiver 112: photo layers the cast no longer shows let go; confetti and pickleball canvases freed when idle",
-  "receiverTree": "daac12fafcf3395eb6aa87507bab37e6c824fb16",
-  "revision": 112,
-  "deployedAt": "2026-11-27T20:39:29Z",
+  "commit": "bdfadb06134a5a0f6428d2ec85388cec3112a073",
+  "subject": "Receiver 113: pictures that come in with the stadium on are warmed a frame at a time; a frame with many cold ones waits while they are",
+  "receiverTree": "fa89f32ee40bb6e4262ce79b030587b30ceff18f",
+  "revision": 113,
+  "deployedAt": "2026-11-27T20:47:00Z",
   "previous": {
-    "tree": "40fec065233daa48589cb8b9c8f7860d0435dde1",
+    "tree": "daac12fafcf3395eb6aa87507bab37e6c824fb16",
     "changed": [
       "index.html",
-      "receiver-celebration.js",
-      "receiver-pickleball-core.js",
       "receiver-pickleball.js",
-      "receiver-scene-core.js",
       "receiver-scene.js"
     ]
   },
   "earlier": [
     {
+      "tree": "40fec065233daa48589cb8b9c8f7860d0435dde1",
+      "changed": [
+        "index.html",
+        "receiver-celebration.js",
+        "receiver-pickleball-core.js",
+        "receiver-pickleball.js",
+        "receiver-scene-core.js",
+        "receiver-scene.js"
+      ]
+    },
+    {
       "tree": "a8864d741a1d21af8b10a8467b9e904069884759",
       "changed": [
+        "index.html",
         "receiver-celebration.js",
         "receiver-pickleball.js",
         "receiver-scene.js"
@@ -28,6 +37,7 @@
     {
       "tree": "b0a92b26362071084edc5b8b37738a2ac435d173",
       "changed": [
+        "index.html",
         "receiver-celebration.js",
         "receiver-pickleball.js",
         "receiver-scene-core.js",
@@ -101,77 +111,6 @@
         "receiver-pickleball.js",
         "receiver-scene-core.js",
         "receiver-scene.js"
-      ]
-    },
-    {
-      "tree": "bb3723822b4fd8e81d914f977855a7dab4b19c7f",
-      "changed": [
-        "README.md",
-        "index.html",
-        "pickleball/PickleballBackhandCoralCreator.webp",
-        "pickleball/PickleballBackhandCreator.webp",
-        "pickleball/PickleballBackhandFemaleCoralCreator.webp",
-        "pickleball/PickleballBackhandFemaleCreator.webp",
-        "pickleball/PickleballDinkCoralCreator.webp",
-        "pickleball/PickleballDinkCreator.webp",
-        "pickleball/PickleballDinkFemaleCoralCreator.webp",
-        "pickleball/PickleballDinkFemaleCreator.webp",
-        "pickleball/PickleballForehandCoralCreator.webp",
-        "pickleball/PickleballForehandCreator.webp",
-        "pickleball/PickleballForehandFemaleCoralCreator.webp",
-        "pickleball/PickleballForehandFemaleCreator.webp",
-        "pickleball/PickleballOverheadCoralCreator.webp",
-        "pickleball/PickleballOverheadCreator.webp",
-        "pickleball/PickleballOverheadFemaleCoralCreator.webp",
-        "pickleball/PickleballOverheadFemaleCreator.webp",
-        "pickleball/PickleballServeCoralCreator.webp",
-        "pickleball/PickleballServeCreator.webp",
-        "pickleball/PickleballServeFemaleCoralCreator.webp",
-        "pickleball/PickleballServeFemaleCreator.webp",
-        "pickleball/PickleballShuffleCoralCreator.webp",
-        "pickleball/PickleballShuffleCreator.webp",
-        "pickleball/PickleballShuffleFemaleCoralCreator.webp",
-        "pickleball/PickleballShuffleFemaleCreator.webp",
-        "pickleball/PickleballVolleyCoralCreator.webp",
-        "pickleball/PickleballVolleyCreator.webp",
-        "pickleball/PickleballVolleyFemaleCoralCreator.webp",
-        "pickleball/PickleballVolleyFemaleCreator.webp",
-        "pickleball/manifest.json",
-        "pickleball/small/PickleballBackhandCoralCreator.webp",
-        "pickleball/small/PickleballBackhandCreator.webp",
-        "pickleball/small/PickleballBackhandFemaleCoralCreator.webp",
-        "pickleball/small/PickleballBackhandFemaleCreator.webp",
-        "pickleball/small/PickleballDinkCoralCreator.webp",
-        "pickleball/small/PickleballDinkCreator.webp",
-        "pickleball/small/PickleballDinkFemaleCoralCreator.webp",
-        "pickleball/small/PickleballDinkFemaleCreator.webp",
-        "pickleball/small/PickleballForehandCoralCreator.webp",
-        "pickleball/small/PickleballForehandCreator.webp",
-        "pickleball/small/PickleballForehandFemaleCoralCreator.webp",
-        "pickleball/small/PickleballForehandFemaleCreator.webp",
-        "pickleball/small/PickleballOverheadCoralCreator.webp",
-        "pickleball/small/PickleballOverheadCreator.webp",
-        "pickleball/small/PickleballOverheadFemaleCoralCreator.webp",
-        "pickleball/small/PickleballOverheadFemaleCreator.webp",
-        "pickleball/small/PickleballServeCoralCreator.webp",
-        "pickleball/small/PickleballServeCreator.webp",
-        "pickleball/small/PickleballServeFemaleCoralCreator.webp",
-        "pickleball/small/PickleballServeFemaleCreator.webp",
-        "pickleball/small/PickleballShuffleCoralCreator.webp",
-        "pickleball/small/PickleballShuffleCreator.webp",
-        "pickleball/small/PickleballShuffleFemaleCoralCreator.webp",
-        "pickleball/small/PickleballShuffleFemaleCreator.webp",
-        "pickleball/small/PickleballVolleyCoralCreator.webp",
-        "pickleball/small/PickleballVolleyCreator.webp",
-        "pickleball/small/PickleballVolleyFemaleCoralCreator.webp",
-        "pickleball/small/PickleballVolleyFemaleCreator.webp",
-        "receiver-celebration.js",
-        "receiver-dye.js",
-        "receiver-pickleball-core.js",
-        "receiver-pickleball.js",
-        "receiver-scene-core.js",
-        "receiver-scene.js",
-        "receiver.css"
       ]
     }
   ]
