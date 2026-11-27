@@ -490,6 +490,9 @@
   // Where a sheet's file is and its scale (the file's pixels per phone sheet pixel, which the drawing commands name).
   // Receiver 106: a weak dongle (a 32-bit Chromecast, the weak plan) loads the smaller copy in small/ when the manifest
   // has one (`small`: its scale and size); other TVs, and manifests without it, the sheet itself. Null with no spec.
+  // Receiver 112: the far player's sheets (drawn at most 0.20 of a phone sheet pixel in every recorded match, against
+  // the near player's 0.66), which every TV loads from small/ at 0.2 (receiver-pickleball.js `farSmall`).
+  function farSheet(name) { return /^PickleballOpponent/.test(String(name)); }
   function sheetFile(spec, weak) {
     if (!spec) return null;
     const small = weak && spec.small && Number(spec.small.scale) > 0 ? spec.small : null;
@@ -499,6 +502,6 @@
   return {
     STAGE, HUD_STAGE, VERSION, DELAY, MAX_BLEND_GAP, CALLOUT_SECONDS, BALL,
     decodeOp, halves, opShape, blendOps, blendPush, percentile, createPlayout, plateLayout, opBounds, drawOps, hudView, readyView, resultView,
-    sheetsFor, sheetFile, STALLED, arrivalStalled, PADDLE_SUFFIX, plainSheet
+    sheetsFor, sheetFile, farSheet, STALLED, arrivalStalled, PADDLE_SUFFIX, plainSheet
   };
 });

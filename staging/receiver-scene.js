@@ -1811,8 +1811,10 @@
     // first photo that doesn't reach every edge (the bowled hold's pushed-in camera), as receiver 104 did.
     // `warm` (receiver 111): a cold stadium held under the phone's picture and the rehearsal resumed after a cold one;
     // `warm: 0` draws as receiver 110 did.
+    // Receiver 112: `runs: 0` draws a batter whose hands follow the player's every piece every draw (no liveRuns), as
+    // receiver 111 did.
     const TUNED = Object.freeze({ blur: "shadow", layers: "bounded", cover: "clip", bitmaps: 0, shade: "thirds", blend: 1, cache: 1, photo: "layer", opaque: 0,
-      match: 1, dirty: 1, early: 1, own: 1, live: 1, edge: 1, warm: 1 });
+      match: 1, dirty: 1, early: 1, own: 1, live: 1, edge: 1, warm: 1, runs: 1 });
     // A weak dongle (core.isWeakDongle): no redraw only to blend between
     // frames (each draw costs it ~30 ms of its page's thread) and glows
     // drawn plain, never blurred.
@@ -2425,22 +2427,35 @@
     // his own size and copied from there (one drawImage, pixel for pixel, for his ~20 pieces and shadows) until he moves,
     // a picture arrives or the look changes (`artEpoch`). Only plain pieces and shadows (no layer, blur or blend); his
     // place in the frame is the slot's, so what is drawn under and over him is unchanged.
-    const liveLayer = { canvas: null, key: null, epoch: -1, s: 0, width: 0, height: 0, rect: null, last: null, lastEpoch: -1,
+    const liveLayer = { canvas: null, key: null, epoch: -1, s: 0, width: 0, height: 0, rect: null, last: null, lastEpoch: -1, lastBatter: null,
       dyed: null, plain: null, built: 0, hits: 0 };
     const liveKeys = new WeakMap();
+    // Receiver 112: from his commands' own keys (liveOpKeys), each made once a batter.
     function liveKey(batter) {
       let key = liveKeys.get(batter);
       if (key !== undefined) return key;
       key = null;
-      let plain = batter.o.length > 0;
-      for (const op of batter.o) {
-        const kind = op[0];
-        if ((kind !== "f" && kind !== "s" && kind !== "i") || (op[2] && op[2] !== "source-over")
-            || filtersOf(batter, kind === "f" ? op[7] : kind === "s" ? op[9] : op[5]).blur > 0) { plain = false; break; }
-      }
-      if (plain) key = JSON.stringify([batter.o, batter.fl, batter.cl]);
+      const keys = liveOpKeys(batter);
+      if (keys && keys.every((one) => one !== null)) key = keys.context + "\u0001" + keys.join("\u0001");
       liveKeys.set(batter, key);
       return key;
+    }
+    // Each of a batter's commands as a key (null for one that isn't a plain piece or shadow: a blend, a blur), with his
+    // filters' and clips' own (`context`); null for a batter with anything else (a layer, text), drawn as he is.
+    const liveOpKeyCache = new WeakMap();
+    function liveOpKeys(batter) {
+      let keys = liveOpKeyCache.get(batter);
+      if (keys !== undefined) return keys;
+      keys = batter.o.length ? new Array(batter.o.length) : null;
+      for (let index = 0; keys && index < batter.o.length; index += 1) {
+        const op = batter.o[index], kind = op[0];
+        if (kind !== "f" && kind !== "s" && kind !== "i") { keys = null; break; }
+        const plain = !(op[2] && op[2] !== "source-over") && !(filtersOf(batter, kind === "f" ? op[7] : kind === "s" ? op[9] : op[5]).blur > 0);
+        keys[index] = plain ? JSON.stringify(op) : null;
+      }
+      if (keys) keys.context = JSON.stringify([batter.fl, batter.cl]);
+      liveOpKeyCache.set(batter, keys);
+      return keys;
     }
     // His pixels on the TV's canvas (`scale` canvas pixels a stage point), with room for his pieces' edges.
     function liveRect(batter, scale) {
@@ -2500,9 +2515,14 @@
         liveLayer.hits += 1;
       } else {
         // Drawn as he is until the same batter comes round again: a batter on the move is never built.
+        // Receiver 112: again in the phone's next live batter (he stands as he stood), not the same batter drawn a second
+        // time between two of them: a batter whose hands follow the player's is new in every one, and a layer built on his
+        // second draw was a whole extra draw of him, copied once at most (liveRuns copies his still pieces instead).
+        if (tune.runs && liveLayer.lastBatter === batter) return false;
         const again = liveLayer.last === key && liveLayer.lastEpoch === artEpoch;
         liveLayer.last = key;
         liveLayer.lastEpoch = artEpoch;
+        liveLayer.lastBatter = batter;
         if (!again) return false;
         const rect = liveRect(batter, scale);
         if (!rect || !buildLiveLayer(batter, surface, rect, key)) return false;
@@ -2522,8 +2542,127 @@
     function dropLiveLayer() {
       liveLayer.key = null;
       liveLayer.last = null;
+      liveLayer.lastBatter = null;
       liveLayer.rect = null;
       if (liveLayer.canvas) { try { liveLayer.canvas.width = 0; liveLayer.canvas.height = 0; } catch (error) { /* gone */ } liveLayer.canvas = null; }
+      dropLiveRuns();
+    }
+
+    // MARK: The live batter's still pieces (receiver 112, Nov 27 2026)
+    //
+    // The owner on tester build AA (Android 27579 and iOS 411 on the Living Room TV's Chromecast Ultra: "Still lagging a
+    // bit in pickleball", "Lagging in cricket as well", "the frames are not smooth. It's missing frames in between"): in
+    // play the TV drew 21-23 a second, each draw 10-11 ms, against 24-26 and 6.5-8 ms on builds up to L (Nov 24). Since
+    // build R (Nov 25) the drawn batter's hands follow the player's own (HandsFollow, StadiumHandsFollow): a camera's pose
+    // wobbles every frame, so his arms, gloves and willow move a little in every live batter, no two the same, and his
+    // layer (liveLayer, receiver 105) went from 13-36 copies every 2 s to 0-2 (`batter` in stats): his twenty pieces,
+    // most of them turned, drawn again every draw. His legs, pelvis, torso and head don't move with his hands. So each run
+    // of his commands that is the same as in the batter before (at least two, a picture among them) is drawn once into a
+    // canvas of its own and copied from there while it stays the same; what moved is drawn in place between those runs,
+    // in his own order, so what is under and over each piece is unchanged. A run is only made once it has held from one
+    // batter to the next (a swing changes every piece: nothing is made). `batterRuns` in stats counts the copies.
+    // `runs: 0` (a bench switch) draws him as receiver 111 did. receiver-live-runs.test.cjs: the same pixels as his
+    // pieces drawn again (the layer's tolerance), and the draws' work against a budget.
+    const MAX_RUN_LAYERS = 4;
+    const liveRuns = { layers: new Map(), batter: null, keys: null, before: null, beforeEpoch: -1, epoch: -1, hits: 0, built: 0 };
+    function dropLiveRuns() {
+      liveRuns.layers.forEach((layer) => zeroCanvas(layer.canvas));
+      liveRuns.layers.clear();
+      liveRuns.batter = null;
+      liveRuns.keys = null;
+      liveRuns.before = null;
+    }
+    // The runs of `keys` the same as `before` (index ranges [from, to)): two commands at least, a picture among them.
+    function stillRuns(batter, keys, before) {
+      const runs = [];
+      let start = -1;
+      for (let index = 0; index <= keys.length; index += 1) {
+        const same = index < keys.length && keys[index] !== null && keys[index] === before[index];
+        if (same && start < 0) start = index;
+        if (!same && start >= 0) {
+          if (index - start >= 2 && batter.o.slice(start, index).some((op) => op[0] === "i")) runs.push([start, index]);
+          start = -1;
+        }
+      }
+      return runs;
+    }
+    function runLayer(batter, keys, from, to, surface) {
+      const key = surface.s + "|" + canvas.width + "x" + canvas.height + "|" + artEpoch + "|" + keys.context + "\u0002" + keys.slice(from, to).join("\u0001");
+      const kept = liveRuns.layers.get(key);
+      if (kept) {
+        // The most recently used last (the oldest goes first).
+        liveRuns.layers.delete(key);
+        liveRuns.layers.set(key, kept);
+        liveRuns.hits += 1;
+        return kept;
+      }
+      const part = Object.assign({}, batter, { o: batter.o.slice(from, to) });
+      const rect = liveRect(part, surface.s);
+      if (!rect) return null;
+      let reused = null;
+      if (liveRuns.layers.size >= MAX_RUN_LAYERS) {
+        const oldest = liveRuns.layers.keys().next().value;
+        reused = liveRuns.layers.get(oldest).canvas;
+        liveRuns.layers.delete(oldest);
+      }
+      const layer = reused || document.createElement("canvas");
+      const w = rect[2] - rect[0], h = rect[3] - rect[1];
+      // Grown, not shrunk: a resized canvas is a new allocation.
+      if (layer.width < w || layer.height < h) { layer.width = Math.max(layer.width, w); layer.height = Math.max(layer.height, h); }
+      const c = layer.getContext("2d");
+      c.setTransform(1, 0, 0, 1, 0, 0);
+      c.globalAlpha = 1;
+      c.globalCompositeOperation = "source-over";
+      c.clearRect(0, 0, layer.width, layer.height);
+      c.imageSmoothingQuality = smoothing;
+      const missing = counters.missing, epoch = artEpoch, dyed = drawDyed, plain = drawPlainLook;
+      drawDyed = new Set(); drawPlainLook = new Set();
+      paint(shiftedContext(c, rect[0], rect[1]), part, 0, Object.assign({}, surface, { live: null, cacheLive: false }), 0, null);
+      const built = { canvas: layer, rect, dyed: drawDyed, plain: drawPlainLook };
+      drawDyed = dyed; drawPlainLook = plain;
+      // A piece missing or the look changing as it was drawn: not kept (drawn in place).
+      if (counters.missing !== missing || artEpoch !== epoch || dressingWasOn) { zeroCanvas(layer); return null; }
+      liveRuns.layers.set(key, built);
+      liveRuns.built += 1;
+      return built;
+    }
+    // Draws `batter` with his still runs copied; false when there are none (he is drawn as before).
+    function drawLiveRuns(c, batter, surface, bounds, depth) {
+      if (!tune.cache || !tune.live || !tune.runs || dressingWasOn) { liveRuns.batter = null; return false; }
+      const keys = liveOpKeys(batter);
+      // A new batter: the one before is what his runs are measured against (a batter drawn again keeps his).
+      if (liveRuns.batter !== batter) {
+        liveRuns.before = liveRuns.keys;
+        liveRuns.beforeEpoch = liveRuns.epoch;
+        liveRuns.batter = batter;
+        liveRuns.keys = keys;
+        liveRuns.epoch = artEpoch;
+      }
+      const before = liveRuns.before;
+      if (!keys || !before || before.length !== keys.length || before.context !== keys.context || liveRuns.beforeEpoch !== artEpoch) return false;
+      const runs = stillRuns(batter, keys, before);
+      if (!runs.length) return false;
+      const live = Object.assign({}, surface, { live: null });
+      const inPlace = (from, to) => { if (to > from) paint(c, Object.assign({}, batter, { o: batter.o.slice(from, to) }), 0, live, depth, bounds); };
+      let at = 0;
+      for (const [from, to] of runs) {
+        inPlace(at, from);
+        const layer = runLayer(batter, keys, from, to, surface);
+        if (!layer) { inPlace(from, to); at = to; continue; }
+        const r = layer.rect, w = r[2] - r[0], h = r[3] - r[1];
+        c.save();
+        c.setTransform(1, 0, 0, 1, 0, 0);
+        c.globalAlpha = 1;
+        c.globalCompositeOperation = "source-over";
+        c.drawImage(layer.canvas, 0, 0, w, h, r[0], r[1], w, h);
+        c.restore();
+        if (bounds) grow(bounds, [r[0] / surface.s, r[1] / surface.s, r[2] / surface.s, r[3] / surface.s], surface.s, 0);
+        if (drawDyed) layer.dyed.forEach((k) => drawDyed.add(k));
+        if (drawPlainLook) layer.plain.forEach((k) => drawPlainLook.add(k));
+        at = to;
+      }
+      inPlace(at, batter.o.length);
+      return true;
     }
 
     // Draws a frame's commands from `from` on into `target`: the TV's
@@ -2647,6 +2786,8 @@
             if (batter && batter.o.length) {
               // Receiver 105: a batter standing as he stood is copied from his own layer (liveLayer).
               if (surface.cacheLive && stack.length === 1 && drawLiveLayer(c, batter, surface, top.bounds)) break;
+              // Receiver 112: his still pieces copied, what moved drawn in place (liveRuns).
+              if (surface.cacheLive && stack.length === 1 && drawLiveRuns(c, batter, surface, top.bounds, base)) break;
               paint(c, batter, 0, Object.assign({}, surface, { live: null }), base + stack.length - 1, top.bounds);
             }
             break;
@@ -2979,9 +3120,11 @@
           behind: Math.round(core.percentile(counters.late, 0.9)),
           drawMs: Number(core.percentile(counters.drawMs, 0.5).toFixed(1)),
           drawMax: Number(Math.max(0, ...counters.drawMs).toFixed(1)),
+          // Receiver 112: draws of 50 ms or more (one spike or many behind `drawMax`).
+          drawSlow: counters.drawMs.filter((ms) => ms >= 50).length,
           dressMax: Number(counters.dressMax.toFixed(1)), dressed: counters.dressed,
           dressReadMax: Number(counters.dressReadMax.toFixed(1)), dressDyeMax: Number(counters.dressDyeMax.toFixed(1)),
-          missing: counters.missing, images: images.size, warmed: warmed.size, cached: staticLayer.hits, rebuilt: staticLayer.built, batter: liveLayer.hits, bitmaps: bitmaps.size, queue: timeline.length,
+          missing: counters.missing, images: images.size, warmed: warmed.size, cached: staticLayer.hits, rebuilt: staticLayer.built, batter: liveLayer.hits, batterRuns: liveRuns.hits, bitmaps: bitmaps.size, queue: timeline.length,
           // How glows are blurred (receiver 57): as shadows, or in small canvases.
           glow: tune.blur === "filter" ? "filter" : tune.blur === "off" ? "off" : castsOffstageShadows() ? "shadow" : "scratch",
           synced: clock.synced ? 1 : 0, w: canvas.width, canvas: plan.why, weak: plan.weak ? 1 : 0,
@@ -3455,7 +3598,7 @@
 
     return { NAMESPACE, handle, report, setOn, renderHUD, drawFrame, keptFile, playRecording, playRecordingAt, snapshot, timeline, clock, live, images, bitmaps, release, selectGame,
       get cricketWanted() { return cricketWanted; },
-      pictures, counters, tune, setTune, warmed, staticLayer, liveLayer, get dressing() { return dressingWasOn; }, holdLast, get holding() { return holding; }, get hasFrame() { return !!shownFrame; },
+      pictures, counters, tune, setTune, warmed, staticLayer, liveLayer, liveRuns, get dressing() { return dressingWasOn; }, holdLast, get holding() { return holding; }, get hasFrame() { return !!shownFrame; },
       // Receiver 77: how the rehearsal and the preload stand (tests and the bench's probe).
       get rehearsal() { return { draws: rehearsal.draws, wanted: rehearsal.wanted, own: rehearsal.own, startedAt: rehearsal.startedAt, askedAt: rehearsal.askedAt }; },
       // Receiver 111: how warm the stadium's drawing is, and whether this stadium came on cold.
