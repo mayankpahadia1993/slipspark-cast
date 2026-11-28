@@ -456,7 +456,9 @@
     // (its result card): only an innings' cold stadium waits under the phone's picture.
     innings: () => !!lastState && PLAY_SCREENS.has(lastState.screen),
     // ?canvas=1920 draws previews and films that wide (a Mac counts as a dongle).
-    canvasWidth: Number(query.get("canvas")) || undefined
+    canvasWidth: Number(query.get("canvas")) || undefined,
+    // Receiver 116: ?light=1 (or 0) draws as a Chromecast Ultra's light plan does (or not), for previews and tests.
+    light: query.get("light") === "1" ? true : query.get("light") === "0" ? false : undefined
   });
   window.__rallycadeScene = scene;
 

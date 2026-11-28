@@ -1,27 +1,39 @@
 {
   "environment": "staging",
-  "commit": "7cc68bbd03a8eddfdfae9e968baabb8a276ca651",
-  "subject": "Receiver 115: ready no longer says fb, so phones that ride (AF-AH) send every live batter on its own",
-  "receiverTree": "c0e5f775579a110ec71fa30a9e5f784a421579b3",
-  "revision": 115,
-  "deployedAt": "2026-11-28T00:23:40Z",
+  "commit": "25eed27a01aac2d0f6a03d17fde8a9fe73ad024b",
+  "subject": "CAST_SCENE: the iPhone round's blur-off switch was a no-op for that recording",
+  "receiverTree": "eb25989a2c418249b17cab662b880d8eefe6f281",
+  "revision": 116,
+  "deployedAt": "2026-11-28T07:53:13Z",
   "previous": {
-    "tree": "fa89f32ee40bb6e4262ce79b030587b30ceff18f",
+    "tree": "c0e5f775579a110ec71fa30a9e5f784a421579b3",
     "changed": [
       "index.html",
       "receiver-pickleball.js",
       "receiver-scene-core.js",
-      "receiver-scene.js"
+      "receiver-scene.js",
+      "receiver.js"
     ]
   },
   "earlier": [
+    {
+      "tree": "fa89f32ee40bb6e4262ce79b030587b30ceff18f",
+      "changed": [
+        "index.html",
+        "receiver-pickleball.js",
+        "receiver-scene-core.js",
+        "receiver-scene.js",
+        "receiver.js"
+      ]
+    },
     {
       "tree": "836ede54e7398def7005218f67a1a796d6a1fc20",
       "changed": [
         "index.html",
         "receiver-pickleball.js",
         "receiver-scene-core.js",
-        "receiver-scene.js"
+        "receiver-scene.js",
+        "receiver.js"
       ]
     },
     {
@@ -30,7 +42,8 @@
         "index.html",
         "receiver-pickleball.js",
         "receiver-scene-core.js",
-        "receiver-scene.js"
+        "receiver-scene.js",
+        "receiver.js"
       ]
     },
     {
@@ -41,17 +54,8 @@
         "receiver-pickleball-core.js",
         "receiver-pickleball.js",
         "receiver-scene-core.js",
-        "receiver-scene.js"
-      ]
-    },
-    {
-      "tree": "a8864d741a1d21af8b10a8467b9e904069884759",
-      "changed": [
-        "index.html",
-        "receiver-celebration.js",
-        "receiver-pickleball.js",
-        "receiver-scene-core.js",
-        "receiver-scene.js"
+        "receiver-scene.js",
+        "receiver.js"
       ]
     }
   ]

@@ -41,7 +41,11 @@
     // layer and the HUD, not the photo's layer, a see-through canvas over it
     // and two shading layers. `opaqueCanvas` is what the canvas was made with.
     let opaqueCanvas = false;
-    let ctx = core.isWeakDongle(navigator.userAgent) ? opaqueContext(canvas) : canvas.getContext("2d");
+    // Receiver 116: the Ultra's light plan starts opaque too (core.isLightDongle).
+    // `options.light` (receiver.js's ?light=0 or 1) picks the light plan or the layered page on any TV, for previews and tests.
+    const lightOption = options && (options.light === true || options.light === false) ? options.light : undefined;
+    const startsLight = lightOption !== undefined ? lightOption : core.isLightDongle(navigator.userAgent);
+    let ctx = core.isWeakDongle(navigator.userAgent) || startsLight ? opaqueContext(canvas) : canvas.getContext("2d");
     function opaqueContext(target) {
       const context = target.getContext("2d", { alpha: false });
       opaqueCanvas = true;
@@ -129,7 +133,7 @@
     // The canvas's most pixels across (core.canvasPlan): 1920 on devices
     // that keep up, 1280 on the Chromecast dongles, whose software raster
     // can't fill 1920 x 1080 thirty times a second. The phone can set it.
-    let plan = core.canvasPlan({ ua: navigator.userAgent, pinned: options.canvasWidth, remembered: rememberedCanvas() });
+    let plan = core.canvasPlan({ ua: navigator.userAgent, pinned: options.canvasWidth, remembered: rememberedCanvas(), light: lightOption });
     let maxCanvasWidth = plan.width;
     const rateWatch = core.createRateWatch({ minFps: core.CANVAS.minFps });
     // The last frame drawn, drawn again at once when the canvas narrows.
@@ -197,7 +201,7 @@
     // frame on screen is drawn again in the same animation frame, so the TV
     // never shows the cleared canvas.
     function narrowCanvas() {
-      plan = { width: core.CANVAS.narrow, adaptive: false, why: "slow", weak: false };
+      plan = Object.assign({ width: core.CANVAS.narrow, adaptive: false, why: "slow", weak: false }, plan.light ? { light: true } : {});
       maxCanvasWidth = plan.width;
       rememberCanvas(plan.width);
       resize();
@@ -724,7 +728,10 @@
           // Receiver 65: the replay's outfield too (made at the first replay,
           // it cost an onn's first replay a 283 ms/s of long tasks).
           // Receiver 82: a ground's plate and outfield, never its inset (drawn small on the canvas, as the classic one).
-          if (/^(stadium-(ground|backdrop)|field-(real-)?outfield|ground)-/.test(key) && !/-inset-\d+x\d+$/.test(key) && opaque.has(key)) backdropLayer(key);
+          // Receiver 116: not on a page that draws its photos on the canvas (the weak and light plans): a layer it never
+          // shows would hold a 1672 x 941 texture and its decoded copy for nothing.
+          if (/^(stadium-(ground|backdrop)|field-(real-)?outfield|ground)-/.test(key) && !/-inset-\d+x\d+$/.test(key) && opaque.has(key)
+            && tune.photo !== "canvas") backdropLayer(key);
           warmDecode(key);
         }, () => loading.delete(key))
         .then(done, done);
@@ -1972,11 +1979,14 @@
     // Oct 19 2026: and one opaque canvas with the photo and the shading drawn
     // in, no CSS animation in the HUD (see `opaqueCanvas`).
     const WEAK_TUNED = Object.freeze(Object.assign({}, TUNED, { blur: "off", blend: 0, photo: "canvas", shade: "canvas", opaque: 1 }));
+    // Receiver 116: a Chromecast Ultra (core.isLightDongle): one opaque canvas with the photo in it, as the weak plan's,
+    // but its 1280 canvas, blending between frames, glows and the shading's thirds as every other TV's.
+    const LIGHT_TUNED = Object.freeze(Object.assign({}, TUNED, { photo: "canvas", opaque: 1 }));
     const tune = Object.assign({}, TUNED);
     // Each hello starts from the defaults (the weak ones on a weak dongle);
     // the bench's `x` changes them.
     function setTune(x) {
-      const base = plan && plan.weak ? WEAK_TUNED : TUNED;
+      const base = plan && plan.weak ? WEAK_TUNED : plan && plan.light ? LIGHT_TUNED : TUNED;
       Object.assign(tune, base);
       if (x && typeof x === "object") Object.keys(base).forEach((name) => { if (x[name] !== undefined) tune[name] = x[name]; });
       // An opaque canvas hides whatever is under it: it draws the photo.
@@ -3334,7 +3344,7 @@
           missing: counters.missing, images: images.size, layers: backdropLayers.size, warmed: warmed.size, cached: staticLayer.hits, rebuilt: staticLayer.built, batter: liveLayer.hits, batterRuns: liveRuns.hits, bitmaps: bitmaps.size, queue: timeline.length,
           // How glows are blurred (receiver 57): as shadows, or in small canvases.
           glow: tune.blur === "filter" ? "filter" : tune.blur === "off" ? "off" : castsOffstageShadows() ? "shadow" : "scratch",
-          synced: clock.synced ? 1 : 0, w: canvas.width, canvas: plan.why, weak: plan.weak ? 1 : 0,
+          synced: clock.synced ? 1 : 0, w: canvas.width, canvas: plan.why, weak: plan.weak ? 1 : 0, light: plan.light ? 1 : 0,
           gap: Number(core.percentile(counters.gaps, 0.5).toFixed(1)),
           gap90: Number(core.percentile(counters.gaps, 0.9).toFixed(1)),
           // Live batters received; and how old the pose of the batter on
@@ -3515,6 +3525,8 @@
         held: options.heldKeep || 0, cards: options.heldCards ? options.heldCards() : [], screen: screenPixels(), version: VERSION, ua: navigator.userAgent, have };
       // A weak dongle: the phone sends frames and live batters at its pace.
       if (plan.weak) ready.weak = 1;
+      // Receiver 116: a Chromecast Ultra's light plan (one opaque canvas); phones need do nothing about it.
+      if (plan.light) ready.light = 1;
       send(ready);
       preloadBundled(helloKit, helloGround, helloViews);
     }
@@ -3579,7 +3591,8 @@
           // the device's own plan, and a wide canvas is measured afresh.
           // `x.weak` (the bench) draws as a weak dongle does on any TV.
           plan = core.canvasPlan({ ua: navigator.userAgent, pinned: message.canvas || options.canvasWidth,
-            wide: message.wide === 1, remembered: rememberedCanvas(), weak: !!(message.x && message.x.weak === 1) });
+            wide: message.wide === 1, remembered: rememberedCanvas(), weak: !!(message.x && message.x.weak === 1),
+            light: message.x && (message.x.light === 0 || message.x.light === 1) ? message.x.light : lightOption });
           maxCanvasWidth = plan.width;
           rateWatch.reset();
           resize();

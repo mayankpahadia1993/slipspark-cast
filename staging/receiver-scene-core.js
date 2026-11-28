@@ -1180,6 +1180,20 @@
     return /Android|GoogleTV|Google TV|Fuchsia/i.test(text);
   }
 
+  // Receiver 116 (Nov 27 2026, ee31g5d3 and rd0wje8g: the owner's Android and iPhone on the Living Room TV's Chromecast
+  // Ultra, "Cricket can a bit smoother with older Chromecast", "Quite laggy overall": the TV's loop every 41-69 ms at
+  // pace 21-24, its page's thread 300-500 ms of script and up to 680 ms of long tasks a 2 s report while the camera
+  // moved): the Ultra, a CrKey dongle on 64-bit Linux (not Android TV, Google TV or a Fuchsia display; a 32-bit one is
+  // `isWeakDongle`), draws the stadium on one opaque canvas with the photo in it (`LIGHT_TUNED`), so its GPU
+  // composites one layer under the HUD instead of the photo's, the canvas over it and the shading. On the Guest Room
+  // TV's Ultra (the same model) that cut the page's script ~10% and its long tasks ~25% on both phones' recorded
+  // streams, moving camera and still, and the 2 s reports under 25 a second from 13 to 5 of 55 (iOS) and 5 to 3
+  // (Android), with the 1280 canvas, blending and glows as they were.
+  function isLightDongle(ua) {
+    const text = String(ua || "");
+    return /CrKey/.test(text) && /aarch64/.test(text) && !/Android|GoogleTV|Google TV|Fuchsia/i.test(text);
+  }
+
   // `device`: `ua` (navigator.userAgent), `pinned` (a width the phone or the
   // bench asked for in `hello`), `wide` (the phone's hello allows 1920: build
   // 134 on), `remembered` (what this TV found last time: `{ua, width}`).
@@ -1187,6 +1201,13 @@
   // rate, and why (sent in `stats`). Phones that don't allow it (the App
   // Store's 2.6) keep the 1280 canvas they were released with.
   function canvasPlan(device) {
+    const plan = widthPlan(device);
+    // Receiver 116: the Ultra's light plan, whatever width it draws (`device.light` 0 or 1: the bench's `x.light`).
+    const light = device && device.light !== undefined && device.light !== null ? !!device.light : isLightDongle(device && device.ua);
+    if (!plan.weak && light) plan.light = true;
+    return plan;
+  }
+  function widthPlan(device) {
     const ua = String((device && device.ua) || "");
     const pinned = Number(device && device.pinned);
     const weak = !!(device && device.weak) || isWeakDongle(ua);
@@ -1576,7 +1597,7 @@
   }
 
   return {
-    isWeakDongle, drawsInset, storageNames, STAGE, MAX_BLEND_GAP, MAX_STEP, CANVAS, normalizeFrame, plainFrame, expandInset, shapeKey, opShape, viewOf, matchOps, blendMatched, blendMatchedInto,
+    isWeakDongle, isLightDongle, drawsInset, storageNames, STAGE, MAX_BLEND_GAP, MAX_STEP, CANVAS, normalizeFrame, plainFrame, expandInset, shapeKey, opShape, viewOf, matchOps, blendMatched, blendMatchedInto,
     blendFrames, blendFramesInto, cloneFrame, createTimeline, createClock,
     percentile, debugLine, tracePath, cssColor, pictureSize, canvasPlan, canvasWidth, createRateWatch, STEADY, createSteadyWatch, createLiveLayer, hasLiveSlot, poseAge, poseAhead,
     filterParts, opBounds, layerEnd, clipsWholeStage, mergeRects, overStrip, readLook, lookColours, dyeFrame, copyAtlasFrame, GRIP_OPACITY, GRIP_SHADE,
