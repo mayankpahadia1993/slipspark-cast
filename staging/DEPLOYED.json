@@ -1,22 +1,29 @@
 {
   "environment": "staging",
-  "commit": "3db16f38c1fd4f35759e2501d7784311f389f269",
-  "subject": "Merge remote-tracking branch 'origin/claude/cricket-after-pickleball' into claude/receiver-aw-117",
-  "receiverTree": "b4f5d5c4bcbf507b18e2c4f046d5b878ddc50bb3",
+  "commit": "f0a683568c0a075afa51b425e5ff4c2dc4b32b1c",
+  "subject": "TV: the camera setup card centred (the owner, Nov 28 2026)",
+  "receiverTree": "7dfd2a06120a1f23f01f06f8adcecf0ad7f4729a",
   "revision": 117,
-  "deployedAt": "2026-11-28T10:52:53Z",
+  "deployedAt": "2026-11-28T16:44:14Z",
   "previous": {
-    "tree": "eb25989a2c418249b17cab662b880d8eefe6f281",
+    "tree": "b4f5d5c4bcbf507b18e2c4f046d5b878ddc50bb3",
     "changed": [
-      "README.md",
-      "index.html",
-      "receiver-core.js",
-      "receiver-pickleball.js",
-      "receiver-scene.js",
-      "receiver.js"
+      "receiver.css"
     ]
   },
   "earlier": [
+    {
+      "tree": "eb25989a2c418249b17cab662b880d8eefe6f281",
+      "changed": [
+        "README.md",
+        "index.html",
+        "receiver-core.js",
+        "receiver-pickleball.js",
+        "receiver-scene.js",
+        "receiver.css",
+        "receiver.js"
+      ]
+    },
     {
       "tree": "c0e5f775579a110ec71fa30a9e5f784a421579b3",
       "changed": [
@@ -26,6 +33,7 @@
         "receiver-pickleball.js",
         "receiver-scene-core.js",
         "receiver-scene.js",
+        "receiver.css",
         "receiver.js"
       ]
     },
@@ -38,6 +46,7 @@
         "receiver-pickleball.js",
         "receiver-scene-core.js",
         "receiver-scene.js",
+        "receiver.css",
         "receiver.js"
       ]
     },
@@ -50,18 +59,7 @@
         "receiver-pickleball.js",
         "receiver-scene-core.js",
         "receiver-scene.js",
-        "receiver.js"
-      ]
-    },
-    {
-      "tree": "daac12fafcf3395eb6aa87507bab37e6c824fb16",
-      "changed": [
-        "README.md",
-        "index.html",
-        "receiver-core.js",
-        "receiver-pickleball.js",
-        "receiver-scene-core.js",
-        "receiver-scene.js",
+        "receiver.css",
         "receiver.js"
       ]
     }
