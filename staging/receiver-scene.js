@@ -84,19 +84,6 @@
     const clock = core.createClock();
     // The batter, drawn for now and shown as soon as it arrives ("b").
     const live = core.createLiveLayer();
-    // Receiver 115: frames' commands by stamp, for frames that send theirs as references (core.createRefBook).
-    const refs = core.createRefBook();
-    let lastRefMissAt = -Infinity;
-    // Whether this phone's hello said it sends references (`refs: 1`): only then are its whole frames kept as bases.
-    let helloRefs = false;
-    // A frame whose references can't be put back isn't drawn; the phone sends its next frame whole.
-    function refMissed(raw) {
-      counters.refMiss += 1;
-      const local = performance.now();
-      if (local - lastRefMissAt < 250) return;
-      lastRefMissAt = local;
-      send({ t: "refs", miss: Number(raw && raw.r) || 0 });
-    }
     const images = new Map();
     const tinted = new Map();
     // Receiver 89 (Nov 11 2026): the Living Room TV's Chromecast Ultra drew 5-8 frames a second after 7.8 h and many
@@ -157,8 +144,7 @@
     let helloPieces = new Set();
     // `received` (receiver 83): the phone's pictures decoded since the last report (core.warmReport).
     const counters = { draws: 0, blended: 0, frames: 0, late: [], drawMs: [], dressMax: 0, dressReadMax: 0, dressDyeMax: 0, dressed: 0, missing: 0, redraws: 0, gaps: [], live: 0, pose: [], ahead: [], eff: [],
-      js: 0, long: 0, lag: [], partly: 0, stale: [], received: 0, coldHeld: 0, warmedLate: 0, coldHeldTotal: 0, warmedLateTotal: 0,
-      refFrames: 0, refMiss: 0 };
+      js: 0, long: 0, lag: [], partly: 0, stale: [], received: 0, coldHeld: 0, warmedLate: 0, coldHeldTotal: 0, warmedLateTotal: 0 };
 
     // What the page's thread does besides drawing (Oct 19 2026): `js`, the
     // script's own time in the loop and the messages; `long`, tasks of 50 ms
@@ -2454,41 +2440,15 @@
     // over the layer in its own order. Anything without bounds (the live
     // batter's slot, a layer) ends the search, so nothing after it moves.
     const overlaps = (a, b) => a[0] < b[2] && b[0] < a[2] && a[1] < b[3] && b[1] < a[3];
-    // Receiver 114: a command's padded bounds, kept with the array (received commands are never written to, and the
-    // same command in the next frame is the same array: core.shareOps). A blended frame's own arrays are rewritten
-    // every draw: its commands the same in both frames it blends between (`same`) use their source's.
-    const paddedBoxes = new WeakMap();
-    function paddedBox(op) {
-      let padded = paddedBoxes.get(op);
-      if (padded !== undefined) return padded;
-      const box = core.opBounds(op, pictureSize);
-      padded = box ? [box[0] - 2, box[1] - 2, box[2] + 2, box[3] + 2] : null;
-      // A picture not here yet has no size: worked out again once it is.
-      if (padded || op[0] !== "i") paddedBoxes.set(op, padded);
-      return padded;
-    }
-    function boxesOf(frame, from, same) {
-      const boxes = new Array(frame.o.length);
-      for (let index = from; index < frame.o.length; index += 1) {
-        const op = frame.o[index];
-        if (op[0] === "L" || op[0] === "B" || op[0] === "l") break;
-        const source = same ? same[index] : op;
-        let box;
-        if (source) box = paddedBox(source);
-        else { const raw = core.opBounds(op, pictureSize); box = raw ? [raw[0] - 2, raw[1] - 2, raw[2] + 2, raw[3] + 2] : null; }
-        boxes[index] = box;
-        if (!box) break;
-      }
-      return boxes;
-    }
-    function splitStatic(frame, from, previous, keys, boxes) {
+    function splitStatic(frame, from, previous, keys) {
       const statics = [];
       const changed = [];
       for (let index = from; index < frame.o.length; index += 1) {
         const op = frame.o[index];
         if (op[0] === "L" || op[0] === "B" || op[0] === "l") break;
-        const padded = boxes[index];
-        if (!padded) break;
+        const box = core.opBounds(op, pictureSize);
+        if (!box) break;
+        const padded = [box[0] - 2, box[1] - 2, box[2] + 2, box[3] + 2];
         if (staticable(op) && previous && previous.has(keys[index]) && !changed.some((other) => overlaps(other, padded))) statics.push(index);
         else changed.push(padded);
       }
@@ -2498,7 +2458,7 @@
     // fit: each must be there in the layer's order, before anything without
     // bounds, with no other command before it overlapping it (that one
     // would be drawn above it now).
-    function layerFits(frame, from, keys, boxes) {
+    function layerFits(frame, from, keys) {
       const want = staticLayer.keys;
       if (!want || !want.length) return null;
       const at = [];
@@ -2507,8 +2467,9 @@
       for (let index = from; index < frame.o.length && next < want.length; index += 1) {
         const op = frame.o[index];
         if (op[0] === "L" || op[0] === "B" || op[0] === "l") return null;
-        const padded = boxes[index];
-        if (!padded) return null;
+        const box = core.opBounds(op, pictureSize);
+        if (!box) return null;
+        const padded = [box[0] - 2, box[1] - 2, box[2] + 2, box[3] + 2];
         if (keys[index] === want[next]) {
           if (others.some((other) => overlaps(other, padded))) return null;
           at.push(index);
@@ -2552,33 +2513,27 @@
       // (a test's own) is written out as before.
       const a = fresh ? frame.__from : null, b = fresh ? frame.__to : null, pairs = fresh ? frame.__pairs : null;
       const blendedFrom = !!(a && b && a.o.length === frame.o.length);
-      // Receiver 114: what each command's bounds come from (its own array; a blended frame's, the source command the
-      // same in both frames, else worked out from the draw's numbers).
-      const same = fresh ? new Array(frame.o.length).fill(null) : null;
       for (let index = from; index < frame.o.length; index += 1) {
         const op = frame.o[index];
         if (op[0] !== "f" && op[0] !== "s" && op[0] !== "i") continue;
         if (blendedFrom) {
           const partner = pairs ? pairs[index] : index;
-          const opA = a.o[index], opB = partner >= 0 ? b.o[partner] : null;
-          const keyA = opKey(opA, false);
-          // Receiver 114: the same array in both (core.shareOps) is the same command without comparing their text.
-          if (opB && opB !== opA && opKey(opB, false) !== keyA) continue;
+          const keyA = opKey(a.o[index], false);
+          const keyB = partner >= 0 && b.o[partner] ? opKey(b.o[partner], false) : keyA;
+          if (keyA !== keyB) continue;
           keys[index] = keyA;
-          same[index] = opA;
         } else {
           keys[index] = opKey(op, fresh);
         }
         keysNow.add(keys[index]);
       }
-      const boxes = boxesOf(frame, from, same);
-      const statics = splitStatic(frame, from, lastStaticKeys, keys, boxes);
+      const statics = splitStatic(frame, from, lastStaticKeys, keys);
       lastStaticKeys = keysNow;
       const candidateKey = statics.length >= 2 ? statics.map((index) => keys[index]).join("|") : null;
       const steady = candidateKey !== null && candidateKey === lastCandidateKey;
       lastCandidateKey = candidateKey;
       const sized = staticLayer.canvas && staticLayer.canvas.width === canvas.width && staticLayer.canvas.height === canvas.height;
-      let used = sized ? layerFits(frame, from, keys, boxes) : null;
+      let used = sized ? layerFits(frame, from, keys) : null;
       // A bigger set of unchanged commands that held for two draws: worth a
       // rebuild. A layer that no longer fits: the set now, if there is one.
       if (used && steady && statics.length >= used.length + 3) used = null;
@@ -2652,8 +2607,7 @@
         const op = batter.o[index], kind = op[0];
         if (kind !== "f" && kind !== "s" && kind !== "i") { keys = null; break; }
         const plain = !(op[2] && op[2] !== "source-over") && !(filtersOf(batter, kind === "f" ? op[7] : kind === "s" ? op[9] : op[5]).blur > 0);
-        // Receiver 114: written out once a command array (his unchanged pieces are the live batter before's arrays).
-        keys[index] = plain ? opKey(op, false) : null;
+        keys[index] = plain ? JSON.stringify(op) : null;
       }
       if (keys) keys.context = JSON.stringify([batter.fl, batter.cl]);
       liveOpKeyCache.set(batter, keys);
@@ -3350,9 +3304,7 @@
           partly: counters.partly, stale: Math.round(core.percentile(counters.stale, 0.5)), stale90: Math.round(core.percentile(counters.stale, 0.9)),
           rehearsed: rehearsal.draws,
           // Receiver 113: draws held while cold pictures were warmed, and pictures warmed with the stadium on.
-          coldHeld: counters.coldHeld, warmedLate: counters.warmedLate,
-          // Receiver 115: frames that came as references, and those that couldn't be put back.
-          refFrames: counters.refFrames, refMiss: counters.refMiss
+          coldHeld: counters.coldHeld, warmedLate: counters.warmedLate
         };
         if (rehearsal.ms.length >= 20) stats.rehearseMs = [rehearsal.firstMs, Number(core.percentile(rehearsal.ms.slice(-10), 0.5).toFixed(1))];
         // Receiver 77: when the rehearsal began and the preload ran dry, ms from the hello.
@@ -3387,7 +3339,7 @@
         counters.live = 0; counters.pose = []; counters.ahead = []; counters.eff = [];
         counters.js = 0; counters.long = 0; counters.lag = [];
         counters.partly = 0; counters.stale = [];
-        counters.coldHeld = 0; counters.warmedLate = 0; counters.refFrames = 0; counters.refMiss = 0;
+        counters.coldHeld = 0; counters.warmedLate = 0;
       }
     }
 
@@ -3504,14 +3456,7 @@
       // `held` (receiver 67): it keeps this many of the phone's pictures and
       // says which (`cards`, oldest first, [id, width] each; `held` messages
       // after each change), and asks for one it lacks (`want`).
-      // Receiver 115: `refs`, a frame's commands may be references to a frame before (core.createRefBook). Not `fb`
-      // (receiver 114's live batter riding in a frame's message): y8qphjrd (Android AG 27585 on staging 114, Nov 27 ~14:10:
-      // "It used to show the shot, now it just directly goes to fielding") against zcm4jrnf (AH on 113, no riding: "Much
-      // better, timing was good as well"): a batter waiting up to 20 ms for his frame crossed the TV's display frames, and a
-      // 30 Hz model of the recordings loses ~150 of 2,205 drawn batters (Android) and ~93 of 1,313 (iOS), most in swings.
-      // A rider that comes anyway is still drawn (the "f" handler), so a phone that rides on a receiver that never said fb
-      // loses nothing more.
-      const ready = { t: "ready", scene: 1, pic: 1, card: 1, live: 1, setup: 1, whole: 1, predict: 1, shared: 1, inset: insetOff ? 0 : 1, steady: 1, refs: 1,
+      const ready = { t: "ready", scene: 1, pic: 1, card: 1, live: 1, setup: 1, whole: 1, predict: 1, shared: 1, inset: insetOff ? 0 : 1, steady: 1,
         held: options.heldKeep || 0, cards: options.heldCards ? options.heldCards() : [], screen: screenPixels(), version: VERSION, ua: navigator.userAgent, have };
       // A weak dongle: the phone sends frames and live batters at its pace.
       if (plan.weak) ready.weak = 1;
@@ -3589,8 +3534,6 @@
           released = false;
           clock.reset();
           timeline.reset();
-          refs.clear();
-          helloRefs = message.refs === 1;
           live.clear();
           lastStamp = null;
           lastAcknowledgedStamp = null;
@@ -3620,33 +3563,11 @@
           setOn(message.on === 1);
           break;
         case "f": {
-          // Receiver 115: its references to a frame before put back (ready.refs).
-          if (message.r != null) {
-            if (!refs.resolve(message)) { refMissed(message); break; }
-            counters.refFrames += 1;
-          } else if (helloRefs) refs.resolve(message);
           const frame = timeline.add(message, message.e);
           if (frame) noteArrival(frame);
-          // Receiver 114 (`ready.fb`): a live batter that rides in the frame's message (`b`, his own "b" message), as
-          // if it had come on its own just after: one Cast message instead of two (each costs the Ultra ~3 ms: the Cast
-          // framework parses it twice and dispatches it twice).
-          if (message.b && typeof message.b === "object" && !Array.isArray(message.b)) { message.b.t = "b"; handleMessage(message.b); }
           break;
         }
         case "fs": {
-          // Receiver 115: each frame's references put back, in order (a frame may refer to the one before it in the set);
-          // one that can't be, and those after it, aren't drawn.
-          if (Array.isArray(message.frames)) {
-            const whole = [];
-            for (const raw of message.frames) {
-              const referred = raw && raw.r != null;
-              if (!referred && !helloRefs) { whole.push(raw); continue; }
-              if (!refs.resolve(raw)) { refMissed(raw); break; }
-              if (referred) counters.refFrames += 1;
-              whole.push(raw);
-            }
-            if (whole.length < message.frames.length) message.frames = whole;
-          }
           const frames = timeline.replace(message.frames, message.e);
           frames.forEach(noteArrival);
           if (frames.length) counters.redraws += 1;

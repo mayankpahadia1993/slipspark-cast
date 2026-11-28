@@ -803,111 +803,6 @@
     return out;
   }
 
-  // MARK: The same commands, the same arrays (receiver 114, Nov 27 2026)
-  //
-  // qqxemq6y (the owner's AB iPhone game on staging 113, the Living Room TV's Ultra): the frame loop every 41-66 ms at
-  // pace 26, drawMs 12-16 in play, the page's own script 430-510 ms a second. Each frame and live batter arrives as new
-  // arrays though most of its commands are the frame before's again (the stadium, the pitch's marks, the standing
-  // fielders; the batter's legs, pelvis, torso and head), and the receiver wrote each one out as text again (opKey),
-  // worked out its shape (opShape) and its bounds again, every frame. Now a command equal to its partner in the frame
-  // before is that very array: what is worked out from a command once (keyed by the array) is worked out once. Partners
-  // are found by place, allowing for up to two commands inserted or removed at a time (`shift`), so commands that changed in
-  // place (a fielder moving) keep the rest in step. Commands are never written to once received, so sharing is safe.
-  function sameValue(a, b) {
-    if (a === b) return true;
-    if (!isArray(a) || !isArray(b) || a.length !== b.length) return false;
-    for (let index = 0; index < a.length; index += 1) {
-      const x = a[index], y = b[index];
-      if (x === y) continue;
-      if (!isArray(x) || !isArray(y) || !sameValue(x, y)) return false;
-    }
-    return true;
-  }
-  // `ops`' commands equal to their partners in `before` replaced by those (in place); how many were.
-  const SHARE_REACH = [1, -1, 2, -2];
-  function shareOps(ops, before) {
-    if (!before || !before.length || !ops.length) return 0;
-    let shift = 0, shared = 0;
-    for (let index = 0; index < ops.length; index += 1) {
-      const at = index + shift, op = ops[index];
-      if (at >= 0 && at < before.length && sameValue(op, before[at])) { ops[index] = before[at]; shared += 1; continue; }
-      // Up to two removed here (a fielder's shadow and picture together), or inserted.
-      for (const step of SHARE_REACH) {
-        const near = at + step;
-        if (near >= 0 && near < before.length && sameValue(op, before[near])) { ops[index] = before[near]; shift += step; shared += 1; break; }
-      }
-    }
-    return shared;
-  }
-  const opsShared = { shared: 0, total: 0 };
-
-  // MARK: Commands sent as references (receiver 115, Nov 27 2026)
-  //
-  // The iPhone's redraw sets ("fs", 22-55 KB, up to 9 a second in qqxemq6y) were the 20-40 ms message tasks behind most
-  // of the Living Room Ultra's 100 ms frames (receiver 114 traced): the Cast framework parses every byte twice, and most
-  // of a frame's commands are the frame before's again. With `ready.refs`, a phone may send a frame (`f`, or each frame
-  // of an `fs`) with `r`, the stamp of a frame it sent before, and in its `o` a whole number k for "command k of that
-  // frame" (its `o` as sent, before the inset is drawn out); its hello says `refs: 1`. The receiver keeps each frame's
-  // commands by stamp (`createRefBook`, the last REF_FRAMES, only for such a phone) and puts the very arrays back (so receiver 114's shared commands see them as
-  // the same at once); a frame whose `r` it no longer holds, or a number that names no command, isn't drawn and the
-  // phone is told (`{t: "refs", miss}`) to send its next frame whole. A frame without `r` is as before: old phones
-  // never send one, and a phone sends whole frames to a receiver that doesn't say `refs` (114 and older).
-  // Nov 27 2026 (the plain stream ran worse on 115 than on 114 in one A/B): 16, not 48 (a phone refers to the frame it
-  // sent last, a redraw set's frames to the one before them); and only for a phone whose hello says `refs: 1`, so an old
-  // phone's frames cost the receiver nothing more than on 114 (receiver-scene.js `helloRefs`).
-  const REF_FRAMES = 16;
-  function createRefBook(limit) {
-    const kept = new Map();
-    const most = limit || REF_FRAMES;
-    function remember(raw) {
-      const stamp = Number(raw.s);
-      if (!Number.isFinite(stamp) || !isArray(raw.o)) return;
-      kept.delete(stamp);
-      kept.set(stamp, raw.o);
-      if (kept.size > most) kept.delete(kept.keys().next().value);
-    }
-    return {
-      get size() { return kept.size; },
-      // `raw` with its references put back (in place), kept as a base for later frames; null when one can't be.
-      resolve(raw) {
-        if (!raw || typeof raw !== "object" || !isArray(raw.o)) return raw;
-        if (raw.r == null) { remember(raw); return raw; }
-        const base = kept.get(Number(raw.r));
-        if (!base) return null;
-        const ops = raw.o;
-        for (let index = 0; index < ops.length; index += 1) {
-          const entry = ops[index];
-          if (typeof entry !== "number") continue;
-          const op = Number.isInteger(entry) && entry >= 0 ? base[entry] : undefined;
-          if (!isArray(op)) return null;
-          ops[index] = op;
-        }
-        remember(raw);
-        return raw;
-      },
-      clear() { kept.clear(); }
-    };
-  }
-  // The phones' rule (iOS CastFrameRefs, Android core CastFrameRefs), for the benches and tests: each command equal to
-  // its partner in `base` (by place, up to two inserted or removed at a time, as shareOps) as that partner's index.
-  // `same` compares two commands (their text, as a phone has them).
-  function encodeRefs(ops, base, same) {
-    const equal = same || ((a, b) => JSON.stringify(a) === JSON.stringify(b));
-    const out = new Array(ops.length);
-    let shift = 0, refs = 0;
-    for (let index = 0; index < ops.length; index += 1) {
-      const at = index + shift, op = ops[index];
-      out[index] = op;
-      if (!base) continue;
-      if (at >= 0 && at < base.length && equal(op, base[at])) { out[index] = at; refs += 1; continue; }
-      for (const step of SHARE_REACH) {
-        const near = at + step;
-        if (near >= 0 && near < base.length && equal(op, base[near])) { out[index] = near; shift += step; refs += 1; break; }
-      }
-    }
-    return { o: out, refs };
-  }
-
   // The frames on their way to the screen, by moment. A redraw (a newer
   // epoch) replaces everything from its first moment on, and frames of an
   // older epoch still arriving are dropped.
@@ -924,14 +819,6 @@
     let scratchShape = null;
     // The HUD changes waiting for their moment, oldest first.
     let huds = [];
-    // Receiver 114: the frame that came last, whose commands the next one shares where they are the same.
-    let last = null;
-    const sharing = !(options && options.share === false);
-    function share(frame, before) {
-      if (!sharing || !before) return;
-      opsShared.shared += shareOps(frame.o, before.o);
-      opsShared.total += frame.o.length;
-    }
 
     function insert(frame) {
       let index = frames.length;
@@ -962,9 +849,6 @@
         const e = Number(frameEpoch) || 0;
         if (e < epoch) return null;
         epoch = e;
-        // Receiver 114: its commands the same as the frame before's are those arrays.
-        share(frame, last);
-        last = frame;
         insert(frame);
         return frame;
       },
@@ -976,8 +860,6 @@
         epoch = e;
         const incoming = rawFrames.map((raw) => normalize(raw)).filter(Boolean).sort((x, y) => x.s - y.s);
         if (!incoming.length) return [];
-        // Receiver 114: each frame's commands shared with the one before it (the first with the last frame that came).
-        incoming.forEach((frame) => { share(frame, last); last = frame; });
         const from = incoming[0].s;
         frames = frames.filter((frame) => frame.s < from);
         huds = huds.filter((entry) => entry.s < from);
@@ -1022,10 +904,10 @@
         return latest;
       },
 
-      clear() { frames = []; huds = []; last = null; },
+      clear() { frames = []; huds = []; },
 
       // A new phone (or the same one, started again) counts epochs afresh.
-      reset() { frames = []; huds = []; epoch = 0; last = null; }
+      reset() { frames = []; huds = []; epoch = 0; }
     };
   }
 
@@ -1043,8 +925,6 @@
         if (!frame) return null;
         if (current && frame.s < current.s) return null;
         frame.h = null;
-        // Receiver 114: his commands the same as the live batter before's are those arrays.
-        if (current) { opsShared.shared += shareOps(frame.o, current.o); opsShared.total += frame.o.length; }
         current = frame;
         return frame;
       },
@@ -1581,6 +1461,6 @@
     percentile, debugLine, tracePath, cssColor, pictureSize, canvasPlan, canvasWidth, createRateWatch, STEADY, createSteadyWatch, createLiveLayer, hasLiveSlot, poseAge, poseAhead,
     filterParts, opBounds, layerEnd, clipsWholeStage, mergeRects, overStrip, readLook, lookColours, dyeFrame, copyAtlasFrame, GRIP_OPACITY, GRIP_SHADE,
     readGear, gearColours, GEAR_HELMET_OPACITY, GEAR_FINISH_OPACITY, GEAR_STICKER, WARM_REPORT_MS, warmReport,
-    CREATOR_KIT, wearsCreatorKit, polishColour, farStripes, sameValue, shareOps, opsShared, createRefBook, encodeRefs, REF_FRAMES
+    CREATOR_KIT, wearsCreatorKit, polishColour, farStripes
   };
 });
