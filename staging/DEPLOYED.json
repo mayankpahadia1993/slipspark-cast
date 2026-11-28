@@ -1,17 +1,25 @@
 {
   "environment": "staging",
-  "commit": "f0a683568c0a075afa51b425e5ff4c2dc4b32b1c",
-  "subject": "TV: the camera setup card centred (the owner, Nov 28 2026)",
-  "receiverTree": "7dfd2a06120a1f23f01f06f8adcecf0ad7f4729a",
+  "commit": "914feb00eb529287151ff22e9a42248f66fdcb76",
+  "subject": "Receiver test: inline data pictures are relative-safe, as the CSS check already allows",
+  "receiverTree": "f1e861d02139a56430142ab63aeaf28d0cb4b94b",
   "revision": 117,
-  "deployedAt": "2026-11-28T16:44:14Z",
+  "deployedAt": "2026-11-28T16:54:18Z",
   "previous": {
-    "tree": "b4f5d5c4bcbf507b18e2c4f046d5b878ddc50bb3",
+    "tree": "7dfd2a06120a1f23f01f06f8adcecf0ad7f4729a",
     "changed": [
+      "index.html",
       "receiver.css"
     ]
   },
   "earlier": [
+    {
+      "tree": "b4f5d5c4bcbf507b18e2c4f046d5b878ddc50bb3",
+      "changed": [
+        "index.html",
+        "receiver.css"
+      ]
+    },
     {
       "tree": "eb25989a2c418249b17cab662b880d8eefe6f281",
       "changed": [
@@ -39,19 +47,6 @@
     },
     {
       "tree": "fa89f32ee40bb6e4262ce79b030587b30ceff18f",
-      "changed": [
-        "README.md",
-        "index.html",
-        "receiver-core.js",
-        "receiver-pickleball.js",
-        "receiver-scene-core.js",
-        "receiver-scene.js",
-        "receiver.css",
-        "receiver.js"
-      ]
-    },
-    {
-      "tree": "836ede54e7398def7005218f67a1a796d6a1fc20",
       "changed": [
         "README.md",
         "index.html",
