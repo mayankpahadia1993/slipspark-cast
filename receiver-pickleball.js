@@ -36,7 +36,7 @@
   // photograph layers, a HUD that never animates, the sheets' smaller copies (`pickleball/small/`), no decode() at load,
   // and arrivals just after the TV's own stall kept out of the delay. `ready` and `stats` say `weak: 1`; `stats` add
   // `worst`, the longest gap between draws. The hello's `x.weak` (1 or 0, benches) draws as a weak dongle does, or not.
-  const RECEIVER_VERSION = 115;
+  const RECEIVER_VERSION = 117;
   const core = window.RallycadePickleballCore;
   const sceneCore = window.RallycadeSceneCore;
   // Receiver 109: cricket's canvas plan, rate watch and warm reports, through the layer every game uses
@@ -387,9 +387,61 @@
     let pickleballWanted = !options.waitForGame;
     let pending = null;
     function selectGame(game) {
+      const was = pickleballWanted;
       pickleballWanted = game === "pickleball";
-      if (!pickleballWanted) { if (warmRaf) endWarm(); return; }
+      if (!pickleballWanted) {
+        if (warmRaf) endWarm();
+        // Receiver 117: the player left pickleball (another game, or none chosen): what it holds goes.
+        if (was && options.waitForGame) releaseGame();
+        return;
+      }
       if (pending) { const next = pending; pending = null; preload(next.look, next.sheets); }
+    }
+
+    // Receiver 117 (Nov 28 2026, the owner on iOS 431 and Android 27602, the Living Room TV's Ultra: pickleball first,
+    // then cricket on the same cast, "This wasn't smooth", "all bowled ... Timing off"; c06kq3zj, vxya5zc0, awt4gfbf).
+    // The match's look (fifteen sheets, 27-33 MB decoded), the court's two canvas bitmaps (3.7 and 2 MB, which the TV can
+    // never let go) and its photographs' layers stayed on the page through the innings after it, on a TV that runs near
+    // its memory limit (receiver 112: a critical memory notice empties its picture caches and the stadium decodes its
+    // whole working set again on the page's thread). The innings after a match drew with long tasks of 139 ms a second
+    // (32 on a fresh cast) and 24.5 draws a second (28). When the player leaves pickleball everything it loaded goes, and
+    // it all loads again (and is warmed under the ready card) the next time pickleball is chosen. Not on a weak dongle's
+    // opaque canvas, which keeps nothing more than its plan already does; `stats.released` counts the releases.
+    let releases = 0;
+    function releaseGame() {
+      if (released || !options.waitForGame) return;
+      releases += 1;
+      stop();
+      if (warmRaf) endWarm();
+      // A pinned sheet's image is its bitmap: closed by unpin. Every other sheet's image lets its bytes go.
+      pictures.forEach((entry) => {
+        const image = entry && entry.image;
+        if (image && !image.close && image.removeAttribute) { image.onload = null; image.onerror = null; image.removeAttribute("src"); }
+      });
+      pictures.clear();
+      unpin();
+      [canvasPlate, canvasTall].forEach((bitmap) => { try { if (bitmap && bitmap.close) bitmap.close(); } catch (error) { /* gone */ } });
+      canvasPlate = null; canvasTall = null; canvasPlateSettled = false; canvasTallSettled = false; bitmapBytes = 0;
+      plate = null; plateWait = null; plateLoaded = false; tallPlate = null; tallSettled = false;
+      [plateImg, plateImg2, tallImgs[0], tallImgs[1]].forEach((image) => {
+        if (!image || !image.removeAttribute) return;
+        image.onload = null; image.onerror = null;
+        image.removeAttribute("src");
+      });
+      if (!weak && canvas && canvas.width) { canvas.width = 0; canvas.height = 0; canvasPx = 0; lastDrawn = null; }
+      // Its look loads again when pickleball is chosen again (as the hello asked).
+      if (lookLoadedAt !== null || named.length) pending = { look, sheets: named.slice() };
+      lookLoadedAt = null;
+      warmDone = false;
+      stillShown = ""; weakKey = "";
+    }
+    let released = false;
+    // What this game holds now (benches and tests): its sheets and their decoded size, the court's bitmaps.
+    function held() {
+      let mb = 0;
+      pictures.forEach((entry) => { const image = entry && entry.image; if (image && image.width) mb += image.width * image.height * 4 / 1e6; });
+      return { sheets: pictures.size, mb: Math.round(mb), plate: !!canvasPlate, tall: !!canvasTall, layers: [plateImg, plateImg2, tallImgs[0], tallImgs[1]]
+        .filter((image) => image && image.getAttribute && image.getAttribute("src")).length, releases };
     }
     function preloadWhenWanted(nextLook, sheets) {
       if (pickleballWanted) return preload(nextLook, sheets);
@@ -1033,7 +1085,9 @@
       // Tests: the next draw is whole (receiver 106's weak plan otherwise paints only where things moved).
       drawWhole() { weakKey = ""; lastDrawn = null; },
       stats: () => maybeReport(true), sizeCanvas, picture, loaded: () => lookLoadedAt !== null,
-      release() { stop(); pictures.clear(); unpin(); },
+      release() { stop(); pictures.clear(); unpin(); released = true; },
+      // Receiver 117: what the game holds, and letting it all go when the player leaves pickleball.
+      held, releaseGame,
       get bitmapBytes() { return bitmapBytes; },
       // Receiver 112: the bench's pinned sheets (`x.pin: 1`), bytes decoded.
       get pinnedBytes() { return pinnedBytes; }

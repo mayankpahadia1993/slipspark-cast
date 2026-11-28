@@ -41,7 +41,11 @@
     // layer and the HUD, not the photo's layer, a see-through canvas over it
     // and two shading layers. `opaqueCanvas` is what the canvas was made with.
     let opaqueCanvas = false;
-    let ctx = core.isWeakDongle(navigator.userAgent) ? opaqueContext(canvas) : canvas.getContext("2d");
+    // Receiver 116: the Ultra's light plan starts opaque too (core.isLightDongle).
+    // `options.light` (receiver.js's ?light=0 or 1) picks the light plan or the layered page on any TV, for previews and tests.
+    const lightOption = options && (options.light === true || options.light === false) ? options.light : undefined;
+    const startsLight = lightOption !== undefined ? lightOption : core.isLightDongle(navigator.userAgent);
+    let ctx = core.isWeakDongle(navigator.userAgent) || startsLight ? opaqueContext(canvas) : canvas.getContext("2d");
     function opaqueContext(target) {
       const context = target.getContext("2d", { alpha: false });
       opaqueCanvas = true;
@@ -129,7 +133,7 @@
     // The canvas's most pixels across (core.canvasPlan): 1920 on devices
     // that keep up, 1280 on the Chromecast dongles, whose software raster
     // can't fill 1920 x 1080 thirty times a second. The phone can set it.
-    let plan = core.canvasPlan({ ua: navigator.userAgent, pinned: options.canvasWidth, remembered: rememberedCanvas() });
+    let plan = core.canvasPlan({ ua: navigator.userAgent, pinned: options.canvasWidth, remembered: rememberedCanvas(), light: lightOption });
     let maxCanvasWidth = plan.width;
     const rateWatch = core.createRateWatch({ minFps: core.CANVAS.minFps });
     // The last frame drawn, drawn again at once when the canvas narrows.
@@ -197,7 +201,7 @@
     // frame on screen is drawn again in the same animation frame, so the TV
     // never shows the cleared canvas.
     function narrowCanvas() {
-      plan = { width: core.CANVAS.narrow, adaptive: false, why: "slow", weak: false };
+      plan = Object.assign({ width: core.CANVAS.narrow, adaptive: false, why: "slow", weak: false }, plan.light ? { light: true } : {});
       maxCanvasWidth = plan.width;
       rememberCanvas(plan.width);
       resize();
@@ -581,6 +585,10 @@
     function selectGame(game) {
       const before = selectedGame;
       selectedGame = game === "cricket" || game === "pickleball" ? game : null;
+      // Receiver 117: pickleball chosen, the stadium lets go of what it holds; pickleball left, it loads it all again and
+      // is warmed as a fresh cast's stadium is (`setAsideForGame`, `bringBackForGame`).
+      if (options.waitForGame && selectedGame === "pickleball" && before !== "pickleball") setAsideForGame();
+      else if (options.waitForGame && selectedGame !== "pickleball" && before === "pickleball") bringBackForGame();
       const wanted = selectedGame === "cricket";
       const changed = wanted !== cricketWanted;
       cricketWanted = wanted;
@@ -724,7 +732,10 @@
           // Receiver 65: the replay's outfield too (made at the first replay,
           // it cost an onn's first replay a 283 ms/s of long tasks).
           // Receiver 82: a ground's plate and outfield, never its inset (drawn small on the canvas, as the classic one).
-          if (/^(stadium-(ground|backdrop)|field-(real-)?outfield|ground)-/.test(key) && !/-inset-\d+x\d+$/.test(key) && opaque.has(key)) backdropLayer(key);
+          // Receiver 116: not on a page that draws its photos on the canvas (the weak and light plans): a layer it never
+          // shows would hold a 1672 x 941 texture and its decoded copy for nothing.
+          if (/^(stadium-(ground|backdrop)|field-(real-)?outfield|ground)-/.test(key) && !/-inset-\d+x\d+$/.test(key) && opaque.has(key)
+            && tune.photo !== "canvas") backdropLayer(key);
           warmDecode(key);
         }, () => loading.delete(key))
         .then(done, done);
@@ -1972,11 +1983,14 @@
     // Oct 19 2026: and one opaque canvas with the photo and the shading drawn
     // in, no CSS animation in the HUD (see `opaqueCanvas`).
     const WEAK_TUNED = Object.freeze(Object.assign({}, TUNED, { blur: "off", blend: 0, photo: "canvas", shade: "canvas", opaque: 1 }));
+    // Receiver 116: a Chromecast Ultra (core.isLightDongle): one opaque canvas with the photo in it, as the weak plan's,
+    // but its 1280 canvas, blending between frames, glows and the shading's thirds as every other TV's.
+    const LIGHT_TUNED = Object.freeze(Object.assign({}, TUNED, { photo: "canvas", opaque: 1 }));
     const tune = Object.assign({}, TUNED);
     // Each hello starts from the defaults (the weak ones on a weak dongle);
     // the bench's `x` changes them.
     function setTune(x) {
-      const base = plan && plan.weak ? WEAK_TUNED : TUNED;
+      const base = plan && plan.weak ? WEAK_TUNED : plan && plan.light ? LIGHT_TUNED : TUNED;
       Object.assign(tune, base);
       if (x && typeof x === "object") Object.keys(base).forEach((name) => { if (x[name] !== undefined) tune[name] = x[name]; });
       // An opaque canvas hides whatever is under it: it draws the photo.
@@ -3334,7 +3348,7 @@
           missing: counters.missing, images: images.size, layers: backdropLayers.size, warmed: warmed.size, cached: staticLayer.hits, rebuilt: staticLayer.built, batter: liveLayer.hits, batterRuns: liveRuns.hits, bitmaps: bitmaps.size, queue: timeline.length,
           // How glows are blurred (receiver 57): as shadows, or in small canvases.
           glow: tune.blur === "filter" ? "filter" : tune.blur === "off" ? "off" : castsOffstageShadows() ? "shadow" : "scratch",
-          synced: clock.synced ? 1 : 0, w: canvas.width, canvas: plan.why, weak: plan.weak ? 1 : 0,
+          synced: clock.synced ? 1 : 0, w: canvas.width, canvas: plan.why, weak: plan.weak ? 1 : 0, light: plan.light ? 1 : 0,
           gap: Number(core.percentile(counters.gaps, 0.5).toFixed(1)),
           gap90: Number(core.percentile(counters.gaps, 0.9).toFixed(1)),
           // Live batters received; and how old the pose of the batter on
@@ -3357,6 +3371,8 @@
         if (rehearsal.ms.length >= 20) stats.rehearseMs = [rehearsal.firstMs, Number(core.percentile(rehearsal.ms.slice(-10), 0.5).toFixed(1))];
         // Receiver 77: when the rehearsal began and the preload ran dry, ms from the hello.
         if (rehearsal.startedAt) stats.rehearseAt = Math.round(rehearsal.startedAt - rehearsal.askedAt);
+        // Receiver 117: the times this page let the stadium go for pickleball.
+        if (gameReleases) stats.gameRelease = gameReleases;
         if (preloadDoneAt !== null && rehearsal.asked) stats.preloadMs = Math.max(0, Math.round(preloadDoneAt - rehearsal.askedAt));
         // Receiver 111: the drawing's warm-up so far (draws rehearsed and drawn, up to a rehearsal's worth); a stadium that
         // came on cold (`cold`) and how long the phone's picture stayed over it (`cover`, ms from it coming on).
@@ -3515,6 +3531,8 @@
         held: options.heldKeep || 0, cards: options.heldCards ? options.heldCards() : [], screen: screenPixels(), version: VERSION, ua: navigator.userAgent, have };
       // A weak dongle: the phone sends frames and live batters at its pace.
       if (plan.weak) ready.weak = 1;
+      // Receiver 116: a Chromecast Ultra's light plan (one opaque canvas); phones need do nothing about it.
+      if (plan.light) ready.light = 1;
       send(ready);
       preloadBundled(helloKit, helloGround, helloViews);
     }
@@ -3579,7 +3597,8 @@
           // the device's own plan, and a wide canvas is measured afresh.
           // `x.weak` (the bench) draws as a weak dongle does on any TV.
           plan = core.canvasPlan({ ua: navigator.userAgent, pinned: message.canvas || options.canvasWidth,
-            wide: message.wide === 1, remembered: rememberedCanvas(), weak: !!(message.x && message.x.weak === 1) });
+            wide: message.wide === 1, remembered: rememberedCanvas(), weak: !!(message.x && message.x.weak === 1),
+            light: message.x && (message.x.light === 0 || message.x.light === 1) ? message.x.light : lightOption });
           maxCanvasWidth = plan.width;
           rateWatch.reset();
           resize();
@@ -3836,6 +3855,55 @@
       objectURLs.clear();
     }
 
+    // Receiver 117 (Nov 28 2026, the owner on iOS 430 and 431, Android 27602, the Living Room TV's Ultra: whichever game
+    // came second on a cast suffered. Cricket after pickleball: "This wasn't smooth", "all bowled ... Timing off", the
+    // innings drawn with long tasks of 139 ms a second against 32 on a fresh cast; pickleball after cricket "still
+    // laggy"). The page kept both games' pictures: the stadium's ~130 (its bitmaps, which the TV can never let go, its
+    // atlases, photo layers, dressed kit, caches) through pickleball, and pickleball's sheets through the innings after,
+    // on a TV that runs near its memory limit (receiver 112). Pickleball chosen, the stadium lets go of everything it
+    // holds, as receiver 59's release does, but the page goes on: the composed pictures keep their commands (made again
+    // from them), and when pickleball is left (another game or none chosen) the hello's pictures load again, from the TV's
+    // own copies, and the rehearsal draws again, so the next innings starts as warm as a fresh cast's. `gameRelease` in
+    // stats counts the times.
+    let setAside = false, gameReleases = 0;
+    function setAsideForGame() {
+      if (released || setAside) return;
+      setAside = true;
+      const hadHello = hasHello;
+      gameReleases += 1;
+      // The phone's composed pictures keep their commands, without their pixels.
+      const kept = [];
+      pictures.forEach((entry, key) => { if (entry && entry.frame) kept.push([key, { frame: entry.frame, width: entry.width, height: entry.height,
+        opaque: entry.opaque, fallback: entry.fallback, uses: entry.uses, ready: false }]); });
+      backdropLayers.forEach((entry, key) => evictLayer(key, entry));
+      if (liveLayer.canvas) { zeroCanvas(liveLayer.canvas); liveLayer.canvas = null; }
+      liveLayer.key = null; liveLayer.last = null;
+      release();
+      kept.forEach(([key, entry]) => pictures.set(key, entry));
+      // Not going away: the page carries on (the phone's hello with it), the next game's pictures load into what this let go.
+      released = false;
+      hasHello = hadHello;
+      loading.clear();
+      warmed.clear();
+      preloadQueue = [];
+      preloadDoneAt = null;
+      shownFrame = null;
+    }
+    function bringBackForGame() {
+      if (!setAside || released) return;
+      setAside = false;
+      if (window.RallycadeDye) window.RallycadeDye.prepare();
+      resize();
+      // Warm again as a fresh cast's stadium is: the rehearsal from the start, the cover over a stadium still cold.
+      rehearsedFully = false;
+      drewSteadily = false;
+      stadiumDraws = 0;
+      wasCold = false;
+      coldProgress = 0;
+      if (hasHello) preloadBundled(helloKit, helloGround, helloViews); else if (!options.noPreload) preloadBundled();
+      wantRehearsal();
+    }
+
     // Receiver 107: another of the receiver's own files (the music bed, receiver.js) kept on the TV as its pictures are:
     // where it loads from once the TV's copies are open (`keptURL`), the plain path if they never open.
     function keptFile(path) {
@@ -3850,6 +3918,8 @@
       // Receiver 111: how warm the stadium's drawing is, and whether this stadium came on cold.
       get warmth() { return { warm: drawingWarm(), draws: rehearsal.draws + stadiumDraws, rehearsedFully, drewSteadily, cold: coldOn, wasCold, uncoveredAt }; },
       get selectedGame() { return selectedGame; },
+      // Receiver 117: how often the stadium was set aside for pickleball, and whether it is now.
+      get gameRelease() { return { times: gameReleases, aside: setAside }; },
       get preload() { return { left: preloadQueue.length, loading: preloading, doneAt: preloadDoneAt }; } };
   }
 

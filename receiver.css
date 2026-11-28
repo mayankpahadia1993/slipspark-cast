@@ -314,7 +314,15 @@ body[data-scene-weak="1"] .scene-hud *, body[data-scene-weak="1"] .scene-hud { a
 /* Build 122: setup on a Chromecast is the phone's setup card and its hold
    ring; the TV never draws the batter's skeleton. The same ring fills on the
    paused card. */
-.positioning-screen { display: flex; align-items: center; justify-content: flex-start; padding: 6vh 8vw; }
+.positioning-screen { display: flex; align-items: center; justify-content: center; padding: 6vh 8vw; }
+/* Nov 28 2026, the owner: the camera setup card centred on the TV, its words and hold ring too. */
+.positioning-screen .stadium-card { text-align: center; }
+.positioning-screen .stadium-card .hold { justify-content: center; }
+.setup-examples { display: flex; justify-content: center; align-items: flex-end; gap: 3vw; margin-top: 3vh; }
+.setup-examples figure { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 1vh; }
+.setup-examples img { display: block; height: clamp(110px, 17vh, 240px); width: auto; }
+.setup-photo img { border-radius: 1vw; box-shadow: 0 0 0 3px #ffc252; }
+.setup-examples figcaption { color: var(--muted); font-size: clamp(14px, 1.3vw, 24px); font-weight: 800; }
 .positioning-screen .stadium-card { width: min(62vw, 1200px); }
 #positioning-detail { white-space: pre-line; }
 .hold { display: flex; align-items: center; gap: 1.2vw; margin-top: 2vh; }
