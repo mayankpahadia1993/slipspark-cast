@@ -1,25 +1,40 @@
 {
   "environment": "staging",
-  "commit": "25eed27a01aac2d0f6a03d17fde8a9fe73ad024b",
-  "subject": "CAST_SCENE: the iPhone round's blur-off switch was a no-op for that recording",
-  "receiverTree": "eb25989a2c418249b17cab662b880d8eefe6f281",
-  "revision": 116,
-  "deployedAt": "2026-11-28T07:53:13Z",
+  "commit": "3db16f38c1fd4f35759e2501d7784311f389f269",
+  "subject": "Merge remote-tracking branch 'origin/claude/cricket-after-pickleball' into claude/receiver-aw-117",
+  "receiverTree": "b4f5d5c4bcbf507b18e2c4f046d5b878ddc50bb3",
+  "revision": 117,
+  "deployedAt": "2026-11-28T10:52:53Z",
   "previous": {
-    "tree": "c0e5f775579a110ec71fa30a9e5f784a421579b3",
+    "tree": "eb25989a2c418249b17cab662b880d8eefe6f281",
     "changed": [
+      "README.md",
       "index.html",
+      "receiver-core.js",
       "receiver-pickleball.js",
-      "receiver-scene-core.js",
       "receiver-scene.js",
       "receiver.js"
     ]
   },
   "earlier": [
     {
+      "tree": "c0e5f775579a110ec71fa30a9e5f784a421579b3",
+      "changed": [
+        "README.md",
+        "index.html",
+        "receiver-core.js",
+        "receiver-pickleball.js",
+        "receiver-scene-core.js",
+        "receiver-scene.js",
+        "receiver.js"
+      ]
+    },
+    {
       "tree": "fa89f32ee40bb6e4262ce79b030587b30ceff18f",
       "changed": [
+        "README.md",
         "index.html",
+        "receiver-core.js",
         "receiver-pickleball.js",
         "receiver-scene-core.js",
         "receiver-scene.js",
@@ -29,7 +44,9 @@
     {
       "tree": "836ede54e7398def7005218f67a1a796d6a1fc20",
       "changed": [
+        "README.md",
         "index.html",
+        "receiver-core.js",
         "receiver-pickleball.js",
         "receiver-scene-core.js",
         "receiver-scene.js",
@@ -39,19 +56,9 @@
     {
       "tree": "daac12fafcf3395eb6aa87507bab37e6c824fb16",
       "changed": [
+        "README.md",
         "index.html",
-        "receiver-pickleball.js",
-        "receiver-scene-core.js",
-        "receiver-scene.js",
-        "receiver.js"
-      ]
-    },
-    {
-      "tree": "40fec065233daa48589cb8b9c8f7860d0435dde1",
-      "changed": [
-        "index.html",
-        "receiver-celebration.js",
-        "receiver-pickleball-core.js",
+        "receiver-core.js",
         "receiver-pickleball.js",
         "receiver-scene-core.js",
         "receiver-scene.js",

@@ -143,7 +143,9 @@
       result: null,
       cricketDuelHandoff: null,
       cricketDuelResult: null,
-      timingCheck: null
+      timingCheck: null,
+      // Receiver 117: the game the player is in, when the phone names it (phones from receiver 117's change on); else null.
+      game: value.game === "cricket" || value.game === "pickleball" ? value.game : null
     };
 
     if (screen === "positioning") {

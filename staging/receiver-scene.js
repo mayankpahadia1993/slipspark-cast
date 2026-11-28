@@ -585,6 +585,10 @@
     function selectGame(game) {
       const before = selectedGame;
       selectedGame = game === "cricket" || game === "pickleball" ? game : null;
+      // Receiver 117: pickleball chosen, the stadium lets go of what it holds; pickleball left, it loads it all again and
+      // is warmed as a fresh cast's stadium is (`setAsideForGame`, `bringBackForGame`).
+      if (options.waitForGame && selectedGame === "pickleball" && before !== "pickleball") setAsideForGame();
+      else if (options.waitForGame && selectedGame !== "pickleball" && before === "pickleball") bringBackForGame();
       const wanted = selectedGame === "cricket";
       const changed = wanted !== cricketWanted;
       cricketWanted = wanted;
@@ -3367,6 +3371,8 @@
         if (rehearsal.ms.length >= 20) stats.rehearseMs = [rehearsal.firstMs, Number(core.percentile(rehearsal.ms.slice(-10), 0.5).toFixed(1))];
         // Receiver 77: when the rehearsal began and the preload ran dry, ms from the hello.
         if (rehearsal.startedAt) stats.rehearseAt = Math.round(rehearsal.startedAt - rehearsal.askedAt);
+        // Receiver 117: the times this page let the stadium go for pickleball.
+        if (gameReleases) stats.gameRelease = gameReleases;
         if (preloadDoneAt !== null && rehearsal.asked) stats.preloadMs = Math.max(0, Math.round(preloadDoneAt - rehearsal.askedAt));
         // Receiver 111: the drawing's warm-up so far (draws rehearsed and drawn, up to a rehearsal's worth); a stadium that
         // came on cold (`cold`) and how long the phone's picture stayed over it (`cover`, ms from it coming on).
@@ -3849,6 +3855,55 @@
       objectURLs.clear();
     }
 
+    // Receiver 117 (Nov 28 2026, the owner on iOS 430 and 431, Android 27602, the Living Room TV's Ultra: whichever game
+    // came second on a cast suffered. Cricket after pickleball: "This wasn't smooth", "all bowled ... Timing off", the
+    // innings drawn with long tasks of 139 ms a second against 32 on a fresh cast; pickleball after cricket "still
+    // laggy"). The page kept both games' pictures: the stadium's ~130 (its bitmaps, which the TV can never let go, its
+    // atlases, photo layers, dressed kit, caches) through pickleball, and pickleball's sheets through the innings after,
+    // on a TV that runs near its memory limit (receiver 112). Pickleball chosen, the stadium lets go of everything it
+    // holds, as receiver 59's release does, but the page goes on: the composed pictures keep their commands (made again
+    // from them), and when pickleball is left (another game or none chosen) the hello's pictures load again, from the TV's
+    // own copies, and the rehearsal draws again, so the next innings starts as warm as a fresh cast's. `gameRelease` in
+    // stats counts the times.
+    let setAside = false, gameReleases = 0;
+    function setAsideForGame() {
+      if (released || setAside) return;
+      setAside = true;
+      const hadHello = hasHello;
+      gameReleases += 1;
+      // The phone's composed pictures keep their commands, without their pixels.
+      const kept = [];
+      pictures.forEach((entry, key) => { if (entry && entry.frame) kept.push([key, { frame: entry.frame, width: entry.width, height: entry.height,
+        opaque: entry.opaque, fallback: entry.fallback, uses: entry.uses, ready: false }]); });
+      backdropLayers.forEach((entry, key) => evictLayer(key, entry));
+      if (liveLayer.canvas) { zeroCanvas(liveLayer.canvas); liveLayer.canvas = null; }
+      liveLayer.key = null; liveLayer.last = null;
+      release();
+      kept.forEach(([key, entry]) => pictures.set(key, entry));
+      // Not going away: the page carries on (the phone's hello with it), the next game's pictures load into what this let go.
+      released = false;
+      hasHello = hadHello;
+      loading.clear();
+      warmed.clear();
+      preloadQueue = [];
+      preloadDoneAt = null;
+      shownFrame = null;
+    }
+    function bringBackForGame() {
+      if (!setAside || released) return;
+      setAside = false;
+      if (window.RallycadeDye) window.RallycadeDye.prepare();
+      resize();
+      // Warm again as a fresh cast's stadium is: the rehearsal from the start, the cover over a stadium still cold.
+      rehearsedFully = false;
+      drewSteadily = false;
+      stadiumDraws = 0;
+      wasCold = false;
+      coldProgress = 0;
+      if (hasHello) preloadBundled(helloKit, helloGround, helloViews); else if (!options.noPreload) preloadBundled();
+      wantRehearsal();
+    }
+
     // Receiver 107: another of the receiver's own files (the music bed, receiver.js) kept on the TV as its pictures are:
     // where it loads from once the TV's copies are open (`keptURL`), the plain path if they never open.
     function keptFile(path) {
@@ -3863,6 +3918,8 @@
       // Receiver 111: how warm the stadium's drawing is, and whether this stadium came on cold.
       get warmth() { return { warm: drawingWarm(), draws: rehearsal.draws + stadiumDraws, rehearsedFully, drewSteadily, cold: coldOn, wasCold, uncoveredAt }; },
       get selectedGame() { return selectedGame; },
+      // Receiver 117: how often the stadium was set aside for pickleball, and whether it is now.
+      get gameRelease() { return { times: gameReleases, aside: setAside }; },
       get preload() { return { left: preloadQueue.length, loading: preloading, doneAt: preloadDoneAt }; } };
   }
 

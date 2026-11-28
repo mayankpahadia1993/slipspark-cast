@@ -340,8 +340,11 @@
     new Set(Object.values(screens)).forEach((screen) => setVisible(screen, screen === shown));
     if (state.positioning) renderPositioning(state.positioning);
     lastState = state;
-    // Receiver 83: a cricket screen is cricket selected.
-    if (CRICKET_SCREENS.has(state.screen)) selectGame("cricket");
+    // Receiver 117: the game the player is in, when the phone names it (`game`, phones from receiver 117's change on): chosen as the
+    // player opens it, so the game before lets go of its pictures and this one's load and warm while its home shows.
+    // Receiver 83: else a cricket screen is cricket selected.
+    if (state.game) selectGame(state.game);
+    else if (CRICKET_SCREENS.has(state.screen)) selectGame("cricket");
     if (!PLAY_SCREENS.has(state.screen)) stadiumThisPlay = false;
     if (PLAY_SCREENS.has(state.screen)) renderHolding(state, sceneLost);
     updateHold();
