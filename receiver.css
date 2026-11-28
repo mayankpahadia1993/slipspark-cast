@@ -161,6 +161,22 @@ body[data-scene-weak="1"] .scene-hud *, body[data-scene-weak="1"] .scene-hud { a
 /* Boundary over sends no scorebug: its line takes the scorebug's place, or goes under the level's card. */
 #hud-score[hidden] + #hud-check[hidden] + #hud-level-card[hidden] + .hud-friend { position: static; }
 #hud-level-card:not([hidden]) + .hud-friend { position: static; width: max-content; margin-top: 14px; }
+/* Can you beat my score? (docs/design/CHALLENGES.md "TV message"): the challenge chip under the scorebug, as on the
+   phone: the setter's initial, "{name}'s {setter}", then where this innings stands, green ahead (passed, chased), red
+   behind, gold for the last over's target, cream at the start and when level; "at this ball" quieter after it. Under the
+   match line when there is one. Older phones send no `challenge`: none shows. */
+/* Its top follows the scorebug's own height (taller since receiver 69 with the level beside the overs): 12px under
+   whatever the column holds in flow, never a fixed offset that the level's row runs into. */
+.hud-challenge { position: absolute; left: 0; top: calc(100% + 12px); display: flex; align-items: center; gap: 10px; padding: 7px 22px 7px 8px; border-radius: 999px;
+  background: rgba(var(--ink), .9); color: var(--cream); white-space: nowrap; font-size: 22px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.hud-friend:not([hidden]) + .hud-challenge { top: 172px; }
+#hud-score[hidden] + #hud-check[hidden] + #hud-level-card[hidden] + .hud-friend[hidden] + .hud-challenge { position: static; width: max-content; }
+.hud-challenge i { flex: none; width: 32px; height: 32px; border-radius: 50%; background: #f29cc3; color: rgb(var(--ink)); font-style: normal; font-size: 18px; font-weight: 900; line-height: 32px; text-align: center; }
+.hud-challenge-dot { opacity: .6; }
+.hud-challenge small { display: inline; font-size: 19px; font-weight: 700; letter-spacing: 0; opacity: .72; }
+.hud-challenge.tone-ahead #hud-challenge-text, .hud-challenge.tone-passed #hud-challenge-text, .hud-challenge.tone-chased #hud-challenge-text { color: var(--good); }
+.hud-challenge.tone-behind #hud-challenge-text { color: var(--wicket); }
+.hud-challenge.tone-target #hud-challenge-text { color: var(--gold); }
 .hud-status { max-width: 730px; display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 20px 31px; border-radius: 27px; background: rgba(var(--ink), .9); text-align: center; transition: opacity .2s ease; }
 .hud-status strong { font-size: 31px; font-weight: 900; line-height: 1.15; }
 .hud-status span { font-size: 20px; font-weight: 600; white-space: pre-line; }

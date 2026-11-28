@@ -84,6 +84,19 @@
     const clock = core.createClock();
     // The batter, drawn for now and shown as soon as it arrives ("b").
     const live = core.createLiveLayer();
+    // Receiver 115: frames' commands by stamp, for frames that send theirs as references (core.createRefBook).
+    const refs = core.createRefBook();
+    let lastRefMissAt = -Infinity;
+    // Whether this phone's hello said it sends references (`refs: 1`): only then are its whole frames kept as bases.
+    let helloRefs = false;
+    // A frame whose references can't be put back isn't drawn; the phone sends its next frame whole.
+    function refMissed(raw) {
+      counters.refMiss += 1;
+      const local = performance.now();
+      if (local - lastRefMissAt < 250) return;
+      lastRefMissAt = local;
+      send({ t: "refs", miss: Number(raw && raw.r) || 0 });
+    }
     const images = new Map();
     const tinted = new Map();
     // Receiver 89 (Nov 11 2026): the Living Room TV's Chromecast Ultra drew 5-8 frames a second after 7.8 h and many
@@ -144,7 +157,8 @@
     let helloPieces = new Set();
     // `received` (receiver 83): the phone's pictures decoded since the last report (core.warmReport).
     const counters = { draws: 0, blended: 0, frames: 0, late: [], drawMs: [], dressMax: 0, dressReadMax: 0, dressDyeMax: 0, dressed: 0, missing: 0, redraws: 0, gaps: [], live: 0, pose: [], ahead: [], eff: [],
-      js: 0, long: 0, lag: [], partly: 0, stale: [], received: 0 };
+      js: 0, long: 0, lag: [], partly: 0, stale: [], received: 0, coldHeld: 0, warmedLate: 0, coldHeldTotal: 0, warmedLateTotal: 0,
+      refFrames: 0, refMiss: 0 };
 
     // What the page's thread does besides drawing (Oct 19 2026): `js`, the
     // script's own time in the loop and the messages; `long`, tasks of 50 ms
@@ -738,6 +752,8 @@
     const warmed = new Set();
     let warmCanvas = null;
     function warmDecode(key) {
+      // Receiver 113: with the stadium on, warmed a frame at a time in the frame's spare time (warmLate).
+      if (on && WARM_MODE !== "off" && !released && tune.cold) { queueLateWarm(key); return; }
       if (WARM_MODE === "off" || on || warmed.has(key) || released) return;
       if (backdropLayers.has(key)) return;
       const image = images.get(key);
@@ -758,6 +774,7 @@
         const side = WARM_MODE === "gpu" ? 256 : 1;
         if (!warmCanvas) { warmCanvas = document.createElement("canvas"); warmCanvas.width = side; warmCanvas.height = side; }
         warmCanvas.getContext("2d").drawImage(source, 0, 0, side, side);
+        hotSources.add(source);
         return true;
       } catch (error) { return false; /* decoded at the first frame instead */ }
     }
@@ -765,6 +782,104 @@
       if (!warmCanvas) return;
       try { warmCanvas.width = 0; warmCanvas.height = 0; } catch (error) { /* gone */ }
       warmCanvas = null;
+    }
+
+    // MARK: Cold pictures in play (receiver 113, Nov 27 2026)
+    //
+    // fgqcsp7e (the owner on Android 27580, staging 112, a match's chase on the Living Room TV's Chromecast Ultra): one
+    // stadium draw took 673 ms and the frame loop stopped for 1404 ms, frames came 2317 ms late and the phone read that as
+    // a Wi-Fi that can't carry the stream (15 a second for the next 30 s). The chase's pictures had come in with the
+    // stadium on (images 74 -> 141), where nothing warmed them (warmDecode runs with the stadium off), so the first draw
+    // that showed them decoded and uploaded them all at once, on the page's thread. On that TV (Nov 27): 26 fresh
+    // fielder pictures drawn in one frame held it 267 ms with 2 ms of script; drawn first one an animation frame into the
+    // warm-up's 256 x 256 canvas, no frame was late and the frame with all 26 took 33 ms. So with the stadium on:
+    //  - a picture that comes in is warmed so in a later animation frame, one a frame, only while that frame's own
+    //    script has been short (LATE_WARM_IDLE_MS): most come ahead of the frame that shows them;
+    //  - a frame that would still draw more than COLD_DRAW_MAX pictures never drawn before keeps the picture on screen
+    //    while they are warmed COLD_WARM_PER_FRAME a frame, COLD_HOLD_MS at most (then it draws, as before).
+    // A picture is hot once drawn on any canvas (drawPicture) or warmed. `coldHeld` and `warmedLate` in stats; `cold: 0`
+    // (a bench switch) draws as receiver 112 did; `cold: 2` only holds (nothing warmed ahead). receiver-cold-pictures.test.cjs.
+    const COLD_WARM_PER_FRAME = 2, COLD_DRAW_MAX = 2, COLD_HOLD_MS = 600, LATE_WARM_IDLE_MS = 12, LATE_WARM_SIDE = 256;
+    const hotSources = new WeakSet();
+    const lateWarm = [];
+    const lateQueued = new Set();
+    let lateWarmCanvas = null;
+    let coldHoldSince = null;
+    function queueLateWarm(key) {
+      if (lateQueued.has(key) || backdropLayers.has(key)) return;
+      lateQueued.add(key);
+      lateWarm.push(key);
+    }
+    // What a key draws from: a picture's own image or bitmap, or a sprite's atlas; null for a canvas (nothing to decode)
+    // or a picture not here.
+    function warmSource(key) {
+      const image = images.get(key);
+      if (!image) return null;
+      const source = image.sprite ? (image.sheet ? image.sheet.bitmap || image.sheet.image : null) : bitmaps.get(key) || image;
+      if (!source || (typeof HTMLCanvasElement !== "undefined" && source instanceof HTMLCanvasElement)) return null;
+      return source;
+    }
+    function warmLate(source) {
+      try {
+        if (!lateWarmCanvas) { lateWarmCanvas = document.createElement("canvas"); lateWarmCanvas.width = LATE_WARM_SIDE; lateWarmCanvas.height = LATE_WARM_SIDE; }
+        lateWarmCanvas.getContext("2d").drawImage(source, 0, 0, LATE_WARM_SIDE, LATE_WARM_SIDE);
+      } catch (error) { /* drawn cold at its first frame instead */ }
+      hotSources.add(source);
+      counters.warmedLate += 1;
+      counters.warmedLateTotal += 1;
+    }
+    function dropLateWarm() {
+      lateWarm.length = 0;
+      lateQueued.clear();
+      coldHoldSince = null;
+      zeroCanvas(lateWarmCanvas);
+      lateWarmCanvas = null;
+    }
+    // One queued picture a frame, while this frame's script has been short.
+    function warmQueued(began) {
+      while (lateWarm.length && performance.now() - began < LATE_WARM_IDLE_MS) {
+        const key = lateWarm.shift();
+        lateQueued.delete(key);
+        const source = warmSource(key);
+        if (source && !hotSources.has(source)) { warmLate(source); return; }
+      }
+    }
+    // The pictures a draw of `frame` (and the live batter) would decode for the first time. A received frame or batter
+    // found all hot isn't looked at again until a picture comes in (`artEpoch`): a blended draw looks at the two frames
+    // it blends between.
+    const hotSeen = new WeakMap();
+    function coldSources(frame, batter) {
+      const cold = [];
+      const look = (owner) => {
+        if (!owner || !owner.o || hotSeen.get(owner) === artEpoch) return;
+        const before = cold.length;
+        for (const op of owner.o) {
+          if (op[0] !== "i") continue;
+          const source = warmSource(op[3]);
+          if (source && !hotSources.has(source) && cold.indexOf(source) < 0) cold.push(source);
+        }
+        if (cold.length === before) hotSeen.set(owner, artEpoch);
+      };
+      if (frame.scratch && frame.__from) { look(frame.__from); look(frame.__to); } else look(frame);
+      if (batter && hasLiveSlot(frame)) look(batter);
+      return cold;
+    }
+    function hasLiveSlot(frame) {
+      if (frame.__slot === undefined) frame.__slot = frame.o.some((op) => op[0] === "B");
+      return frame.__slot;
+    }
+    // Whether this animation frame keeps the picture on screen while cold pictures are warmed (see above).
+    function holdsForCold(frame, local) {
+      if (!tune.cold || !shownFrame || rehearsing) { coldHoldSince = null; return false; }
+      const cold = coldSources(frame, live.current);
+      if (!cold.length) { coldHoldSince = null; return false; }
+      for (let index = 0; index < COLD_WARM_PER_FRAME && cold.length; index += 1) warmLate(cold.shift());
+      if (cold.length <= COLD_DRAW_MAX) { coldHoldSince = null; return false; }
+      if (coldHoldSince === null) coldHoldSince = local;
+      if (local - coldHoldSince >= COLD_HOLD_MS) { coldHoldSince = null; return false; }
+      counters.coldHeld += 1;
+      counters.coldHeldTotal += 1;
+      return true;
     }
 
     // MARK: The rehearsal (receiver 65)
@@ -1649,9 +1764,11 @@
         core.copyAtlasFrame(dressingSheet(cut.atlas), cut, pixels.data);
         const readAt = performance.now();
         // The tiny CPU kernel avoids long JS pixel loops on older TV browsers.
-        // Unsupported/blocked WebAssembly keeps the identical JS recipe.
+        // Unsupported/blocked WebAssembly keeps the identical JS recipe. The
+        // Creator kit (its polish, and the helmet's stripes, which need the
+        // frame's width) is always the JS recipe's: the kernel says no to it.
         const fast = window.RallycadeDye && window.RallycadeDye.dyeFrame(pixels.data, shares, look || null, gearShares, gearShares ? gear : null);
-        if (!fast) core.dyeFrame(pixels.data, shares, look || null, gearShares, gearShares ? gear : null);
+        if (!fast) core.dyeFrame(pixels.data, shares, look || null, gearShares, gearShares ? gear : null, cut.width);
         const dyedAt = performance.now();
         c.putImageData(pixels, 0, 0);
         counters.dressMax = Math.max(counters.dressMax, performance.now() - started);
@@ -1719,7 +1836,7 @@
         element.className = "scene-backdrop";
         element.alt = "";
         element.style.opacity = "0";
-        entry = { element, ready: false, transform: "" };
+        entry = { element, ready: false, transform: "", session: layerSession, shownIn: -1 };
         backdropLayers.set(key, entry);
         backdrop.parentNode.insertBefore(element, backdrop);
         element.src = source.src;
@@ -1757,6 +1874,8 @@
         entry.shown = true;
         backdropKey = op[3];
       }
+      entry.shownIn = layerSession;
+      entry.shownAt = performance.now();
       backdropTransform = transform;
       return true;
     }
@@ -1764,6 +1883,40 @@
     function hideBackdrops(except) {
       backdropLayers.forEach((entry, key) => { if (key !== except) entry.element.style.opacity = "0"; });
       if (except == null) backdropKey = null;
+    }
+
+    // MARK: Photo layers the TV lets go (receiver 112, Nov 27 2026)
+    //
+    // Traced on the Living Room TV's Ultra while it drew the AA app's recorded stream: a memory-pressure notice every 5 s
+    // (V8.MemoryPressureNotification level 1, each followed by a 28-40 ms garbage collection to give memory back), and
+    // now and then a critical one (level 2): the TV emptied its picture caches and the stadium decoded its pictures again
+    // on the page's thread, 65 in 12 s at 10.6 ms each (up to 51 ms), 319 a minute, each a hitch. The page held five photo
+    // layers: stadium-ground and field-real-outfield (what the app draws), and stadium-backdrop, field-outfield and a
+    // phone's 1280 x 720 photo, made for earlier casts and never shown again: each a 1672 x 941 GPU texture and its decoded
+    // copy, ~12 MB, for the page's life (a page lives all evening, across phones, grounds and games). Now a layer goes
+    // (its element and its texture with it; made again if a frame draws it) when its picture has gone, or when it hasn't
+    // been shown since the phone's hello (a new cast, a reconnect) and the stadium has been on LAYER_GRACE_MS since. A
+    // layer this cast has shown stays, as before: the batting view's and the field view's photos swap every ball.
+    // `evict: 0` (a bench switch) keeps them all, as receiver 111 did; `grace: <ms>` (benches) waits that long instead.
+    // `stats.layers` counts the layers held.
+    const LAYER_GRACE_MS = 120000;
+    let layerSession = 0, sessionOnMs = 0, lastLayerCheck = 0;
+    function evictLayer(key, entry) {
+      if (layerWarming && layerWarming.key === key) layerWarming = null;
+      try { entry.element.removeAttribute("src"); } catch (error) { /* gone */ }
+      if (entry.element.parentNode) entry.element.parentNode.removeChild(entry.element);
+      backdropLayers.delete(key);
+    }
+    function evictLayers(local) {
+      if (!tune.evict || !on) return;
+      if (lastLayerCheck) sessionOnMs += Math.min(1000, local - lastLayerCheck);
+      lastLayerCheck = local;
+      for (const [key, entry] of Array.from(backdropLayers)) {
+        if (key === backdropKey) continue;
+        const gone = !images.has(key);
+        const stale = entry.shownIn !== layerSession && sessionOnMs >= (Number(tune.grace) > 0 ? Number(tune.grace) : LAYER_GRACE_MS);
+        if (gone || stale) evictLayer(key, entry);
+      }
     }
 
     // MARK: Cheap drawing on a Chromecast (receiver 57)
@@ -1809,8 +1962,10 @@
     // first photo that doesn't reach every edge (the bowled hold's pushed-in camera), as receiver 104 did.
     // `warm` (receiver 111): a cold stadium held under the phone's picture and the rehearsal resumed after a cold one;
     // `warm: 0` draws as receiver 110 did.
+    // Receiver 112: `runs: 0` draws a batter whose hands follow the player's every piece every draw (no liveRuns), as
+    // receiver 111 did. `layers: ...` is taken; `evict: 0` keeps every photo's GPU layer for the page's life (receiver 111).
     const TUNED = Object.freeze({ blur: "shadow", layers: "bounded", cover: "clip", bitmaps: 0, shade: "thirds", blend: 1, cache: 1, photo: "layer", opaque: 0,
-      match: 1, dirty: 1, early: 1, own: 1, live: 1, edge: 1, warm: 1 });
+      match: 1, dirty: 1, early: 1, own: 1, live: 1, edge: 1, warm: 1, runs: 1, evict: 1, grace: 0, cold: 1 });
     // A weak dongle (core.isWeakDongle): no redraw only to blend between
     // frames (each draw costs it ~30 ms of its page's thread) and glows
     // drawn plain, never blurred.
@@ -1988,6 +2143,8 @@
     // pixels are the same but for rounding in where they are sampled.
     function drawPicture(c, drawn) {
       const size = drawn.size, cut = drawn.cut;
+      // Receiver 113: decoded and on the GPU from here on (coldSources).
+      hotSources.add(drawn.image);
       if (!cut) { c.drawImage(drawn.image, 0, 0, size.width, size.height); return; }
       const kx = size.width / cut.width, ky = size.height / cut.height;
       c.drawImage(drawn.image, cut.x, cut.y, cut.w, cut.h, cut.ox * kx, cut.oy * ky, cut.w * kx, cut.h * ky);
@@ -2297,15 +2454,41 @@
     // over the layer in its own order. Anything without bounds (the live
     // batter's slot, a layer) ends the search, so nothing after it moves.
     const overlaps = (a, b) => a[0] < b[2] && b[0] < a[2] && a[1] < b[3] && b[1] < a[3];
-    function splitStatic(frame, from, previous, keys) {
+    // Receiver 114: a command's padded bounds, kept with the array (received commands are never written to, and the
+    // same command in the next frame is the same array: core.shareOps). A blended frame's own arrays are rewritten
+    // every draw: its commands the same in both frames it blends between (`same`) use their source's.
+    const paddedBoxes = new WeakMap();
+    function paddedBox(op) {
+      let padded = paddedBoxes.get(op);
+      if (padded !== undefined) return padded;
+      const box = core.opBounds(op, pictureSize);
+      padded = box ? [box[0] - 2, box[1] - 2, box[2] + 2, box[3] + 2] : null;
+      // A picture not here yet has no size: worked out again once it is.
+      if (padded || op[0] !== "i") paddedBoxes.set(op, padded);
+      return padded;
+    }
+    function boxesOf(frame, from, same) {
+      const boxes = new Array(frame.o.length);
+      for (let index = from; index < frame.o.length; index += 1) {
+        const op = frame.o[index];
+        if (op[0] === "L" || op[0] === "B" || op[0] === "l") break;
+        const source = same ? same[index] : op;
+        let box;
+        if (source) box = paddedBox(source);
+        else { const raw = core.opBounds(op, pictureSize); box = raw ? [raw[0] - 2, raw[1] - 2, raw[2] + 2, raw[3] + 2] : null; }
+        boxes[index] = box;
+        if (!box) break;
+      }
+      return boxes;
+    }
+    function splitStatic(frame, from, previous, keys, boxes) {
       const statics = [];
       const changed = [];
       for (let index = from; index < frame.o.length; index += 1) {
         const op = frame.o[index];
         if (op[0] === "L" || op[0] === "B" || op[0] === "l") break;
-        const box = core.opBounds(op, pictureSize);
-        if (!box) break;
-        const padded = [box[0] - 2, box[1] - 2, box[2] + 2, box[3] + 2];
+        const padded = boxes[index];
+        if (!padded) break;
         if (staticable(op) && previous && previous.has(keys[index]) && !changed.some((other) => overlaps(other, padded))) statics.push(index);
         else changed.push(padded);
       }
@@ -2315,7 +2498,7 @@
     // fit: each must be there in the layer's order, before anything without
     // bounds, with no other command before it overlapping it (that one
     // would be drawn above it now).
-    function layerFits(frame, from, keys) {
+    function layerFits(frame, from, keys, boxes) {
       const want = staticLayer.keys;
       if (!want || !want.length) return null;
       const at = [];
@@ -2324,9 +2507,8 @@
       for (let index = from; index < frame.o.length && next < want.length; index += 1) {
         const op = frame.o[index];
         if (op[0] === "L" || op[0] === "B" || op[0] === "l") return null;
-        const box = core.opBounds(op, pictureSize);
-        if (!box) return null;
-        const padded = [box[0] - 2, box[1] - 2, box[2] + 2, box[3] + 2];
+        const padded = boxes[index];
+        if (!padded) return null;
         if (keys[index] === want[next]) {
           if (others.some((other) => overlaps(other, padded))) return null;
           at.push(index);
@@ -2363,17 +2545,40 @@
       const fresh = !!frame.scratch;
       const keys = new Array(frame.o.length);
       const keysNow = new Set();
+      // Receiver 112 (the Living Room TV's Ultra profiled while it drew: `opKey` 3.2% of its page's thread, every
+      // command of every blended draw written out as text): a blended frame's command is keyed from the two frames it
+      // is blended between, whose keys are made once each. The same in both, it is that command exactly (each number
+      // x + (x - x) u); different, it is on the move and has no key (never in the layer). A scratch frame without them
+      // (a test's own) is written out as before.
+      const a = fresh ? frame.__from : null, b = fresh ? frame.__to : null, pairs = fresh ? frame.__pairs : null;
+      const blendedFrom = !!(a && b && a.o.length === frame.o.length);
+      // Receiver 114: what each command's bounds come from (its own array; a blended frame's, the source command the
+      // same in both frames, else worked out from the draw's numbers).
+      const same = fresh ? new Array(frame.o.length).fill(null) : null;
       for (let index = from; index < frame.o.length; index += 1) {
         const op = frame.o[index];
-        if (op[0] === "f" || op[0] === "s" || op[0] === "i") { keys[index] = opKey(op, fresh); keysNow.add(keys[index]); }
+        if (op[0] !== "f" && op[0] !== "s" && op[0] !== "i") continue;
+        if (blendedFrom) {
+          const partner = pairs ? pairs[index] : index;
+          const opA = a.o[index], opB = partner >= 0 ? b.o[partner] : null;
+          const keyA = opKey(opA, false);
+          // Receiver 114: the same array in both (core.shareOps) is the same command without comparing their text.
+          if (opB && opB !== opA && opKey(opB, false) !== keyA) continue;
+          keys[index] = keyA;
+          same[index] = opA;
+        } else {
+          keys[index] = opKey(op, fresh);
+        }
+        keysNow.add(keys[index]);
       }
-      const statics = splitStatic(frame, from, lastStaticKeys, keys);
+      const boxes = boxesOf(frame, from, same);
+      const statics = splitStatic(frame, from, lastStaticKeys, keys, boxes);
       lastStaticKeys = keysNow;
       const candidateKey = statics.length >= 2 ? statics.map((index) => keys[index]).join("|") : null;
       const steady = candidateKey !== null && candidateKey === lastCandidateKey;
       lastCandidateKey = candidateKey;
       const sized = staticLayer.canvas && staticLayer.canvas.width === canvas.width && staticLayer.canvas.height === canvas.height;
-      let used = sized ? layerFits(frame, from, keys) : null;
+      let used = sized ? layerFits(frame, from, keys, boxes) : null;
       // A bigger set of unchanged commands that held for two draws: worth a
       // rebuild. A layer that no longer fits: the set now, if there is one.
       if (used && steady && statics.length >= used.length + 3) used = null;
@@ -2423,22 +2628,36 @@
     // his own size and copied from there (one drawImage, pixel for pixel, for his ~20 pieces and shadows) until he moves,
     // a picture arrives or the look changes (`artEpoch`). Only plain pieces and shadows (no layer, blur or blend); his
     // place in the frame is the slot's, so what is drawn under and over him is unchanged.
-    const liveLayer = { canvas: null, key: null, epoch: -1, s: 0, width: 0, height: 0, rect: null, last: null, lastEpoch: -1,
+    const liveLayer = { canvas: null, key: null, epoch: -1, s: 0, width: 0, height: 0, rect: null, last: null, lastEpoch: -1, lastBatter: null,
       dyed: null, plain: null, built: 0, hits: 0 };
     const liveKeys = new WeakMap();
+    // Receiver 112: from his commands' own keys (liveOpKeys), each made once a batter.
     function liveKey(batter) {
       let key = liveKeys.get(batter);
       if (key !== undefined) return key;
       key = null;
-      let plain = batter.o.length > 0;
-      for (const op of batter.o) {
-        const kind = op[0];
-        if ((kind !== "f" && kind !== "s" && kind !== "i") || (op[2] && op[2] !== "source-over")
-            || filtersOf(batter, kind === "f" ? op[7] : kind === "s" ? op[9] : op[5]).blur > 0) { plain = false; break; }
-      }
-      if (plain) key = JSON.stringify([batter.o, batter.fl, batter.cl]);
+      const keys = liveOpKeys(batter);
+      if (keys && keys.every((one) => one !== null)) key = keys.context + "\u0001" + keys.join("\u0001");
       liveKeys.set(batter, key);
       return key;
+    }
+    // Each of a batter's commands as a key (null for one that isn't a plain piece or shadow: a blend, a blur), with his
+    // filters' and clips' own (`context`); null for a batter with anything else (a layer, text), drawn as he is.
+    const liveOpKeyCache = new WeakMap();
+    function liveOpKeys(batter) {
+      let keys = liveOpKeyCache.get(batter);
+      if (keys !== undefined) return keys;
+      keys = batter.o.length ? new Array(batter.o.length) : null;
+      for (let index = 0; keys && index < batter.o.length; index += 1) {
+        const op = batter.o[index], kind = op[0];
+        if (kind !== "f" && kind !== "s" && kind !== "i") { keys = null; break; }
+        const plain = !(op[2] && op[2] !== "source-over") && !(filtersOf(batter, kind === "f" ? op[7] : kind === "s" ? op[9] : op[5]).blur > 0);
+        // Receiver 114: written out once a command array (his unchanged pieces are the live batter before's arrays).
+        keys[index] = plain ? opKey(op, false) : null;
+      }
+      if (keys) keys.context = JSON.stringify([batter.fl, batter.cl]);
+      liveOpKeyCache.set(batter, keys);
+      return keys;
     }
     // His pixels on the TV's canvas (`scale` canvas pixels a stage point), with room for his pieces' edges.
     function liveRect(batter, scale) {
@@ -2498,9 +2717,14 @@
         liveLayer.hits += 1;
       } else {
         // Drawn as he is until the same batter comes round again: a batter on the move is never built.
+        // Receiver 112: again in the phone's next live batter (he stands as he stood), not the same batter drawn a second
+        // time between two of them: a batter whose hands follow the player's is new in every one, and a layer built on his
+        // second draw was a whole extra draw of him, copied once at most (liveRuns copies his still pieces instead).
+        if (tune.runs && liveLayer.lastBatter === batter) return false;
         const again = liveLayer.last === key && liveLayer.lastEpoch === artEpoch;
         liveLayer.last = key;
         liveLayer.lastEpoch = artEpoch;
+        liveLayer.lastBatter = batter;
         if (!again) return false;
         const rect = liveRect(batter, scale);
         if (!rect || !buildLiveLayer(batter, surface, rect, key)) return false;
@@ -2520,8 +2744,127 @@
     function dropLiveLayer() {
       liveLayer.key = null;
       liveLayer.last = null;
+      liveLayer.lastBatter = null;
       liveLayer.rect = null;
       if (liveLayer.canvas) { try { liveLayer.canvas.width = 0; liveLayer.canvas.height = 0; } catch (error) { /* gone */ } liveLayer.canvas = null; }
+      dropLiveRuns();
+    }
+
+    // MARK: The live batter's still pieces (receiver 112, Nov 27 2026)
+    //
+    // The owner on tester build AA (Android 27579 and iOS 411 on the Living Room TV's Chromecast Ultra: "Still lagging a
+    // bit in pickleball", "Lagging in cricket as well", "the frames are not smooth. It's missing frames in between"): in
+    // play the TV drew 21-23 a second, each draw 10-11 ms, against 24-26 and 6.5-8 ms on builds up to L (Nov 24). Since
+    // build R (Nov 25) the drawn batter's hands follow the player's own (HandsFollow, StadiumHandsFollow): a camera's pose
+    // wobbles every frame, so his arms, gloves and willow move a little in every live batter, no two the same, and his
+    // layer (liveLayer, receiver 105) went from 13-36 copies every 2 s to 0-2 (`batter` in stats): his twenty pieces,
+    // most of them turned, drawn again every draw. His legs, pelvis, torso and head don't move with his hands. So each run
+    // of his commands that is the same as in the batter before (at least two, a picture among them) is drawn once into a
+    // canvas of its own and copied from there while it stays the same; what moved is drawn in place between those runs,
+    // in his own order, so what is under and over each piece is unchanged. A run is only made once it has held from one
+    // batter to the next (a swing changes every piece: nothing is made). `batterRuns` in stats counts the copies.
+    // `runs: 0` (a bench switch) draws him as receiver 111 did. receiver-live-runs.test.cjs: the same pixels as his
+    // pieces drawn again (the layer's tolerance), and the draws' work against a budget.
+    const MAX_RUN_LAYERS = 4;
+    const liveRuns = { layers: new Map(), batter: null, keys: null, before: null, beforeEpoch: -1, epoch: -1, hits: 0, built: 0 };
+    function dropLiveRuns() {
+      liveRuns.layers.forEach((layer) => zeroCanvas(layer.canvas));
+      liveRuns.layers.clear();
+      liveRuns.batter = null;
+      liveRuns.keys = null;
+      liveRuns.before = null;
+    }
+    // The runs of `keys` the same as `before` (index ranges [from, to)): two commands at least, a picture among them.
+    function stillRuns(batter, keys, before) {
+      const runs = [];
+      let start = -1;
+      for (let index = 0; index <= keys.length; index += 1) {
+        const same = index < keys.length && keys[index] !== null && keys[index] === before[index];
+        if (same && start < 0) start = index;
+        if (!same && start >= 0) {
+          if (index - start >= 2 && batter.o.slice(start, index).some((op) => op[0] === "i")) runs.push([start, index]);
+          start = -1;
+        }
+      }
+      return runs;
+    }
+    function runLayer(batter, keys, from, to, surface) {
+      const key = surface.s + "|" + canvas.width + "x" + canvas.height + "|" + artEpoch + "|" + keys.context + "\u0002" + keys.slice(from, to).join("\u0001");
+      const kept = liveRuns.layers.get(key);
+      if (kept) {
+        // The most recently used last (the oldest goes first).
+        liveRuns.layers.delete(key);
+        liveRuns.layers.set(key, kept);
+        liveRuns.hits += 1;
+        return kept;
+      }
+      const part = Object.assign({}, batter, { o: batter.o.slice(from, to) });
+      const rect = liveRect(part, surface.s);
+      if (!rect) return null;
+      let reused = null;
+      if (liveRuns.layers.size >= MAX_RUN_LAYERS) {
+        const oldest = liveRuns.layers.keys().next().value;
+        reused = liveRuns.layers.get(oldest).canvas;
+        liveRuns.layers.delete(oldest);
+      }
+      const layer = reused || document.createElement("canvas");
+      const w = rect[2] - rect[0], h = rect[3] - rect[1];
+      // Grown, not shrunk: a resized canvas is a new allocation.
+      if (layer.width < w || layer.height < h) { layer.width = Math.max(layer.width, w); layer.height = Math.max(layer.height, h); }
+      const c = layer.getContext("2d");
+      c.setTransform(1, 0, 0, 1, 0, 0);
+      c.globalAlpha = 1;
+      c.globalCompositeOperation = "source-over";
+      c.clearRect(0, 0, layer.width, layer.height);
+      c.imageSmoothingQuality = smoothing;
+      const missing = counters.missing, epoch = artEpoch, dyed = drawDyed, plain = drawPlainLook;
+      drawDyed = new Set(); drawPlainLook = new Set();
+      paint(shiftedContext(c, rect[0], rect[1]), part, 0, Object.assign({}, surface, { live: null, cacheLive: false }), 0, null);
+      const built = { canvas: layer, rect, dyed: drawDyed, plain: drawPlainLook };
+      drawDyed = dyed; drawPlainLook = plain;
+      // A piece missing or the look changing as it was drawn: not kept (drawn in place).
+      if (counters.missing !== missing || artEpoch !== epoch || dressingWasOn) { zeroCanvas(layer); return null; }
+      liveRuns.layers.set(key, built);
+      liveRuns.built += 1;
+      return built;
+    }
+    // Draws `batter` with his still runs copied; false when there are none (he is drawn as before).
+    function drawLiveRuns(c, batter, surface, bounds, depth) {
+      if (!tune.cache || !tune.live || !tune.runs || dressingWasOn) { liveRuns.batter = null; return false; }
+      const keys = liveOpKeys(batter);
+      // A new batter: the one before is what his runs are measured against (a batter drawn again keeps his).
+      if (liveRuns.batter !== batter) {
+        liveRuns.before = liveRuns.keys;
+        liveRuns.beforeEpoch = liveRuns.epoch;
+        liveRuns.batter = batter;
+        liveRuns.keys = keys;
+        liveRuns.epoch = artEpoch;
+      }
+      const before = liveRuns.before;
+      if (!keys || !before || before.length !== keys.length || before.context !== keys.context || liveRuns.beforeEpoch !== artEpoch) return false;
+      const runs = stillRuns(batter, keys, before);
+      if (!runs.length) return false;
+      const live = Object.assign({}, surface, { live: null });
+      const inPlace = (from, to) => { if (to > from) paint(c, Object.assign({}, batter, { o: batter.o.slice(from, to) }), 0, live, depth, bounds); };
+      let at = 0;
+      for (const [from, to] of runs) {
+        inPlace(at, from);
+        const layer = runLayer(batter, keys, from, to, surface);
+        if (!layer) { inPlace(from, to); at = to; continue; }
+        const r = layer.rect, w = r[2] - r[0], h = r[3] - r[1];
+        c.save();
+        c.setTransform(1, 0, 0, 1, 0, 0);
+        c.globalAlpha = 1;
+        c.globalCompositeOperation = "source-over";
+        c.drawImage(layer.canvas, 0, 0, w, h, r[0], r[1], w, h);
+        c.restore();
+        if (bounds) grow(bounds, [r[0] / surface.s, r[1] / surface.s, r[2] / surface.s, r[3] / surface.s], surface.s, 0);
+        if (drawDyed) layer.dyed.forEach((k) => drawDyed.add(k));
+        if (drawPlainLook) layer.plain.forEach((k) => drawPlainLook.add(k));
+        at = to;
+      }
+      inPlace(at, batter.o.length);
+      return true;
     }
 
     // Draws a frame's commands from `from` on into `target`: the TV's
@@ -2645,6 +2988,8 @@
             if (batter && batter.o.length) {
               // Receiver 105: a batter standing as he stood is copied from his own layer (liveLayer).
               if (surface.cacheLive && stack.length === 1 && drawLiveLayer(c, batter, surface, top.bounds)) break;
+              // Receiver 112: his still pieces copied, what moved drawn in place (liveRuns).
+              if (surface.cacheLive && stack.length === 1 && drawLiveRuns(c, batter, surface, top.bounds, base)) break;
               paint(c, batter, 0, Object.assign({}, surface, { live: null }), base + stack.length - 1, top.bounds);
             }
             break;
@@ -2694,6 +3039,8 @@
     };
     // Where the level can show (receiver 71): the scorebug, the Nets / timing check card, its own card.
     const LEVEL_SLOTS = ["hud-level", "hud-check-level", "hud-level-card"];
+    // A challenge chip's tones (shared/challenges/reference.mjs chip()); anything else is drawn as level (neutral).
+    const CHALLENGE_TONES = ["start", "ahead", "behind", "level", "target", "passed", "chased"];
     // Up to this many chips and rings at full size in THIS OVER's card (6
     // balls and two wides); more and they are drawn smaller (`is-many`).
     const OVER_ROOM = 8;
@@ -2761,6 +3108,23 @@
       setText("hud-check-title", h.check && h.check.title === "NETS PRACTICE" ? "NETS PRACTICE" : "TIMING CHECK");
       show("hud-friend", !!h.friend);
       setText("hud-friend", h.friend);
+      // Can you beat my score? (docs/design/CHALLENGES.md "TV message"): the phone's optional `challenge` {name, setter,
+      // text, suffix?, tone} as "{name}'s {setter} · {text}" under the scorebug (shared/challenges/copy.json tv.chip),
+      // coloured by tone. Older phones send none, and half a chip is none: nothing shows.
+      const challenge = h.challenge && typeof h.challenge.name === "string" && h.challenge.name && typeof h.challenge.text === "string"
+        && (typeof h.challenge.setter === "string" || typeof h.challenge.setter === "number") ? h.challenge : null;
+      show("hud-challenge", !!challenge);
+      if (challenge) {
+        const chip = el("hud-challenge");
+        const tone = "hud-challenge tone-" + (CHALLENGE_TONES.indexOf(challenge.tone) >= 0 ? challenge.tone : "level");
+        if (chip && chip.className !== tone) chip.className = tone;
+        setText("hud-challenge-initial", (Array.from(challenge.name)[0] || "").toUpperCase());
+        setText("hud-challenge-setter", challenge.name + "'s " + challenge.setter);
+        setText("hud-challenge-text", challenge.text);
+        const suffix = typeof challenge.suffix === "string" ? challenge.suffix : "";
+        show("hud-challenge-suffix", !!suffix);
+        setText("hud-challenge-suffix", suffix);
+      }
       // The status card hides while the pause or lost card is up.
       const status = h.status || {};
       setStyle(el("hud-status"), "opacity", status.hidden ? "0" : "1");
@@ -2885,7 +3249,8 @@
       const result = timeline.at(phoneNow);
       // A frame already on screen is drawn again only while blending.
       let drew = false;
-      if (result && ((result.blended && tune.blend) || result.stamp !== lastStamp || needsRedraw)) {
+      // Receiver 113: a frame with cold pictures may wait a frame or two while they are warmed (holdsForCold).
+      if (result && ((result.blended && tune.blend) || result.stamp !== lastStamp || needsRedraw) && !holdsForCold(result.frame, local)) {
         const missingBefore = counters.missing;
         drawFrame(result.frame);
         noteWhole(missingBefore);
@@ -2932,8 +3297,12 @@
     }
 
     function housekeeping(local) {
+      // Receiver 113: a picture that came in with the stadium on, warmed in this frame's spare time.
+      if (lateWarm.length && tune.cold === 1) warmQueued(local);
       // Receiver 77: the start's pictures still to come (the rest waits, restWaits).
       if (preloadQueue.length && preloading < 3) pumpSome();
+      // Receiver 112: photo layers no longer drawn let go, once a second.
+      if (local - lastLayerCheck >= 1000) evictLayers(local);
       // An ack means a new stadium frame was drawn, not merely that this
       // page's timer is alive. A blocked sender can still receive messages:
       // repeating the last stamp hid frozen Google TV pictures from both
@@ -2958,9 +3327,11 @@
           behind: Math.round(core.percentile(counters.late, 0.9)),
           drawMs: Number(core.percentile(counters.drawMs, 0.5).toFixed(1)),
           drawMax: Number(Math.max(0, ...counters.drawMs).toFixed(1)),
+          // Receiver 112: draws of 50 ms or more (one spike or many behind `drawMax`).
+          drawSlow: counters.drawMs.filter((ms) => ms >= 50).length,
           dressMax: Number(counters.dressMax.toFixed(1)), dressed: counters.dressed,
           dressReadMax: Number(counters.dressReadMax.toFixed(1)), dressDyeMax: Number(counters.dressDyeMax.toFixed(1)),
-          missing: counters.missing, images: images.size, warmed: warmed.size, cached: staticLayer.hits, rebuilt: staticLayer.built, batter: liveLayer.hits, bitmaps: bitmaps.size, queue: timeline.length,
+          missing: counters.missing, images: images.size, layers: backdropLayers.size, warmed: warmed.size, cached: staticLayer.hits, rebuilt: staticLayer.built, batter: liveLayer.hits, batterRuns: liveRuns.hits, bitmaps: bitmaps.size, queue: timeline.length,
           // How glows are blurred (receiver 57): as shadows, or in small canvases.
           glow: tune.blur === "filter" ? "filter" : tune.blur === "off" ? "off" : castsOffstageShadows() ? "shadow" : "scratch",
           synced: clock.synced ? 1 : 0, w: canvas.width, canvas: plan.why, weak: plan.weak ? 1 : 0,
@@ -2977,7 +3348,11 @@
           // picture was (p50, p90 ms); the rehearsal's draws and their ms
           // (the first ten's median, the last ten's: the drawing code warming).
           partly: counters.partly, stale: Math.round(core.percentile(counters.stale, 0.5)), stale90: Math.round(core.percentile(counters.stale, 0.9)),
-          rehearsed: rehearsal.draws
+          rehearsed: rehearsal.draws,
+          // Receiver 113: draws held while cold pictures were warmed, and pictures warmed with the stadium on.
+          coldHeld: counters.coldHeld, warmedLate: counters.warmedLate,
+          // Receiver 115: frames that came as references, and those that couldn't be put back.
+          refFrames: counters.refFrames, refMiss: counters.refMiss
         };
         if (rehearsal.ms.length >= 20) stats.rehearseMs = [rehearsal.firstMs, Number(core.percentile(rehearsal.ms.slice(-10), 0.5).toFixed(1))];
         // Receiver 77: when the rehearsal began and the preload ran dry, ms from the hello.
@@ -3012,6 +3387,7 @@
         counters.live = 0; counters.pose = []; counters.ahead = []; counters.eff = [];
         counters.js = 0; counters.long = 0; counters.lag = [];
         counters.partly = 0; counters.stale = [];
+        counters.coldHeld = 0; counters.warmedLate = 0; counters.refFrames = 0; counters.refMiss = 0;
       }
     }
 
@@ -3128,7 +3504,14 @@
       // `held` (receiver 67): it keeps this many of the phone's pictures and
       // says which (`cards`, oldest first, [id, width] each; `held` messages
       // after each change), and asks for one it lacks (`want`).
-      const ready = { t: "ready", scene: 1, pic: 1, card: 1, live: 1, setup: 1, whole: 1, predict: 1, shared: 1, inset: insetOff ? 0 : 1, steady: 1,
+      // Receiver 115: `refs`, a frame's commands may be references to a frame before (core.createRefBook). Not `fb`
+      // (receiver 114's live batter riding in a frame's message): y8qphjrd (Android AG 27585 on staging 114, Nov 27 ~14:10:
+      // "It used to show the shot, now it just directly goes to fielding") against zcm4jrnf (AH on 113, no riding: "Much
+      // better, timing was good as well"): a batter waiting up to 20 ms for his frame crossed the TV's display frames, and a
+      // 30 Hz model of the recordings loses ~150 of 2,205 drawn batters (Android) and ~93 of 1,313 (iOS), most in swings.
+      // A rider that comes anyway is still drawn (the "f" handler), so a phone that rides on a receiver that never said fb
+      // loses nothing more.
+      const ready = { t: "ready", scene: 1, pic: 1, card: 1, live: 1, setup: 1, whole: 1, predict: 1, shared: 1, inset: insetOff ? 0 : 1, steady: 1, refs: 1,
         held: options.heldKeep || 0, cards: options.heldCards ? options.heldCards() : [], screen: screenPixels(), version: VERSION, ua: navigator.userAgent, have };
       // A weak dongle: the phone sends frames and live batters at its pace.
       if (plan.weak) ready.weak = 1;
@@ -3188,6 +3571,8 @@
       switch (message.t) {
         case "hello":
           hasHello = true;
+          // Receiver 112: a new cast's photo layers are counted afresh (evictLayers).
+          layerSession += 1; sessionOnMs = 0; lastLayerCheck = 0;
           if (window.RallycadeDye) window.RallycadeDye.prepare();
           debug = message.debug === 1;
           // A width the phone or the bench asks for is kept as asked; else
@@ -3204,6 +3589,8 @@
           released = false;
           clock.reset();
           timeline.reset();
+          refs.clear();
+          helloRefs = message.refs === 1;
           live.clear();
           lastStamp = null;
           lastAcknowledgedStamp = null;
@@ -3233,11 +3620,33 @@
           setOn(message.on === 1);
           break;
         case "f": {
+          // Receiver 115: its references to a frame before put back (ready.refs).
+          if (message.r != null) {
+            if (!refs.resolve(message)) { refMissed(message); break; }
+            counters.refFrames += 1;
+          } else if (helloRefs) refs.resolve(message);
           const frame = timeline.add(message, message.e);
           if (frame) noteArrival(frame);
+          // Receiver 114 (`ready.fb`): a live batter that rides in the frame's message (`b`, his own "b" message), as
+          // if it had come on its own just after: one Cast message instead of two (each costs the Ultra ~3 ms: the Cast
+          // framework parses it twice and dispatches it twice).
+          if (message.b && typeof message.b === "object" && !Array.isArray(message.b)) { message.b.t = "b"; handleMessage(message.b); }
           break;
         }
         case "fs": {
+          // Receiver 115: each frame's references put back, in order (a frame may refer to the one before it in the set);
+          // one that can't be, and those after it, aren't drawn.
+          if (Array.isArray(message.frames)) {
+            const whole = [];
+            for (const raw of message.frames) {
+              const referred = raw && raw.r != null;
+              if (!referred && !helloRefs) { whole.push(raw); continue; }
+              if (!refs.resolve(raw)) { refMissed(raw); break; }
+              if (referred) counters.refFrames += 1;
+              whole.push(raw);
+            }
+            if (whole.length < message.frames.length) message.frames = whole;
+          }
           const frames = timeline.replace(message.frames, message.e);
           frames.forEach(noteArrival);
           if (frames.length) counters.redraws += 1;
@@ -3416,6 +3825,7 @@
       empty(canvas);
       canvasDrawn = null;
       dropWarmCanvas();
+      dropLateWarm();
       endRehearsal();
       dropStaticLayer();
       // Receiver 89: the composed pictures' own layers, and every blob URL this page made.
@@ -3434,7 +3844,7 @@
 
     return { NAMESPACE, handle, report, setOn, renderHUD, drawFrame, keptFile, playRecording, playRecordingAt, snapshot, timeline, clock, live, images, bitmaps, release, selectGame,
       get cricketWanted() { return cricketWanted; },
-      pictures, counters, tune, setTune, warmed, staticLayer, liveLayer, get dressing() { return dressingWasOn; }, holdLast, get holding() { return holding; }, get hasFrame() { return !!shownFrame; },
+      pictures, counters, tune, setTune, warmed, staticLayer, liveLayer, liveRuns, get dressing() { return dressingWasOn; }, holdLast, get holding() { return holding; }, get hasFrame() { return !!shownFrame; },
       // Receiver 77: how the rehearsal and the preload stand (tests and the bench's probe).
       get rehearsal() { return { draws: rehearsal.draws, wanted: rehearsal.wanted, own: rehearsal.own, startedAt: rehearsal.startedAt, askedAt: rehearsal.askedAt }; },
       // Receiver 111: how warm the stadium's drawing is, and whether this stadium came on cold.

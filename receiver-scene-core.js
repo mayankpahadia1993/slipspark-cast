@@ -136,20 +136,136 @@
     if (!parts.some(Boolean)) return null;
     return "g" + parts.map((part) => (part ? part.join(",") : "-")).join("|");
   }
-  // {helmet, pads, bat} as 0-1 numbers (null for the classic one).
+  // MARK: The Creator kit on the bowler's-end batter (Nov 25 2026, docs/creator-kit.md)
+  //
+  // gear-art.json's helmet-creator and bat-creator (career-rules.json `creatorKit`: never sold, granted for an approved
+  // creator clip, or worn for one recorded game). The phones send gear as numbers, never ids (receiver 81's wire, above),
+  // and the kit's numbers are its own: no other helmet or bat in gear-art.json has them (receiver-creator-kit.test.cjs). So
+  // the receiver knows the kit by them and wears, on its own bowler's-end frames, what gear-art.json gives small
+  // pictures: the `polish` (polished gold) without the blur, in place of the shell's and the finish's tint, and the
+  // helmet's `far` black stripes down the crown. The rim, visor and crest, the bat's edges and stripes, and its black
+  // sticker's crest and CREATOR are the batting end's: the phones draw those into their own dressed pictures and send
+  // them (`kit-…helmet-creator-head-…`, `stroke-blade-face-bat-creator-…`), as every Locker look is sent. A receiver
+  // before this one, or numbers that aren't exactly the kit's, wear the plain tints (a gold helmet, a gold bat with a
+  // black sticker), and anything else the gear carries is ignored as before. Nothing new goes over the channel.
+  const CREATOR_STOPS = [[0.25, [0.259, 0.149, 0.024]], [0.55, [0.525, 0.329, 0.063]], [0.8, [0.776, 0.541, 0.141]],
+    [1.0, [0.925, 0.706, 0.259]], [1.22, [0.98, 0.824, 0.439]], [1.5, [1.0, 0.902, 0.627]], [1.85, [1.0, 0.957, 0.824]]];
+  const CREATOR_INK = [0.063, 0.063, 0.071];
+  const CREATOR_KIT = {
+    // shell + shade in thousandths, as the phones send it; `polish` and `far` as gear-art.json has them.
+    helmet: {
+      id: "helmet-creator", value: [880, 640, 180, 300, 3200],
+      polish: { stops: CREATOR_STOPS, contrast: 1.8 },
+      far: { rows: 0.62, shade: [0.6, 1.4], minWidth: 1.0, lines: [
+        { at: 0.0, width: 0.16, colour: CREATOR_INK }, { at: -0.24, width: 0.04, colour: CREATOR_INK }, { at: 0.24, width: 0.04, colour: CREATOR_INK }] }
+    },
+    // sticker + finish + finish shade in thousandths; `polish` without the sheen and the edges' darkening, which need the
+    // batting end's blade line (trim.blade) the bowler's-end frames don't have.
+    bat: {
+      id: "bat-creator", value: [60, 60, 70, 860, 620, 160, -800, 2200],
+      polish: { stops: CREATOR_STOPS, contrast: 1.7, clamp: [0.8, 1.3], offset: -0.04 }
+    }
+  };
+  const CREATOR_VALUES = { helmet: CREATOR_KIT.helmet.value.join(","), bat: CREATOR_KIT.bat.value.join(",") };
+
+  // {helmet, pads, bat} as 0-1 numbers (null for the classic one). The Creator kit's parts also carry their `item`,
+  // `polish` and (the helmet) `far`.
   function gearColours(gear) {
-    const parts = String(gear || "").replace(/^g/, "").split("|")
-      .map((part) => (part === "-" || part === "" ? null : part.split(",").map((v) => Number(v) / 1000)));
+    const raw = String(gear || "").replace(/^g/, "").split("|");
+    const parts = raw.map((part) => (part === "-" || part === "" ? null : part.split(",").map((v) => Number(v) / 1000)));
     const [helmet, pads, bat] = [parts[0] || null, parts[1] || null, parts[2] || null];
+    const creatorHelmet = helmet && raw[0] === CREATOR_VALUES.helmet ? CREATOR_KIT.helmet : null;
+    const creatorBat = bat && raw[2] === CREATOR_VALUES.bat ? CREATOR_KIT.bat : null;
     return {
-      helmet: helmet && { shell: helmet.slice(0, 3), shade: helmet.slice(3, 5) },
+      helmet: helmet && Object.assign({ shell: helmet.slice(0, 3), shade: helmet.slice(3, 5) },
+        creatorHelmet ? { item: creatorHelmet.id, polish: creatorHelmet.polish, far: creatorHelmet.far } : null),
       pads,
-      bat: bat && { sticker: bat.slice(0, 3), finish: bat.slice(3, 6).some((v) => v !== 0) ? bat.slice(3, 6) : null, shade: bat.slice(6, 8) }
+      bat: bat && Object.assign({ sticker: bat.slice(0, 3), finish: bat.slice(3, 6).some((v) => v !== 0) ? bat.slice(3, 6) : null, shade: bat.slice(6, 8) },
+        creatorBat ? { item: creatorBat.id, polish: creatorBat.polish } : null)
     };
+  }
+  // Whether `gear` (a readGear string) wears any of the Creator kit (the compiled kernel has only the tints).
+  function wearsCreatorKit(gear) {
+    const worn = gearColours(gear);
+    return !!((worn.helmet && worn.helmet.polish) || (worn.bat && worn.bat.polish));
   }
   function tintPixel(rgb, colour, share, shade) {
     const light = shade[0] + shade[1] * (0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2]);
     for (let c = 0; c < 3; c += 1) rgb[c] = rgb[c] * (1 - share) + Math.max(0, Math.min(1, colour[c] * light)) * share;
+  }
+  // gear-art.json `polish` (scripts/creators/kit-art.py `ramp`): the pixel's light `k` (its luminance over the mean of its
+  // part's) clamped to `clamp` plus `offset` (a bat's), pushed by `contrast` about 1, clamped to the first and last stop
+  // and read off `stops`, linear between them, into `out` (0-1 sRGB).
+  function polishColour(polish, k, out) {
+    const stops = polish.stops;
+    let x = Number.isFinite(k) ? k : 1;
+    if (polish.clamp) x = Math.max(polish.clamp[0], Math.min(polish.clamp[1], x)) + (polish.offset || 0);
+    x = Math.max(stops[0][0], Math.min(stops[stops.length - 1][0], 1 + (x - 1) * polish.contrast));
+    let n = 1;
+    while (n < stops.length - 1 && x > stops[n][0]) n += 1;
+    const a = stops[n - 1], b = stops[n];
+    const u = b[0] > a[0] ? (x - a[0]) / (b[0] - a[0]) : 0;
+    for (let c = 0; c < 3; c += 1) out[c] = a[1][c] + (b[1][c] - a[1][c]) * u;
+    return out;
+  }
+  // The polish's luminance (kit-art.py's: Rec. 601) of the frame's own pixel at byte `i`, 0-1.
+  function polishLuminance(rgba, i) { return (0.299 * rgba[i] + 0.587 * rgba[i + 1] + 0.114 * rgba[i + 2]) / 255; }
+  // The mean polish luminance of a frame's helmet shell (red where blue is 0) or willow (blue): over its pixels whose share
+  // is above half, else over any of them; 1 when it has none.
+  function partLuminance(rgba, gearMask, willow) {
+    let sum = 0, count = 0, anySum = 0, anyCount = 0;
+    for (let i = 0; i < rgba.length; i += 4) {
+      if (!rgba[i + 3]) continue;
+      const share = willow ? gearMask[i + 2] : gearMask[i + 2] ? 0 : gearMask[i];
+      if (!share) continue;
+      const l = polishLuminance(rgba, i);
+      anySum += l; anyCount += 1;
+      if (share > 127) { sum += l; count += 1; }
+    }
+    return Math.max(1 / 255, count ? sum / count : anyCount ? anySum / anyCount : 1);
+  }
+  // A thin line's centre on one pixel's centre (iOS StadiumGearTrim.snapped, Android GearTrim): the pixel `centre` falls
+  // in; on a pixel edge, the side nearer the row above's, so the line runs straight down.
+  function snappedCentre(centre, previous) {
+    if (Math.abs(centre - Math.floor(centre)) < 1e-9 && previous != null) {
+      return Math.abs(centre - 0.5 - previous) <= Math.abs(centre + 0.5 - previous) ? centre - 0.5 : centre + 0.5;
+    }
+    return Math.floor(centre) + 0.5;
+  }
+  // gear-art.json's helmet `far` over a frame `width` wide (iOS StadiumGearTrim.farHelmetShares, Android GearTrim.Far):
+  // down the crown's middle row by row, each line `at` x the row's half width from its middle and `width` x the half
+  // width wide (at least `minWidth` pixels), over the top `rows` of the shell; one share (0-255) a pixel per line. Null
+  // without a usable width.
+  function farStripes(far, gearMask, width, length) {
+    if (!far || !isArray(far.lines) || !(width > 0) || width !== Math.floor(width) || length % (width * 4)) return null;
+    const height = length / 4 / width, n = width * height;
+    const shell = new Uint8Array(n);
+    for (let k = 0; k < n; k += 1) shell[k] = gearMask[k * 4 + 2] ? 0 : gearMask[k * 4];
+    const marks = far.lines.map(() => new Uint8Array(n));
+    let top = -1, bottom = -1;
+    for (let j = 0; j < height; j += 1) {
+      for (let i = 0; i < width; i += 1) if (shell[j * width + i] > 127) { if (top < 0) top = j; bottom = j; break; }
+    }
+    if (top < 0) return marks;
+    const limit = Math.floor(top + far.rows * (bottom - top));
+    const previous = far.lines.map(() => null);
+    for (let j = top; j <= limit; j += 1) {
+      let left = -1, last = -1;
+      for (let i = 0; i < width; i += 1) if (shell[j * width + i] > 127) { if (left < 0) left = i; last = i; }
+      if (left < 0) continue;
+      const right = last + 1, cx = (left + right) / 2, half = (right - left) / 2;
+      if (half < 2) continue;
+      far.lines.forEach((line, k) => {
+        const w = Math.max(far.minWidth == null ? 1 : far.minWidth, line.width * half) / 2;
+        let centre = cx + line.at * half;
+        if (w < 1) { centre = snappedCentre(centre, previous[k]); previous[k] = centre; }
+        for (let i = 0; i < width; i += 1) {
+          const s = shell[j * width + i];
+          if (s) marks[k][j * width + i] = Math.round(Math.max(0, Math.min(1, w + 0.5 - Math.abs(i + 0.5 - centre))) * s);
+        }
+      });
+    }
+    return marks;
   }
 
   function copyAtlasFrame(source, cut, target) {
@@ -165,11 +281,22 @@
   // `mask` (the same size: red fabric, green trim, blue grip) in `look`,
   // and wears `gear` through `gearMask` (receiver 81): the kit's cloth and
   // the pads in one dye, then the helmet's shell, the bat's finish and its
-  // sticker, then the grip, in the phones' order.
-  function dyeFrame(rgba, mask, look, gearMask, gear) {
+  // sticker, then the grip, in the phones' order. The Creator kit's helmet
+  // and bat are polished instead of tinted, and its helmet takes its `far`
+  // stripes when the frame's `width` is given (optional: without it, none).
+  function dyeFrame(rgba, mask, look, gearMask, gear, width) {
     const [fabric, trim, grip] = look ? lookColours(look) : [null, null, null];
     const worn = gear && gearMask ? gearColours(gear) : { helmet: null, pads: null, bat: null };
-    const rgb = [0, 0, 0], factor = [1, 1, 1];
+    const rgb = [0, 0, 0], factor = [1, 1, 1], polished = [0, 0, 0];
+    const helmetKit = worn.helmet && worn.helmet.polish ? worn.helmet : null;
+    const batKit = worn.bat && worn.bat.polish ? worn.bat : null;
+    const shellLight = helmetKit ? partLuminance(rgba, gearMask, false) : 1;
+    const willowLight = batKit ? partLuminance(rgba, gearMask, true) : 1;
+    const stripes = helmetKit ? farStripes(helmetKit.far, gearMask, width, rgba.length) : null;
+    const polish = (part, k, share) => {
+      polishColour(part.polish, k, polished);
+      for (let c = 0; c < 3; c += 1) rgb[c] = rgb[c] * (1 - share) + polished[c] * share;
+    };
     for (let i = 0; i < rgba.length; i += 4) {
       if (!rgba[i + 3]) continue;
       const f = fabric && mask ? mask[i] / 255 : 0, t = trim && mask ? mask[i + 1] / 255 : 0, g = grip && mask ? mask[i + 2] / 255 : 0;
@@ -189,8 +316,18 @@
       }
       if (h || w) {
         rgb[0] = r; rgb[1] = gr; rgb[2] = b;
-        if (h) tintPixel(rgb, worn.helmet.shell, h * GEAR_HELMET_OPACITY, worn.helmet.shade);
-        if (w && worn.bat.finish) tintPixel(rgb, worn.bat.finish, w * GEAR_FINISH_OPACITY, worn.bat.shade);
+        if (h) {
+          if (helmetKit) polish(helmetKit, polishLuminance(rgba, i) / shellLight, h * GEAR_HELMET_OPACITY);
+          else tintPixel(rgb, worn.helmet.shell, h * GEAR_HELMET_OPACITY, worn.helmet.shade);
+          if (stripes) {
+            for (let k = 0; k < stripes.length; k += 1) {
+              const m = stripes[k][i >> 2];
+              if (m) tintPixel(rgb, helmetKit.far.lines[k].colour, m / 255, helmetKit.far.shade);
+            }
+          }
+        }
+        if (w && batKit) polish(batKit, polishLuminance(rgba, i) / willowLight, w * GEAR_FINISH_OPACITY);
+        else if (w && worn.bat.finish) tintPixel(rgb, worn.bat.finish, w * GEAR_FINISH_OPACITY, worn.bat.shade);
         if (s) tintPixel(rgb, worn.bat.sticker, s * GEAR_STICKER.opacity, GEAR_STICKER.shade);
         r = rgb[0]; gr = rgb[1]; b = rgb[2];
       }
@@ -666,6 +803,111 @@
     return out;
   }
 
+  // MARK: The same commands, the same arrays (receiver 114, Nov 27 2026)
+  //
+  // qqxemq6y (the owner's AB iPhone game on staging 113, the Living Room TV's Ultra): the frame loop every 41-66 ms at
+  // pace 26, drawMs 12-16 in play, the page's own script 430-510 ms a second. Each frame and live batter arrives as new
+  // arrays though most of its commands are the frame before's again (the stadium, the pitch's marks, the standing
+  // fielders; the batter's legs, pelvis, torso and head), and the receiver wrote each one out as text again (opKey),
+  // worked out its shape (opShape) and its bounds again, every frame. Now a command equal to its partner in the frame
+  // before is that very array: what is worked out from a command once (keyed by the array) is worked out once. Partners
+  // are found by place, allowing for up to two commands inserted or removed at a time (`shift`), so commands that changed in
+  // place (a fielder moving) keep the rest in step. Commands are never written to once received, so sharing is safe.
+  function sameValue(a, b) {
+    if (a === b) return true;
+    if (!isArray(a) || !isArray(b) || a.length !== b.length) return false;
+    for (let index = 0; index < a.length; index += 1) {
+      const x = a[index], y = b[index];
+      if (x === y) continue;
+      if (!isArray(x) || !isArray(y) || !sameValue(x, y)) return false;
+    }
+    return true;
+  }
+  // `ops`' commands equal to their partners in `before` replaced by those (in place); how many were.
+  const SHARE_REACH = [1, -1, 2, -2];
+  function shareOps(ops, before) {
+    if (!before || !before.length || !ops.length) return 0;
+    let shift = 0, shared = 0;
+    for (let index = 0; index < ops.length; index += 1) {
+      const at = index + shift, op = ops[index];
+      if (at >= 0 && at < before.length && sameValue(op, before[at])) { ops[index] = before[at]; shared += 1; continue; }
+      // Up to two removed here (a fielder's shadow and picture together), or inserted.
+      for (const step of SHARE_REACH) {
+        const near = at + step;
+        if (near >= 0 && near < before.length && sameValue(op, before[near])) { ops[index] = before[near]; shift += step; shared += 1; break; }
+      }
+    }
+    return shared;
+  }
+  const opsShared = { shared: 0, total: 0 };
+
+  // MARK: Commands sent as references (receiver 115, Nov 27 2026)
+  //
+  // The iPhone's redraw sets ("fs", 22-55 KB, up to 9 a second in qqxemq6y) were the 20-40 ms message tasks behind most
+  // of the Living Room Ultra's 100 ms frames (receiver 114 traced): the Cast framework parses every byte twice, and most
+  // of a frame's commands are the frame before's again. With `ready.refs`, a phone may send a frame (`f`, or each frame
+  // of an `fs`) with `r`, the stamp of a frame it sent before, and in its `o` a whole number k for "command k of that
+  // frame" (its `o` as sent, before the inset is drawn out); its hello says `refs: 1`. The receiver keeps each frame's
+  // commands by stamp (`createRefBook`, the last REF_FRAMES, only for such a phone) and puts the very arrays back (so receiver 114's shared commands see them as
+  // the same at once); a frame whose `r` it no longer holds, or a number that names no command, isn't drawn and the
+  // phone is told (`{t: "refs", miss}`) to send its next frame whole. A frame without `r` is as before: old phones
+  // never send one, and a phone sends whole frames to a receiver that doesn't say `refs` (114 and older).
+  // Nov 27 2026 (the plain stream ran worse on 115 than on 114 in one A/B): 16, not 48 (a phone refers to the frame it
+  // sent last, a redraw set's frames to the one before them); and only for a phone whose hello says `refs: 1`, so an old
+  // phone's frames cost the receiver nothing more than on 114 (receiver-scene.js `helloRefs`).
+  const REF_FRAMES = 16;
+  function createRefBook(limit) {
+    const kept = new Map();
+    const most = limit || REF_FRAMES;
+    function remember(raw) {
+      const stamp = Number(raw.s);
+      if (!Number.isFinite(stamp) || !isArray(raw.o)) return;
+      kept.delete(stamp);
+      kept.set(stamp, raw.o);
+      if (kept.size > most) kept.delete(kept.keys().next().value);
+    }
+    return {
+      get size() { return kept.size; },
+      // `raw` with its references put back (in place), kept as a base for later frames; null when one can't be.
+      resolve(raw) {
+        if (!raw || typeof raw !== "object" || !isArray(raw.o)) return raw;
+        if (raw.r == null) { remember(raw); return raw; }
+        const base = kept.get(Number(raw.r));
+        if (!base) return null;
+        const ops = raw.o;
+        for (let index = 0; index < ops.length; index += 1) {
+          const entry = ops[index];
+          if (typeof entry !== "number") continue;
+          const op = Number.isInteger(entry) && entry >= 0 ? base[entry] : undefined;
+          if (!isArray(op)) return null;
+          ops[index] = op;
+        }
+        remember(raw);
+        return raw;
+      },
+      clear() { kept.clear(); }
+    };
+  }
+  // The phones' rule (iOS CastFrameRefs, Android core CastFrameRefs), for the benches and tests: each command equal to
+  // its partner in `base` (by place, up to two inserted or removed at a time, as shareOps) as that partner's index.
+  // `same` compares two commands (their text, as a phone has them).
+  function encodeRefs(ops, base, same) {
+    const equal = same || ((a, b) => JSON.stringify(a) === JSON.stringify(b));
+    const out = new Array(ops.length);
+    let shift = 0, refs = 0;
+    for (let index = 0; index < ops.length; index += 1) {
+      const at = index + shift, op = ops[index];
+      out[index] = op;
+      if (!base) continue;
+      if (at >= 0 && at < base.length && equal(op, base[at])) { out[index] = at; refs += 1; continue; }
+      for (const step of SHARE_REACH) {
+        const near = at + step;
+        if (near >= 0 && near < base.length && equal(op, base[near])) { out[index] = near; shift += step; refs += 1; break; }
+      }
+    }
+    return { o: out, refs };
+  }
+
   // The frames on their way to the screen, by moment. A redraw (a newer
   // epoch) replaces everything from its first moment on, and frames of an
   // older epoch still arriving are dropped.
@@ -682,6 +924,14 @@
     let scratchShape = null;
     // The HUD changes waiting for their moment, oldest first.
     let huds = [];
+    // Receiver 114: the frame that came last, whose commands the next one shares where they are the same.
+    let last = null;
+    const sharing = !(options && options.share === false);
+    function share(frame, before) {
+      if (!sharing || !before) return;
+      opsShared.shared += shareOps(frame.o, before.o);
+      opsShared.total += frame.o.length;
+    }
 
     function insert(frame) {
       let index = frames.length;
@@ -712,6 +962,9 @@
         const e = Number(frameEpoch) || 0;
         if (e < epoch) return null;
         epoch = e;
+        // Receiver 114: its commands the same as the frame before's are those arrays.
+        share(frame, last);
+        last = frame;
         insert(frame);
         return frame;
       },
@@ -723,6 +976,8 @@
         epoch = e;
         const incoming = rawFrames.map((raw) => normalize(raw)).filter(Boolean).sort((x, y) => x.s - y.s);
         if (!incoming.length) return [];
+        // Receiver 114: each frame's commands shared with the one before it (the first with the last frame that came).
+        incoming.forEach((frame) => { share(frame, last); last = frame; });
         const from = incoming[0].s;
         frames = frames.filter((frame) => frame.s < from);
         huds = huds.filter((entry) => entry.s < from);
@@ -751,6 +1006,9 @@
             if (u <= 0) return { frame: a, stamp: a.s, blended: false };
             if (scratchShape !== shapeKey(a)) { scratch = cloneFrame(a); scratch.scratch = true; scratchShape = shapeKey(a); }
             const frame = same ? blendFramesInto(scratch, a, b, u) : blendMatchedInto(scratch, a, b, match, u);
+            // Receiver 112: the frames it is blended from, and which of b's commands each of its own is blended toward
+            // (null: the same place), so a command the same in both can be known without reading the scratch's numbers.
+            scratch.__from = a; scratch.__to = b; scratch.__pairs = same ? null : match.pairs;
             return { frame, stamp: a.s, blended: true, partly: !same };
           }
         }
@@ -764,10 +1022,10 @@
         return latest;
       },
 
-      clear() { frames = []; huds = []; },
+      clear() { frames = []; huds = []; last = null; },
 
       // A new phone (or the same one, started again) counts epochs afresh.
-      reset() { frames = []; huds = []; epoch = 0; }
+      reset() { frames = []; huds = []; epoch = 0; last = null; }
     };
   }
 
@@ -785,6 +1043,8 @@
         if (!frame) return null;
         if (current && frame.s < current.s) return null;
         frame.h = null;
+        // Receiver 114: his commands the same as the live batter before's are those arrays.
+        if (current) { opsShared.shared += shareOps(frame.o, current.o); opsShared.total += frame.o.length; }
         current = frame;
         return frame;
       },
@@ -1320,6 +1580,7 @@
     blendFrames, blendFramesInto, cloneFrame, createTimeline, createClock,
     percentile, debugLine, tracePath, cssColor, pictureSize, canvasPlan, canvasWidth, createRateWatch, STEADY, createSteadyWatch, createLiveLayer, hasLiveSlot, poseAge, poseAhead,
     filterParts, opBounds, layerEnd, clipsWholeStage, mergeRects, overStrip, readLook, lookColours, dyeFrame, copyAtlasFrame, GRIP_OPACITY, GRIP_SHADE,
-    readGear, gearColours, GEAR_HELMET_OPACITY, GEAR_FINISH_OPACITY, GEAR_STICKER, WARM_REPORT_MS, warmReport
+    readGear, gearColours, GEAR_HELMET_OPACITY, GEAR_FINISH_OPACITY, GEAR_STICKER, WARM_REPORT_MS, warmReport,
+    CREATOR_KIT, wearsCreatorKit, polishColour, farStripes, sameValue, shareOps, opsShared, createRefBook, encodeRefs, REF_FRAMES
   };
 });
